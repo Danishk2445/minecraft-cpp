@@ -153,6 +153,38 @@ bool bakeFace(const ElementDef& el, Direction dir, const FaceDef& face, const Sp
     if (!(len > 1e-6f)) return false; // zero-area face (e.g. a plane's edge)
     out.face = nearestDirection(n / len);
 
+    // Vanilla recalculateWinding: unrotated elements get their corners re-ordered into
+    // the canonical order of the final facing (smooth lighting relies on it), each
+    // keeping the UV of the original corner at that position.
+    if (!el.hasRotation) {
+        glm::vec3 bmin(1e9f), bmax(-1e9f);
+        for (const auto& p : out.pos) {
+            bmin = glm::min(bmin, p);
+            bmax = glm::max(bmax, p);
+        }
+        const auto& canon = kCorners[size_t(out.face)];
+        std::array<glm::vec3, 4> pos;
+        std::array<glm::vec2, 4> uv;
+        bool complete = true;
+        for (int j = 0; j < 4; ++j) {
+            const glm::vec3 want(canon[size_t(j)].x ? bmax.x : bmin.x, canon[size_t(j)].y ? bmax.y : bmin.y,
+                                 canon[size_t(j)].z ? bmax.z : bmin.z);
+            int match = -1;
+            for (int k = 0; k < 4; ++k)
+                if (glm::all(glm::lessThan(glm::abs(out.pos[size_t(k)] - want), glm::vec3(1e-3f)))) match = k;
+            if (match < 0) {
+                complete = false;
+                break;
+            }
+            pos[size_t(j)] = want;
+            uv[size_t(j)] = out.uv[size_t(match)];
+        }
+        if (complete) {
+            out.pos = pos;
+            out.uv = uv;
+        }
+    }
+
     for (auto& p : out.pos) p /= 16.0f;
     out.cull = face.cull < 0 ? int8_t(-1) : int8_t(nearestDirection(rot * glm::vec3(normal(Direction(face.cull)))));
     // Flush: every corner sits on the block boundary the quad faces.

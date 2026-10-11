@@ -13,6 +13,9 @@
 #include "render/ClientAssets.h"
 #include "render/Gallery.h"
 #include "render/WorldRenderer.h"
+#include "ui/Font.h"
+#include "ui/GuiBatch.h"
+#include "world/light/LightEngine.h"
 #include "world/block/BlockRegistry.h"
 #include "world/gen/ChunkGenerator.h"
 #include "world/level/Level.h"
@@ -60,6 +63,11 @@ bool Game::init() {
         return true;
     }
 
+    gui_ = std::make_unique<GuiBatch>();
+    font_ = std::make_unique<Font>();
+    if (!gui_->init() || !font_->load(assets_->pack())) return false;
+    showDebug_ = opts_.debugOverlay;
+
     if (opts_.gallery) {
         gallery_ = std::make_unique<Gallery>();
         if (!gallery_->init(*assets_)) return false;
@@ -82,8 +90,12 @@ bool Game::initWorld() {
     if (opts_.worldType == "flat") generator = std::make_shared<FlatGenerator>(*registry_);
     else generator = std::make_shared<DebugGenerator>(*registry_);
     level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);
+    level_->chunks().setLightEngine(std::make_shared<LightEngine>(*registry_));
+    if (opts_.time) level_->setDayTime(*opts_.time);
+    level_->daylightCycle = !opts_.freezeTime;
     worldRenderer_ = std::make_unique<WorldRenderer>(*assets_, *registry_);
     if (!worldRenderer_->init()) return false;
+    worldRenderer_->mesherOptions().smoothLighting = opts_.smoothLighting;
 
     camera_.position = opts_.pos.value_or(generator->spawnPoint() + glm::dvec3(0.0, 1.62, 0.0));
     const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
@@ -98,6 +110,8 @@ void Game::shutdown() {
     // Order matters: jobs reference the registry and assets until the pool is joined.
     worldRenderer_.reset();
     level_.reset();
+    font_.reset();
+    gui_.reset();
     gallery_.reset();
     jobs_.reset();
     registry_.reset();
@@ -149,6 +163,7 @@ void Game::handleGlobalKeys() {
     const Input& in = window_.input();
     if (in.keyPressed(GLFW_KEY_F11)) window_.toggleFullscreen();
     if (in.keyPressed(GLFW_KEY_F2)) screenshotRequested_ = true;
+    if (in.keyPressed(GLFW_KEY_F3)) showDebug_ = !showDebug_;
     if (in.keyPressed(GLFW_KEY_ESCAPE)) {
         if (window_.cursorCaptured()) window_.setCursorCaptured(false);
         else window_.setShouldClose(true);
@@ -217,17 +232,61 @@ void Game::tick() {
     ++tickCount_;
     assets_->tick();
     if (level_) level_->tick();
+    if (worldRenderer_) worldRenderer_->tick();
 }
 
 void Game::render(float partialTick) {
     const glm::ivec2 fb = window_.framebufferSize();
-    glViewport(0, 0, fb.x, fb.y);
-    // Vanilla's daytime sky blue (#78A7FF).
-    glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    if (gallery_) gallery_->render(camera_, fb);
-    if (worldRenderer_) worldRenderer_->render(camera_, fb, opts_.renderDistance);
-    (void)partialTick;
+    if (worldRenderer_) {
+        worldRenderer_->render(camera_, fb, opts_.renderDistance, *level_, partialTick);
+    } else {
+        glViewport(0, 0, fb.x, fb.y);
+        glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f); // vanilla daytime sky blue
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        if (gallery_) gallery_->render(camera_, fb);
+    }
+    if (showDebug_) renderDebugOverlay(fb);
+}
+
+void Game::renderDebugOverlay(glm::ivec2 fb) {
+    std::vector<std::string> lines;
+    lines.push_back("Minecraft 1.21.8 (minecraft-cpp)");
+    const glm::dvec3& p = camera_.position;
+    if (level_) {
+        const auto& r = worldRenderer_->chunkRenderer().stats();
+        lines.push_back(std::format("{:.0f} fps  C: {}/{} sections, {} draws", fps_, r.drawn, r.sections, r.draws));
+        const auto st = level_->chunks().stats();
+        lines.push_back(std::format("Chunks: {} loaded, {} lit, {} ready, {} jobs", st.entries, st.lit, st.meshReady,
+                                    st.inFlight));
+        lines.push_back("");
+        lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));
+        const BlockPos b = BlockPos::containing(p);
+        lines.push_back(std::format("Block: {} {} {} [{} {} {}]", b.x, b.y, b.z, b.x & 15, b.y & 15, b.z & 15));
+        lines.push_back(std::format("Chunk: {} {} {} in {} {} {}", b.x & 15, b.y & 15, b.z & 15, b.x >> 4, b.y >> 4, b.z >> 4));
+        static const char* names[4] = {"south (Towards positive Z)", "west (Towards negative X)",
+                                       "north (Towards negative Z)", "east (Towards positive X)"};
+        const int facing = int(std::floor(std::fmod(std::fmod(camera_.yaw, 360.0f) + 360.0f + 45.0f, 360.0f) / 90.0f)) & 3;
+        lines.push_back(std::format("Facing: {} ({:.1f} / {:.1f})", names[facing], std::remainder(camera_.yaw, 360.0f),
+                                    camera_.pitch));
+        if (const Chunk* c = level_->chunks().chunk(ChunkPos::of(b))) {
+            const uint8_t l = c->lightAt(b.x & 15, b.y, b.z & 15);
+            lines.push_back(std::format("Client Light: {} ({} sky, {} block)", std::max(l >> 4, l & 15), l >> 4, l & 15));
+        }
+        const auto& env = worldRenderer_->environment();
+        lines.push_back(std::format("Day {} Time {} (celestial {:.3f}, sky darken {:.2f})",
+                                    level_->dayTime() / 24000, level_->dayTime() % 24000, env.timeOfDay, env.skyDarken));
+    } else {
+        lines.push_back(std::format("{:.0f} fps", fps_));
+        lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));
+    }
+    gui_->begin(fb, autoGuiScale(fb));
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (lines[i].empty()) continue;
+        const float y = 2.0f + 9.0f * float(i);
+        gui_->fill(1, y - 1, 2.0f + float(font_->width(lines[i])) + 1.0f, y + 8, 0x90505050);
+        font_->draw(*gui_, lines[i], 2, y, 0xFFE0E0E0, false);
+    }
+    gui_->end();
 }
 
 void Game::afterFrame() {
@@ -252,6 +311,7 @@ void Game::updateTitle() {
     ++framesSinceTitle_;
     if (titleTimer_.seconds() < 1.0) return;
     const double fps = framesSinceTitle_ / titleTimer_.seconds();
+    fps_ = fps;
     framesSinceTitle_ = 0;
     titleTimer_.reset();
     std::string title = std::format("Minecraft  |  {:.0f} fps", fps);

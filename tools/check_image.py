@@ -37,8 +37,13 @@ def main() -> int:
     ap.add_argument("--tol", type=float, default=8.0, help="per-channel tolerance")
     ap.add_argument("--min-colors", type=int, help="minimum distinct colors (detects blank frames)")
     ap.add_argument("--max-colors", type=int)
+    ap.add_argument("--luma-vs", help="another image: compare mean luma over --region (ratio this/other)")
+    ap.add_argument("--min-ratio", type=float, default=1.0)
     ap.add_argument("--min-luma", type=float)
     ap.add_argument("--max-luma", type=float)
+    ap.add_argument("--count-rgb", type=lambda s: parse_ints(s, 3),
+                    help="count pixels within --tol of this color inside --region")
+    ap.add_argument("--min-count", type=int, default=1)
     args = ap.parse_args()
 
     img = np.asarray(Image.open(args.image).convert("RGB")).astype(np.int32)
@@ -87,6 +92,25 @@ def main() -> int:
             failures.append(f"mean luma {luma:.1f} < {args.min_luma}")
         if args.max_luma is not None and luma > args.max_luma:
             failures.append(f"mean luma {luma:.1f} > {args.max_luma}")
+
+    if args.count_rgb:
+        near = (np.abs(region - np.array(args.count_rgb)) <= args.tol).all(axis=2)
+        n = int(near.sum())
+        if n < args.min_count:
+            failures.append(f"{n} pixels near {args.count_rgb}, expected at least {args.min_count}")
+
+    if args.luma_vs:
+        other = np.asarray(Image.open(args.luma_vs).convert("RGB")).astype(np.int32)
+        if args.region:
+            x0, y0, x1, y1 = args.region
+            other = other[y0:y1, x0:x1]
+        luma = lambda a: float((a[..., 0] * 0.299 + a[..., 1] * 0.587 + a[..., 2] * 0.114).mean())
+        a, b = luma(region), luma(other)
+        ratio = a / max(b, 1e-6)
+        if ratio < args.min_ratio:
+            failures.append(f"luma ratio {a:.1f}/{b:.1f} = {ratio:.2f} < {args.min_ratio}")
+        else:
+            print(f"luma ratio {a:.1f}/{b:.1f} = {ratio:.2f}")
 
     for f in failures:
         print(f"{args.image}: {f}")

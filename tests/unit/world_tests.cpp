@@ -41,10 +41,9 @@ struct WorldFixture : ::testing::Test {
         JobSystem jobs(threads);
         ChunkManager cm(*registry, gen, jobs);
         cm.setView(center, rd);
-        for (int i = 0; i < 100000 && !cm.viewReady(); ++i) {
+        for (int i = 0; i < 1000 && !cm.viewReady(); ++i) {
             cm.update();
-            jobs.drainMain();
-            if (threads > 0) std::this_thread::yield();
+            jobs.waitIdle();
         }
         EXPECT_TRUE(cm.viewReady());
         uint64_t h = 1469598103934665603ull;
@@ -87,9 +86,9 @@ TEST_F(WorldFixture, FlatWorldLayers) {
     JobSystem jobs(4);
     ChunkManager cm(*registry, std::make_shared<FlatGenerator>(*registry), jobs);
     cm.setView({0, 0}, 2);
-    for (int i = 0; i < 100000 && !cm.viewReady(); ++i) {
+    for (int i = 0; i < 1000 && !cm.viewReady(); ++i) {
         cm.update();
-        jobs.drainMain();
+        jobs.waitIdle();
     }
     ASSERT_TRUE(cm.viewReady());
     EXPECT_EQ(cm.getBlock({5, -64, 7}), S("bedrock"));

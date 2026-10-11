@@ -47,6 +47,12 @@ The game opens a world straight away; title screens come in M9. Choose the world
 
 `--exec "/setblock 0 -60 0 stone"` runs commands once the spawn area is loaded. Available commands: `/tp`, `/setblock`, `/fill`, `/time`.
 
+More options:
+- `--time T` (0 = sunrise, 6000 = noon, 18000 = midnight)
+- `--freeze-time`
+- `--debug-overlay` (F3)
+- `--smooth-lighting off`
+
 Controls (free camera for now):
 - Click: capture the mouse
 - Mouse: look
@@ -55,6 +61,7 @@ Controls (free camera for now):
 - Ctrl: fast
 - Esc: release the mouse, or quit
 - F2: screenshot
+- F3: debug screen
 - F11: fullscreen
 
 `--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. The GL tests use it.

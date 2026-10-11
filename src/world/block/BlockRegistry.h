@@ -55,6 +55,7 @@ enum StateFlag : uint16_t {
     kCodeRendered = 1 << 4, // drawn by code (fluids, block entities) instead of model quads
     kReplaceable = 1 << 5,  // placement and world generation may overwrite it (grass, water, snow layer)
     kSkipSame = 1 << 6,     // faces touching the same block are hidden (glass, ice, panes)
+    kAoShade = 1 << 7,      // full-cube shape that darkens neighbors' ambient occlusion (not glass)
 };
 
 struct StateInfo {

@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include "render/ClientAssets.h"
+#include "world/level/Level.h"
+#include "gfx/GL.h"
 
 namespace mc {
 
@@ -13,7 +15,14 @@ WorldRenderer::WorldRenderer(const ClientAssets& assets, const BlockRegistry& re
 
 WorldRenderer::~WorldRenderer() = default;
 
-bool WorldRenderer::init() { return chunks_.init(); }
+bool WorldRenderer::init() {
+    if (!chunks_.init()) return false;
+    if (!sky_.init(assets_.pack())) return false;
+    lightmap_.init();
+    return true;
+}
+
+void WorldRenderer::tick() { flicker_.tick(); }
 
 void WorldRenderer::update(ChunkManager& chunkManager, JobSystem& jobs) {
     for (const ChunkPos& p : chunkManager.takeDropped()) {
@@ -50,10 +59,30 @@ void WorldRenderer::update(ChunkManager& chunkManager, JobSystem& jobs) {
     }
 }
 
-void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int renderDistance) {
+void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level,
+                           float partialTick) {
     const float aspect = float(viewport.x) / float(std::max(viewport.y, 1));
+    EnvironmentInputs in;
+    in.dayTime = level.dayTime();
+    in.partialTick = partialTick;
+    in.lookDir = camera.forward();
+    in.renderDistance = renderDistance;
+    env_ = computeEnvironment(in);
+    lightmap_.update(env_, gamma, flicker_.value());
+
+    glViewport(0, 0, viewport.x, viewport.y);
+    glClearColor(env_.fogColor.r, env_.fogColor.g, env_.fogColor.b, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    sky_.renderSky(camera, aspect, env_);
+
     const glm::mat4 viewProj = camera.projection(aspect) * camera.view();
-    chunks_.render(camera, viewProj, assets_.blockAtlasTexture(), renderDistance);
+    ChunkRenderer::Fog fog;
+    fog.color = glm::vec4(env_.fogColor, 1.0f);
+    fog.distances = glm::vec4(env_.fogEnvStart, env_.fogEnvEnd, env_.fogRdStart, env_.fogRdEnd);
+    lightmap_.bind(1);
+    chunks_.renderOpaque(camera, viewProj, assets_.blockAtlasTexture(), renderDistance, fog);
+    chunks_.renderTranslucent(camera, viewProj, assets_.blockAtlasTexture(), fog);
+    sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick);
 }
 
 } // namespace mc

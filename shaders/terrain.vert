@@ -9,12 +9,17 @@ uniform mat4 uViewProj;
 
 out vec2 vUV;
 out vec3 vColor;
-out vec2 vLight; // block, sky in 0..1
+out vec2 vLightUV;
+out float vSpherical;
+out float vCylindrical;
 
 void main() {
     vec3 pos = aOrigin + vec3(aPos) * (1.0 / 2048.0) - 8.0;
     gl_Position = uViewProj * vec4(pos, 1.0);
     vUV = aUV;
     vColor = vec3(aColor.rgb) / 255.0;
-    vLight = vec2(aLight) / 240.0;
+    // Texel centers of the 16x16 lightmap: exact at integer levels, smooth between.
+    vLightUV = (vec2(aLight) / 16.0 + 0.5) / 16.0;
+    vSpherical = length(pos);
+    vCylindrical = max(length(pos.xz), abs(pos.y));
 }

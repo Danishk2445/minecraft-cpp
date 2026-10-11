@@ -25,6 +25,8 @@ namespace mc {
 
 enum class ChunkStage : uint8_t { Empty, Terrain, Decorated, Final, Lit };
 
+class LightEngine;
+
 class ChunkManager {
 public:
     // Computes the light of the center chunk from the final 3x3 neighborhood,
@@ -41,6 +43,9 @@ public:
     ChunkManager& operator=(const ChunkManager&) = delete;
 
     void setLightFunction(LightFn fn) { lightFn_ = std::move(fn); }
+    // Uses `engine` for the LIGHT stage and for incremental updates after edits.
+    void setLightEngine(std::shared_ptr<const LightEngine> engine);
+    const LightEngine* lightEngine() const { return lightEngine_.get(); }
 
     // Chunks within `renderDistance` of `center` become mesh-ready; the pyramid
     // around them is generated as well. Entries beyond renderDistance + 5 unload.
@@ -115,6 +120,8 @@ private:
     std::shared_ptr<const ChunkGenerator> generator_;
     JobSystem& jobs_;
     LightFn lightFn_;
+    std::shared_ptr<const LightEngine> lightEngine_;
+    std::vector<BlockPos> lightChanged_;
     std::shared_ptr<int> alive_ = std::make_shared<int>(0);
 
     std::unordered_map<ChunkPos, std::unique_ptr<Entry>> entries_;

@@ -202,6 +202,23 @@ TEST(Baking, FaceRotatesWithBlockstate) {
     for (const auto& p : q.pos) EXPECT_NEAR(p.x, 1.0f, 1e-5f);
 }
 
+TEST(Baking, RotatedFacesUseCanonicalWinding) {
+    // A north face rotated to east must list its corners in the vanilla EAST order:
+    // (X1,Y1,Z1) (X1,Y0,Z1) (X1,Y0,Z0) (X1,Y1,Z0).
+    ElementDef cube;
+    FaceDef f;
+    BakedQuad q;
+    ASSERT_TRUE(bakeFace(cube, Direction::North, f, pixelSprite(), blockStateRotation(0, 90), false, q));
+    ASSERT_EQ(q.face, Direction::East);
+    const glm::vec3 want[4] = {{1, 1, 1}, {1, 0, 1}, {1, 0, 0}, {1, 1, 0}};
+    for (int i = 0; i < 4; ++i) {
+        EXPECT_NEAR(glm::distance(q.pos[size_t(i)], want[i]), 0.0f, 1e-5f) << i;
+    }
+    // The original north vertex 0 (X1,Y1,Z0) lands on (X1,Y1,Z1) after y90 and keeps uv (0,0).
+    EXPECT_NEAR(q.uv[0].x, 0.016f, 0.02f);
+    EXPECT_NEAR(q.uv[0].y, 0.016f, 0.02f);
+}
+
 TEST(Baking, UvlockKeepsStairStepWorldAligned) {
     // The upper step of block/stairs: its top face, rotated y=90 with uvlock.
     ElementDef step;

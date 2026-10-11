@@ -39,6 +39,10 @@ struct CliOptions {
     std::vector<std::string> exec; // commands run once the spawn area is ready
     bool waitChunks = false;       // harness: also wait until every visible chunk is meshed
     bool gallery = false;          // show the M1 block gallery instead of a world
+    std::optional<long long> time; // --time: initial time of day (ticks)
+    bool freezeTime = false;       // stop the daylight cycle (deterministic screenshots)
+    bool debugOverlay = false;     // show the F3 screen from the start
+    bool smoothLighting = true;
 
     // Camera / world placement
     std::optional<glm::dvec3> pos;  // --pos X,Y,Z

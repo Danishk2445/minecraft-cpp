@@ -14,6 +14,8 @@ namespace mc {
 
 class BlockRegistry;
 class ClientAssets;
+class Font;
+class GuiBatch;
 class Gallery;
 class Level;
 class WorldRenderer;
@@ -40,6 +42,7 @@ private:
     void afterFrame(); // harness: screenshot / exit when the run conditions are met
     void runCommand(const std::string& line);
     void updateTitle();
+    void renderDebugOverlay(glm::ivec2 fb);
 
     CliOptions opts_;
     Window window_;
@@ -49,6 +52,10 @@ private:
     std::unique_ptr<Gallery> gallery_;
     std::unique_ptr<Level> level_;
     std::unique_ptr<WorldRenderer> worldRenderer_;
+    std::unique_ptr<GuiBatch> gui_;
+    std::unique_ptr<Font> font_;
+    bool showDebug_ = false;
+    double fps_ = 0.0;
     Commands commands_;
     Camera camera_;
 

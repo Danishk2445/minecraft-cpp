@@ -3,6 +3,7 @@
 
   {"match": ["*_leaves", "grass_block", "mangrove_roots"], "layer": "cutout_mipped"},
 
+  {"match": ["glass", "*_stained_glass", "tinted_glass", "barrier"], "ao_shade": false},
   {"match": ["glass", "*_stained_glass", "tinted_glass", "ice", "frosted_ice", "slime_block", "honey_block",
              "*glass_pane", "iron_bars"], "skip_same": true},
   {"match": ["air", "cave_air", "void_air", "water", "lava", "short_grass", "tall_grass", "fern", "large_fern",

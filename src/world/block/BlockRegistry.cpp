@@ -541,6 +541,7 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         const Json* opacityJ = firstField(propRules, name, "opacity");
         const Json* skipSameJ = firstField(propRules, name, "skip_same");
         const Json* replaceableJ = firstField(propRules, name, "replaceable");
+        const Json* aoShadeJ = firstField(propRules, name, "ao_shade");
         const bool liquid = b.className == "liquid";
         const bool waterPlant = b.className == "water_plant" || b.className == "tall_water_plant" ||
                                 name == "bubble_column";
@@ -559,6 +560,7 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
             // Geometry-derived data from the first option of each choice.
             bool anyQuad = false, translucent = false, transparent = false;
             std::array<uint16_t, 6> coverage{};
+            std::array<uint16_t, 6> shape{}; // coverage by any flush quad, transparent or not
             for (const BakedChoice* c : mine) {
                 for (const BakedQuad& q : c->models[0]->quads) {
                     anyQuad = true;
@@ -568,6 +570,7 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
                     // Only fully opaque texels occlude (glass and leaves never cull neighbors).
                     if (q.flush && !sprite.translucent && !sprite.transparent)
                         coverage[size_t(q.face)] |= faceCellMask(q.face, q.pos, false);
+                    if (q.flush) shape[size_t(q.face)] |= faceCellMask(q.face, q.pos, false);
                 }
             }
             si.coverage = coverage;
@@ -593,6 +596,12 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
             }
             si.layer = layer;
             if (skipSameJ && skipSameJ->is_boolean() && skipSameJ->get<bool>()) si.flags |= kSkipSame;
+            {
+                bool fullShape = anyQuad;
+                for (uint16_t c : shape) fullShape &= c == 0xFFFF;
+                if (aoShadeJ && aoShadeJ->is_boolean()) fullShape = aoShadeJ->get<bool>();
+                if (fullShape) si.flags |= kAoShade;
+            }
             if (replaceableJ) {
                 const bool rep = replaceableJ->is_boolean() ? replaceableJ->get<bool>()
                                                             : Expr(replaceableJ->get<std::string>(), get).eval() != 0;

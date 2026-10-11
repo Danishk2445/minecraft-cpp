@@ -110,7 +110,7 @@ if(XVFB_RUN AND Python3_FOUND)
         add_test(NAME ${name}
             COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/${script} ${ARGN}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-        set_tests_properties(${name} PROPERTIES LABELS gl DEPENDS ${depends})
+        set_tests_properties(${name} PROPERTIES LABELS gl DEPENDS "${depends}")
     endfunction()
 
     # M1: every block state renders (no missing textures, nothing unexpectedly empty)
@@ -129,15 +129,23 @@ if(XVFB_RUN AND Python3_FOUND)
         --wait-chunks --screenshot ${MC_TEST_RUN}/debug_world.png --exit)
     mc_py_test(gl_debug_world_check gl_debug_world check_image.py ${MC_TEST_RUN}/debug_world.png
         --size 1280x720 --no-magenta --min-colors 1000)
-    # M2: --exec edits on a flat world (stone wall, glass, slab, stairs).
-    mc_gl_test(gl_flat_world --world-type flat --render-distance 8 --size 1280x720 --pos 0,-55,-12 --look 0,20
+    # M2/M3: --exec edits on a flat world (stone wall, glass, slab), lit at noon and midnight.
+    set(MC_FLAT_SCENE --world-type flat --render-distance 8 --size 1280x720 --pos 0,-55,-12 --look 0,20
         --exec "/fill -3 -60 0 3 -55 6 stone" --exec "/fill -2 -59 1 2 -56 5 air"
-        --exec "/setblock 0 -60 -3 glass" --exec "/setblock 2 -60 -3 oak_slab"
-        --wait-chunks --screenshot ${MC_TEST_RUN}/flat_world.png --exit)
-    mc_py_test(gl_flat_world_wall gl_flat_world check_image.py ${MC_TEST_RUN}/flat_world.png
-        --no-magenta --region 500,150,740,350 --mean-rgb 101,101,101 --tol 6)
-    mc_py_test(gl_flat_world_grass gl_flat_world check_image.py ${MC_TEST_RUN}/flat_world.png
-        --region 100,550,400,700 --mean-rgb 84,110,52 --tol 8)
+        --exec "/setblock 0 -60 -3 glass" --exec "/setblock 2 -60 -3 oak_slab" --wait-chunks --freeze-time)
+    mc_gl_test(gl_flat_noon ${MC_FLAT_SCENE} --time 6000 --screenshot ${MC_TEST_RUN}/flat_noon.png --exit)
+    mc_gl_test(gl_flat_midnight ${MC_FLAT_SCENE} --time 18000 --screenshot ${MC_TEST_RUN}/flat_midnight.png --exit)
+    mc_py_test(gl_flat_noon_wall gl_flat_noon check_image.py ${MC_TEST_RUN}/flat_noon.png
+        --no-magenta --region 500,150,740,350 --mean-rgb 99,99,99 --tol 6)
+    mc_py_test(gl_flat_noon_grass gl_flat_noon check_image.py ${MC_TEST_RUN}/flat_noon.png
+        --region 100,550,400,700 --mean-rgb 83,108,51 --tol 8)
+    mc_py_test(gl_day_night_ratio "gl_flat_noon;gl_flat_midnight" check_image.py ${MC_TEST_RUN}/flat_noon.png
+        --region 100,450,1180,720 --luma-vs ${MC_TEST_RUN}/flat_midnight.png --min-ratio 2.8)
+    # M3: the F3 screen draws text (light gray glyphs in the top-left corner).
+    mc_gl_test(gl_debug_overlay ${MC_FLAT_SCENE} --time 6000 --debug-overlay
+        --screenshot ${MC_TEST_RUN}/debug_overlay.png --exit)
+    mc_py_test(gl_debug_overlay_text gl_debug_overlay check_image.py ${MC_TEST_RUN}/debug_overlay.png
+        --region 0,0,640,240 --count-rgb 224,224,224 --tol 12 --min-count 2000)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

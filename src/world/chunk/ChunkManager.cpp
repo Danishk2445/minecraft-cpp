@@ -4,6 +4,9 @@
 
 #include "core/Log.h"
 #include "world/block/BlockRegistry.h"
+#include "world/light/LightEngine.h"
+
+#include <unordered_set>
 
 namespace mc {
 
@@ -12,6 +15,12 @@ ChunkManager::ChunkManager(const BlockRegistry& registry, std::shared_ptr<const 
     : registry_(registry), generator_(std::move(generator)), jobs_(jobs) {}
 
 ChunkManager::~ChunkManager() = default; // destroying alive_ turns pending callbacks into no-ops
+
+void ChunkManager::setLightEngine(std::shared_ptr<const LightEngine> engine) {
+    lightEngine_ = engine;
+    if (engine) lightFn_ = [engine](const Neighborhood& n, Chunk& out) { engine->computeChunk(n, out); };
+    else lightFn_ = nullptr;
+}
 
 ChunkManager::Entry* ChunkManager::find(ChunkPos p) {
     auto it = entries_.find(p);
@@ -285,6 +294,29 @@ bool ChunkManager::setBlock(const BlockPos& p, StateId state) {
     if (e->chunk->set(p.x & 15, p.y, p.z & 15, state) == state) return true;
     ++e->chunk->blockVersion;
     markMeshDirty(p);
+    if (lightEngine_) {
+        lightChanged_.clear();
+        lightEngine_->update(*this, p, lightChanged_);
+        // Smooth lighting reads up to two cells away from a face: remesh every section
+        // overlapping the 5x5x5 box around each changed cell (deduplicated).
+        std::unordered_set<int64_t> sections;
+        std::unordered_set<int64_t> chunksTouched;
+        for (const BlockPos& c : lightChanged_) {
+            chunksTouched.insert(ChunkPos::of(c).key());
+            const int x0 = floorDiv(c.x - 2, 16), x1 = floorDiv(c.x + 2, 16);
+            const int z0 = floorDiv(c.z - 2, 16), z1 = floorDiv(c.z + 2, 16);
+            const int s0 = sectionIndexOfY(std::max(c.y - 2, kWorldMinY));
+            const int s1 = sectionIndexOfY(std::min(c.y + 2, kWorldMaxY));
+            for (int cz = z0; cz <= z1; ++cz)
+                for (int cx = x0; cx <= x1; ++cx)
+                    for (int si = s0; si <= s1; ++si)
+                        if (sections.insert((ChunkPos(cx, cz).key() << 5) ^ si).second) markSectionDirty({cx, cz}, si);
+        }
+        for (int64_t key : chunksTouched) {
+            const ChunkPos cp(int(key >> 32), int(int32_t(uint32_t(key))));
+            if (Chunk* c = chunk(cp)) ++c->lightVersion;
+        }
+    }
     return true;
 }
 

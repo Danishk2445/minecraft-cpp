@@ -6,7 +6,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M0 Skeleton: CMake/presets, GL loader, window/input, fixed-tick loop, jobs, PNG, screenshots, CLI harness
 - [x] M1 Block models: pack, atlases, model baking, blockstates, gallery, model sheets
 - [x] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
-- [ ] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
+- [x] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
 - [ ] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
 - [ ] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
 - [ ] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
@@ -49,3 +49,10 @@ Recorded per milestone.
   - Block states come from behavior-class schemas (`data/blocks/classes.json`, with schemas in `BlockRegistry.cpp`), or are inferred from blockstate files for blocks without behavior. That gives 25,986 states; vanilla has about 27k, because inferred blocks lack non-visual properties such as note block instruments.
   - Face culling uses a 4×4 coverage grid per face, built from fully opaque flush quads, instead of vanilla's VoxelShape occlusion test.
   - Outline and collision shapes are deferred to M6, where they are first used.
+- **M3:**
+  - Quads are split along the diagonal joining their brighter corners (anisotropy fix, as in Sodium). Vanilla always splits 0-2.
+  - Partial quads interpolate the four AO corner values bilinearly. This is equivalent to vanilla's `SizeInfo` weight tables.
+  - The lightmap is sampled at texel centers, so integer light levels are exact. Vanilla samples at uv/256, which blends neighboring levels.
+  - Fog: render-distance fog covers the last `clamp(rd/10, 4, 64)` blocks; environmental fog appears only in rain. Vanilla's exact atmospheric fog constants are not reproduced.
+  - Clouds are rebuilt every frame within 16 cells (192 blocks), at a height of 192.33. They fade with distance.
+  - The incremental light removal ignores face occlusion: it may over-remove, and re-adding repairs it. A test checks it against from-scratch light after 10,000 random edits.

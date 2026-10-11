@@ -51,8 +51,16 @@ public:
         int sections = 0, drawn = 0, culled = 0, draws = 0;
         size_t vertices = 0;
     };
-    // Draws all layers. `renderDistance` in chunks (cylindrical cutoff).
-    void render(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas, int renderDistance);
+    struct Fog {
+        glm::vec4 color{1.0f};
+        glm::vec4 distances{1e9f, 1e9f + 1, 1e9f, 1e9f + 1}; // envStart, envEnd, rdStart, rdEnd
+    };
+    // Draws the opaque layers (solid, cutout_mipped, cutout). The lightmap must be
+    // bound to texture unit 1. `renderDistance` in chunks (cylindrical cutoff).
+    void renderOpaque(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas, int renderDistance,
+                      const Fog& fog);
+    // Draws the translucent layer (after the opaque layers and entities).
+    void renderTranslucent(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas, const Fog& fog);
     const FrameStats& stats() const { return stats_; }
     size_t gpuBytes() const;
     size_t sectionCount() const;
@@ -74,6 +82,8 @@ private:
         RangeAllocator alloc{0};
     };
 
+    void collectVisible(const Camera& camera, const glm::mat4& viewProj, int renderDistance);
+    void drawLayers(int firstLayer, int lastLayer, const glm::mat4& viewProj, const Texture& atlas, const Fog& fog);
     Alloc allocate(uint32_t vertices);
     void release(Alloc& a);
     void ensureIndexCapacity(uint32_t quads);
@@ -92,6 +102,12 @@ private:
         int32_t baseVertex;
         uint32_t baseInstance;
     };
+    struct Visible {
+        const SectionGpu* section;
+        glm::vec3 origin;
+        float distance2;
+    };
+    std::vector<Visible> visible_;
     std::vector<DrawCommand> commands_;
     std::vector<glm::vec3> offsets_;
     unsigned commandBuffer_ = 0, offsetBuffer_ = 0; // re-specified every draw (stream)

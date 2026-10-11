@@ -109,6 +109,20 @@ const std::vector<Option>& options() {
          }},
         {"--wait-chunks", "", "harness: before --screenshot/--exit, wait until every visible chunk is meshed",
          [](CliOptions& o, std::string_view) { return o.waitChunks = true, true; }},
+        {"--time", "TICKS", "initial time of day (0 sunrise, 6000 noon, 13000 night, 18000 midnight)",
+         [](CliOptions& o, std::string_view v) {
+             long long t = 0;
+             auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), t);
+             if (ec != std::errc() || p != v.data() + v.size()) return false;
+             o.time = t;
+             return true;
+         }},
+        {"--freeze-time", "", "stop the daylight cycle",
+         [](CliOptions& o, std::string_view) { return o.freezeTime = true, true; }},
+        {"--debug-overlay", "", "show the F3 debug screen",
+         [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
+        {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
+         [](CliOptions& o, std::string_view v) { return parseBool(v, o.smoothLighting); }},
         {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
          [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
         {"--pos", "X,Y,Z", "start the camera at this position",

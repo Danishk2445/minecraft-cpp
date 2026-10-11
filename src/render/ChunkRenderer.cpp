@@ -170,17 +170,11 @@ size_t ChunkRenderer::sectionCount() const {
     return n;
 }
 
-void ChunkRenderer::render(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas, int renderDistance) {
+void ChunkRenderer::collectVisible(const Camera& camera, const glm::mat4& viewProj, int renderDistance) {
     stats_ = {};
+    visible_.clear();
     const Frustum frustum = Frustum::fromMatrix(viewProj);
     const double maxDist = renderDistance * 16.0 + 16.0;
-
-    // Visible sections, computed once for all layers.
-    struct Visible {
-        const SectionGpu* section;
-        glm::vec3 origin;
-    };
-    std::vector<Visible> visible;
     for (const auto& [pos, cg] : chunks_) {
         const double cx = pos.minBlockX() + 8.0 - camera.position.x, cz = pos.minBlockZ() + 8.0 - camera.position.z;
         if (cx * cx + cz * cz > maxDist * maxDist) continue;
@@ -197,12 +191,18 @@ void ChunkRenderer::render(const Camera& camera, const glm::mat4& viewProj, cons
                 continue;
             }
             ++stats_.drawn;
-            visible.push_back({&sg, origin});
+            const glm::vec3 c = origin + glm::vec3(8.0f);
+            visible_.push_back({&sg, origin, glm::dot(c, c)});
         }
     }
+}
 
+void ChunkRenderer::drawLayers(int firstLayer, int lastLayer, const glm::mat4& viewProj, const Texture& atlas,
+                               const Fog& fog) {
     shader_.use();
     shader_.set("uViewProj", viewProj);
+    shader_.set("uFogColor", fog.color);
+    shader_.set("uFog", fog.distances);
     atlas.bind(0);
     glBindVertexArray(vao_);
     glEnable(GL_DEPTH_TEST);
@@ -211,7 +211,7 @@ void ChunkRenderer::render(const Camera& camera, const glm::mat4& viewProj, cons
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    for (int layer = 0; layer < kLayerCount; ++layer) {
+    for (int layer = firstLayer; layer <= lastLayer; ++layer) {
         const RenderLayer rl = RenderLayer(layer);
         float cutoff = -1.0f;
         if (rl == RenderLayer::CutoutMipped) cutoff = 0.5f;
@@ -229,7 +229,7 @@ void ChunkRenderer::render(const Camera& camera, const glm::mat4& viewProj, cons
         for (size_t page = 0; page < pages_.size(); ++page) {
             commands_.clear();
             offsets_.clear();
-            for (const Visible& v : visible) {
+            for (const Visible& v : visible_) {
                 const Alloc& a = v.section->layers[size_t(layer)];
                 if (a.page != int(page) || a.count == 0) continue;
                 commands_.push_back({a.count / 4 * 6, 1, 0, int32_t(a.offset), uint32_t(offsets_.size())});
@@ -250,6 +250,20 @@ void ChunkRenderer::render(const Camera& camera, const glm::mat4& viewProj, cons
     glBindSampler(0, 0);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+}
+
+void ChunkRenderer::renderOpaque(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas,
+                                 int renderDistance, const Fog& fog) {
+    collectVisible(camera, viewProj, renderDistance);
+    drawLayers(int(RenderLayer::Solid), int(RenderLayer::Cutout), viewProj, atlas, fog);
+}
+
+void ChunkRenderer::renderTranslucent(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas,
+                                      const Fog& fog) {
+    (void)camera;
+    // Far to near between sections (quads within a section are sorted in M4).
+    std::sort(visible_.begin(), visible_.end(), [](const Visible& a, const Visible& b) { return a.distance2 > b.distance2; });
+    drawLayers(int(RenderLayer::Translucent), int(RenderLayer::Translucent), viewProj, atlas, fog);
 }
 
 } // namespace mc
