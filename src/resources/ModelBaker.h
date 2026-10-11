@@ -26,7 +26,17 @@ struct BakedQuad {
     bool shade = true;
     uint8_t emission = 0;
     uint16_t sprite = 0;
+    // 4x4 cells of the quad's face plane it overlaps (bit = row * 4 + col, see
+    // faceCellMask); the mesher culls the quad when the neighbor covers them all.
+    uint16_t cullMask = 0;
+    // The quad lies on the block boundary in its facing direction (smooth light
+    // samples the neighbor cell for these).
+    bool flush = false;
 };
+
+// Cells of a 4x4 grid on face plane `d` touched (overlap = true) or fully
+// contained (overlap = false) by the rectangle spanned by `pos` (block units).
+uint16_t faceCellMask(Direction d, const std::array<glm::vec3, 4>& pos, bool overlap);
 
 struct BakedModel {
     std::vector<BakedQuad> quads; // model order: overlays follow their base quads

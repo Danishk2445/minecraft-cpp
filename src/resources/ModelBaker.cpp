@@ -33,7 +33,36 @@ glm::vec3 axisVector(Axis a) {
     return {0, 1, 0};
 }
 
+// The two in-plane coordinates of face d (shared by d and its opposite).
+glm::vec2 facePlane(Direction d, const glm::vec3& p) {
+    switch (axisOf(d)) {
+    case Axis::Y: return {p.x, p.z};
+    case Axis::Z: return {p.x, p.y};
+    case Axis::X: return {p.z, p.y};
+    }
+    return {p.x, p.z};
+}
+
 } // namespace
+
+uint16_t faceCellMask(Direction d, const std::array<glm::vec3, 4>& pos, bool overlap) {
+    glm::vec2 lo(1e9f), hi(-1e9f);
+    for (const auto& p : pos) {
+        const glm::vec2 q = facePlane(d, p);
+        lo = glm::min(lo, q);
+        hi = glm::max(hi, q);
+    }
+    constexpr float eps = 1e-4f;
+    uint16_t mask = 0;
+    for (int row = 0; row < 4; ++row)
+        for (int col = 0; col < 4; ++col) {
+            const float u0 = col * 0.25f, u1 = u0 + 0.25f, v0 = row * 0.25f, v1 = v0 + 0.25f;
+            const bool hit = overlap ? (u1 > lo.x + eps && u0 < hi.x - eps && v1 > lo.y + eps && v0 < hi.y - eps)
+                                     : (u0 >= lo.x - eps && u1 <= hi.x + eps && v0 >= lo.y - eps && v1 <= hi.y + eps);
+            if (hit) mask |= uint16_t(1u << (row * 4 + col));
+        }
+    return mask;
+}
 
 glm::mat3 blockStateRotation(int xDegrees, int yDegrees) {
     const glm::mat4 ry = glm::rotate(glm::mat4(1.0f), glm::radians(float(-yDegrees)), glm::vec3(0, 1, 0));
@@ -126,6 +155,15 @@ bool bakeFace(const ElementDef& el, Direction dir, const FaceDef& face, const Sp
 
     for (auto& p : out.pos) p /= 16.0f;
     out.cull = face.cull < 0 ? int8_t(-1) : int8_t(nearestDirection(rot * glm::vec3(normal(Direction(face.cull)))));
+    // Flush: every corner sits on the block boundary the quad faces.
+    {
+        const int axis = int(axisOf(out.face)); // Axis is X=0, Y=1, Z=2
+        const float plane = isPositive(out.face) ? 1.0f : 0.0f;
+        out.flush = true;
+        for (const auto& p : out.pos)
+            if (std::abs(p[axis] - plane) > 1e-4f) out.flush = false;
+    }
+    if (out.cull >= 0) out.cullMask = faceCellMask(Direction(out.cull), out.pos, true);
     out.tint = int8_t(face.tint);
     out.shade = el.shade;
     out.emission = uint8_t(el.lightEmission);

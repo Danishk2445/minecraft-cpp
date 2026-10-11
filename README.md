@@ -38,9 +38,16 @@ Binaries land in `build/<preset>/bin/`.
 
 The game directory (saves, options, screenshots, logs) defaults to `./run`; change it with `--gamedir`.
 
-Until the world arrives (M2), the game opens a gallery that shows every block state the pack defines.
+The game opens a world straight away; title screens come in M9. Choose the world with:
+- `--world-type flat|debug`: debug places every block state on a grid at y=70. The default is debug until terrain generation lands.
+- `--render-distance N`
+- `--seed N`
 
-Gallery controls:
+`--gallery` shows the M1 block gallery instead.
+
+`--exec "/setblock 0 -60 0 stone"` runs commands once the spawn area is loaded. Available commands: `/tp`, `/setblock`, `/fill`, `/time`.
+
+Controls (free camera for now):
 - Click: capture the mouse
 - Mouse: look
 - WASD: move

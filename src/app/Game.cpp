@@ -1,6 +1,8 @@
 #include "app/Game.h"
 
 #include <algorithm>
+#include <cmath>
+#include <format>
 
 #include <GLFW/glfw3.h>
 
@@ -10,6 +12,10 @@
 #include "gfx/Shader.h"
 #include "render/ClientAssets.h"
 #include "render/Gallery.h"
+#include "render/WorldRenderer.h"
+#include "world/block/BlockRegistry.h"
+#include "world/gen/ChunkGenerator.h"
+#include "world/level/Level.h"
 
 namespace mc {
 
@@ -54,19 +60,48 @@ bool Game::init() {
         return true;
     }
 
-    gallery_ = std::make_unique<Gallery>();
-    if (!gallery_->init(*assets_)) return false;
-    camera_.position = opts_.pos.value_or(gallery_->startPosition());
-    const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 35.0f));
+    if (opts_.gallery) {
+        gallery_ = std::make_unique<Gallery>();
+        if (!gallery_->init(*assets_)) return false;
+        camera_.position = opts_.pos.value_or(gallery_->startPosition());
+        const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 35.0f));
+        camera_.yaw = look.x;
+        camera_.pitch = look.y;
+        return true;
+    }
+    return initWorld();
+}
+
+bool Game::initWorld() {
+    registry_ = std::make_unique<BlockRegistry>();
+    std::string err;
+    if (!registry_->build(assets_->blockModels(), assets_->blockAtlas(), opts_.dataDir, &err))
+        log::warn("block registry: {}", err); // problems are logged; the world still runs
+
+    std::shared_ptr<const ChunkGenerator> generator;
+    if (opts_.worldType == "flat") generator = std::make_shared<FlatGenerator>(*registry_);
+    else generator = std::make_shared<DebugGenerator>(*registry_);
+    level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);
+    worldRenderer_ = std::make_unique<WorldRenderer>(*assets_, *registry_);
+    if (!worldRenderer_->init()) return false;
+
+    camera_.position = opts_.pos.value_or(generator->spawnPoint() + glm::dvec3(0.0, 1.62, 0.0));
+    const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
     camera_.yaw = look.x;
     camera_.pitch = look.y;
+    camera_.farPlane = float(opts_.renderDistance * 16 + 64) * 1.5f;
+    log::info("World: type {}, seed {}, render distance {}", generator->type(), opts_.seed, opts_.renderDistance);
     return true;
 }
 
 void Game::shutdown() {
+    // Order matters: jobs reference the registry and assets until the pool is joined.
+    worldRenderer_.reset();
+    level_.reset();
     gallery_.reset();
-    assets_.reset();
     jobs_.reset();
+    registry_.reset();
+    assets_.reset();
     window_.destroy();
 }
 
@@ -76,6 +111,7 @@ int Game::run() {
 
     double last = Window::time();
     double accumulator = 0.0;
+    runTimer_.reset();
     while (!window_.shouldClose()) {
         window_.pollEvents();
         handleGlobalKeys();
@@ -92,11 +128,19 @@ int Game::run() {
         }
 
         updateCamera(frameDt);
-        jobs_->drainMain(4.0);
+        updateWorld();
+        jobs_->drainMain(6.0);
         render(float(accumulator / kTickSeconds));
         ++frameCount_;
         afterFrame();
         window_.swapBuffers();
+        updateTitle();
+    }
+    if (worldRenderer_) {
+        const auto& r = worldRenderer_->chunkRenderer().stats();
+        log::info("Ran {} frames in {:.2f} s ({:.0f} fps avg); last frame drew {} of {} sections, {} draws, {} vertices",
+                  frameCount_, runTimer_.seconds(), double(frameCount_) / std::max(runTimer_.seconds(), 1e-6), r.drawn,
+                  r.sections, r.draws, r.vertices);
     }
     return exitCode_;
 }
@@ -134,9 +178,45 @@ void Game::updateCamera(double dt) {
     }
 }
 
+void Game::updateWorld() {
+    if (!level_) return;
+    ChunkManager& chunks = level_->chunks();
+    chunks.setView(ChunkPos::of(BlockPos::containing(camera_.position)), opts_.renderDistance);
+    chunks.update();
+    worldRenderer_->update(chunks, *jobs_);
+    if (!meshedLogged_ && chunks.viewMeshed() && worldRenderer_->idle()) {
+        meshedLogged_ = true;
+        const auto& r = worldRenderer_->chunkRenderer();
+        log::info("View meshed after {:.2f} s: {} sections, {:.1f} MB of vertex pages", runTimer_.seconds(),
+                  r.sectionCount(), double(r.gpuBytes()) / (1 << 20));
+    }
+    if (!execDone_ && chunks.viewReady()) {
+        execDone_ = true;
+        for (const auto& cmd : opts_.exec) runCommand(cmd);
+    }
+}
+
+void Game::runCommand(const std::string& line) {
+    CommandSource src;
+    src.level = level_.get();
+    src.position = camera_.position;
+    src.rotation = {camera_.yaw, camera_.pitch};
+    src.feedback = [](const std::string& msg) { log::info("[command] {}", msg); };
+    src.teleport = [this](const glm::dvec3& p, std::optional<glm::vec2> rot) {
+        camera_.position = p;
+        if (rot) {
+            camera_.yaw = rot->x;
+            camera_.pitch = rot->y;
+        }
+    };
+    std::string err;
+    if (!commands_.execute(src, line, &err)) log::warn("command '{}' failed: {}", line, err);
+}
+
 void Game::tick() {
     ++tickCount_;
     assets_->tick();
+    if (level_) level_->tick();
 }
 
 void Game::render(float partialTick) {
@@ -146,6 +226,7 @@ void Game::render(float partialTick) {
     glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if (gallery_) gallery_->render(camera_, fb);
+    if (worldRenderer_) worldRenderer_->render(camera_, fb, opts_.renderDistance);
     (void)partialTick;
 }
 
@@ -158,9 +239,31 @@ void Game::afterFrame() {
     if (harnessDone_) return;
     const bool harness = !opts_.screenshot.empty() || opts_.exitAfter;
     if (!harness || frameCount_ < std::max(opts_.frames, 1) || tickCount_ < opts_.ticks) return;
+    if (level_ && (!opts_.exec.empty() || opts_.waitChunks)) {
+        if (!execDone_) return;
+        if (opts_.waitChunks && !(level_->chunks().viewMeshed() && worldRenderer_->idle())) return;
+    }
     harnessDone_ = true;
     if (!opts_.screenshot.empty()) saveScreenshot(opts_.screenshot, fb.x, fb.y);
     if (opts_.exitAfter) window_.setShouldClose(true);
+}
+
+void Game::updateTitle() {
+    ++framesSinceTitle_;
+    if (titleTimer_.seconds() < 1.0) return;
+    const double fps = framesSinceTitle_ / titleTimer_.seconds();
+    framesSinceTitle_ = 0;
+    titleTimer_.reset();
+    std::string title = std::format("Minecraft  |  {:.0f} fps", fps);
+    if (level_) {
+        const auto s = level_->chunks().stats();
+        const auto& r = worldRenderer_->chunkRenderer().stats();
+        title += std::format("  |  chunks {} (lit {}, ready {}, jobs {})  |  sections {}/{}  |  {:.0f} MB VRAM", s.entries,
+                             s.lit, s.meshReady, s.inFlight, r.drawn, r.sections,
+                             double(worldRenderer_->chunkRenderer().gpuBytes()) / (1 << 20));
+        title += std::format("  |  {:.1f} {:.1f} {:.1f}", camera_.position.x, camera_.position.y, camera_.position.z);
+    }
+    window_.setTitle(title);
 }
 
 } // namespace mc

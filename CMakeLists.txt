@@ -119,10 +119,25 @@ if(XVFB_RUN AND Python3_FOUND)
     mc_py_test(gl_golden_tiles gl_model_sheets compare_tiles.py ${MC_TEST_RUN}/sheets/tiles tests/golden/tiles)
 
     # M1: the 3D gallery draws with depth, culling and mipmaps; the corner is clear sky.
-    mc_gl_test(gl_gallery_screenshot --size 1280x720 --frames 3 --pos 120,9,-4 --look -30,40
+    mc_gl_test(gl_gallery_screenshot --gallery --size 1280x720 --frames 3 --pos 120,9,-4 --look -30,40
         --screenshot ${MC_TEST_RUN}/gallery.png --exit)
     mc_py_test(gl_gallery_check gl_gallery_screenshot check_image.py ${MC_TEST_RUN}/gallery.png
         --size 1280x720 --no-magenta --min-colors 500 --region 0,560,60,720 --mean-rgb 120,167,255 --tol 2)
+
+    # M2: the debug world (every block state) through the chunk pipeline, mesher and MDI renderer.
+    mc_gl_test(gl_debug_world --world-type debug --render-distance 6 --size 1280x720 --pos 10,76,10 --look -45,30
+        --wait-chunks --screenshot ${MC_TEST_RUN}/debug_world.png --exit)
+    mc_py_test(gl_debug_world_check gl_debug_world check_image.py ${MC_TEST_RUN}/debug_world.png
+        --size 1280x720 --no-magenta --min-colors 1000)
+    # M2: --exec edits on a flat world (stone wall, glass, slab, stairs).
+    mc_gl_test(gl_flat_world --world-type flat --render-distance 8 --size 1280x720 --pos 0,-55,-12 --look 0,20
+        --exec "/fill -3 -60 0 3 -55 6 stone" --exec "/fill -2 -59 1 2 -56 5 air"
+        --exec "/setblock 0 -60 -3 glass" --exec "/setblock 2 -60 -3 oak_slab"
+        --wait-chunks --screenshot ${MC_TEST_RUN}/flat_world.png --exit)
+    mc_py_test(gl_flat_world_wall gl_flat_world check_image.py ${MC_TEST_RUN}/flat_world.png
+        --no-magenta --region 500,150,740,350 --mean-rgb 101,101,101 --tol 6)
+    mc_py_test(gl_flat_world_grass gl_flat_world check_image.py ${MC_TEST_RUN}/flat_world.png
+        --region 100,550,400,700 --mean-rgb 84,110,52 --tol 8)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

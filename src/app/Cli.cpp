@@ -83,6 +83,34 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return o.screenshot = v, true; }},
         {"--exit", "", "harness: quit once the run conditions are met",
          [](CliOptions& o, std::string_view) { return o.exitAfter = true, true; }},
+        {"--world-type", "TYPE", "world generator: flat or debug",
+         [](CliOptions& o, std::string_view v) {
+             o.worldType = v;
+             return v == "flat" || v == "debug";
+         }},
+        {"--seed", "N", "world seed",
+         [](CliOptions& o, std::string_view v) {
+             auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), o.seed);
+             return ec == std::errc() && p == v.data() + v.size();
+         }},
+        {"--render-distance", "N", "render distance in chunks (2-32, default 12)",
+         [](CliOptions& o, std::string_view v) { return parseInt(v, o.renderDistance) && o.renderDistance >= 2 && o.renderDistance <= 32; }},
+        {"--exec", "CMDS", "commands to run once the spawn area is ready (';'-separated; repeatable)",
+         [](CliOptions& o, std::string_view v) {
+             size_t pos = 0;
+             while (pos <= v.size()) {
+                 const size_t semi = v.find(';', pos);
+                 const std::string_view cmd = v.substr(pos, semi == std::string_view::npos ? std::string_view::npos : semi - pos);
+                 if (!cmd.empty()) o.exec.emplace_back(cmd);
+                 if (semi == std::string_view::npos) break;
+                 pos = semi + 1;
+             }
+             return true;
+         }},
+        {"--wait-chunks", "", "harness: before --screenshot/--exit, wait until every visible chunk is meshed",
+         [](CliOptions& o, std::string_view) { return o.waitChunks = true, true; }},
+        {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
+         [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
         {"--pos", "X,Y,Z", "start the camera at this position",
          [](CliOptions& o, std::string_view v) {
              std::array<double, 3> a{};

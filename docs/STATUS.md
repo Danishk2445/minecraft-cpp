@@ -5,7 +5,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 ## Milestones
 - [x] M0 Skeleton: CMake/presets, GL loader, window/input, fixed-tick loop, jobs, PNG, screenshots, CLI harness
 - [x] M1 Block models: pack, atlases, model baking, blockstates, gallery, model sheets
-- [ ] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
+- [x] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
 - [ ] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
 - [ ] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
 - [ ] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
@@ -45,3 +45,7 @@ Recorded per milestone.
   - Atlas UVs are pulled 0.1% toward the opposite corner, as in pre-1.21 FaceBakery.
   - All block-atlas sprites are aligned to 16 texels, so the atlas keeps 4 mip levels. The 8×8 conduit eyes would otherwise cap it at 3.
   - `paletted_permutations` atlas sources (armor trims) are skipped.
+- **M2:**
+  - Block states come from behavior-class schemas (`data/blocks/classes.json`, with schemas in `BlockRegistry.cpp`), or are inferred from blockstate files for blocks without behavior. That gives 25,986 states; vanilla has about 27k, because inferred blocks lack non-visual properties such as note block instruments.
+  - Face culling uses a 4×4 coverage grid per face, built from fully opaque flush quads, instead of vanilla's VoxelShape occlusion test.
+  - Outline and collision shapes are deferred to M6, where they are first used.
