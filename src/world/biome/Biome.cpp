@@ -35,8 +35,17 @@ uint32_t hsvToRgb(float h, float s, float v) {
     return (c(r) << 16) | (c(g) << 8) | c(b);
 }
 
+// Stand-ins for vanilla's PerlinSimplexNoise instances (same seeds and octaves).
 const PerlinNoise& swampNoise() {
     static const PerlinNoise noise(Xoroshiro(2345), 0, {1.0});
+    return noise;
+}
+const PerlinNoise& temperatureNoise() {
+    static const PerlinNoise noise(Xoroshiro(1234), 0, {1.0});
+    return noise;
+}
+const PerlinNoise& frozenTemperatureNoise() {
+    static const PerlinNoise noise(Xoroshiro(3456), -2, {1.0, 1.0, 1.0});
     return noise;
 }
 
@@ -45,6 +54,21 @@ const PerlinNoise& swampNoise() {
 uint32_t skyColorForTemperature(float temperature) {
     const float f = std::clamp(temperature / 3.0f, -1.0f, 1.0f);
     return hsvToRgb(0.62222224f - f * 0.05f, 0.5f + f * 0.1f, 1.0f);
+}
+
+float Biome::temperatureAt(int x, int y, int z) const {
+    float t = temperature;
+    if (frozenModifier) {
+        const double d = frozenTemperatureNoise().value(x * 0.05, z * 0.05, 0.0) * 7.0;
+        const double e = swampNoise().value(x * 0.2, z * 0.2, 0.0);
+        if (d + e < 0.3 && swampNoise().value(x * 0.09, z * 0.09, 0.0) < 0.8) t = 0.2f;
+    }
+    constexpr int kCoolingStart = 63 + 17;
+    if (y > kCoolingStart) {
+        const float g = float(temperatureNoise().value(x / 8.0, z / 8.0, 0.0) * 8.0);
+        t -= (g + float(y - kCoolingStart)) * 0.05f / 40.0f;
+    }
+    return t;
 }
 
 bool Biome::coldAt(int y) const {
@@ -82,6 +106,7 @@ bool BiomeRegistry::load(const std::filesystem::path& dataDir, const std::filesy
         bio.fogColor = parseColor(b, "fog").value_or(0xC0D8FF);
         bio.skyColor = parseColor(b, "sky").value_or(skyColorForTemperature(bio.temperature));
         const std::string mod = jsonGet<std::string>(b, "grass_modifier", "");
+        bio.frozenModifier = jsonGet<std::string>(b, "temperature_modifier", "") == "frozen";
         bio.grassModifier = mod == "swamp" ? GrassModifier::Swamp
                             : mod == "dark_forest" ? GrassModifier::DarkForest
                                                    : GrassModifier::None;

@@ -18,16 +18,23 @@ namespace mc {
 
 class BlockRegistry;
 
-enum BlockWriteFlag : uint8_t {
-    kWriteAlways = 0,
-    kWriteIfReplaceable = 1 << 0, // only into air, water or replaceable plants
+// How MERGE applies a feature's write. Features decide against the TERRAIN
+// snapshots plus their own source chunk's earlier writes, so a feature from a
+// neighboring source may have changed the block since; `expect` records the
+// block the deciding feature saw.
+enum WritePolicy : uint8_t {
+    kWriteIfUnchanged = 0, // only while the block is still `expect`
+    kWriteForce = 1,       // always
+    kWriteTree = 2,        // also over air, leaves and replaceable_by_trees (vanilla TreeFeature.validTreePos)
 };
 
 struct BlockWrite {
-    BlockPos pos; // world position, within the 3x3 chunks around the source
+    BlockPos pos;     // world position, within the 3x3 chunks around the source
     StateId state;
-    uint8_t step;  // decoration step: lower steps apply first
-    uint8_t flags; // BlockWriteFlag
+    StateId expect;   // the block the feature saw at `pos`
+    uint16_t feature; // global feature order within the step
+    uint8_t step;     // decoration step
+    uint8_t policy;   // WritePolicy
 };
 
 struct DecorationResult {
@@ -59,6 +66,9 @@ public:
     virtual void generateTerrain(Chunk& chunk) const = 0;
     // DECORATE: features that originate in `center` (may write into its neighbors).
     virtual void decorate(const TerrainNeighborhood& terrain, DecorationResult& out) const { (void)terrain, (void)out; }
+    // End of MERGE, after every write into `chunk` was applied: whole-chunk passes
+    // that need the final blocks, such as snow and ice (vanilla freeze_top_layer).
+    virtual void finalizeChunk(Chunk& chunk) const { (void)chunk; }
     virtual glm::dvec3 spawnPoint() const = 0;
 };
 

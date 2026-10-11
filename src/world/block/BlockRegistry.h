@@ -8,6 +8,7 @@
 
 #include <array>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -23,6 +24,7 @@ namespace mc {
 
 class Atlas;
 class BlockModels;
+class BlockRules;
 struct BakedChoice;
 
 using StateId = uint16_t;
@@ -57,6 +59,7 @@ enum StateFlag : uint16_t {
     kReplaceable = 1 << 5,  // placement and world generation may overwrite it (grass, water, snow layer)
     kSkipSame = 1 << 6,     // faces touching the same block are hidden (glass, ice, panes)
     kAoShade = 1 << 7,      // full-cube shape that darkens neighbors' ambient occlusion (not glass)
+    kBlocksMotion = 1 << 8, // has collision and counts as solid (vanilla blocksMotion): heightmaps, worldgen
 };
 
 struct StateInfo {
@@ -66,6 +69,7 @@ struct StateInfo {
     uint8_t opacity = 0;  // 0..15 light absorbed when entering this block
     RenderLayer layer = RenderLayer::Solid;
     uint8_t lightBlockingFaces = 0; // bit d: face d fully covered by an opaque shape (slab bottoms)
+    uint8_t sturdyFaces = 0;        // bit d: face d fully covered by model faces of any opacity (supports torches, snow)
     FluidState fluid;
     // 4x4 coverage of each face by opaque geometry (bit = row*4+col), for culling.
     std::array<uint16_t, 6> coverage{};
@@ -122,6 +126,8 @@ public:
 
     // Block tags from dataDir/tags/blocks (loaded by build()).
     const BlockTags& tags() const { return tags_; }
+    // Rules that look at neighboring blocks (canSurvive), built after the tags.
+    const BlockRules& rules() const { return *rules_; }
     std::optional<TagId> tag(std::string_view name) const { return tags_.find(name); }
     bool hasTag(StateId s, TagId t) const { return tags_.containsBlock(t, info_[s].block); }
 
@@ -135,6 +141,7 @@ private:
     std::vector<uint32_t> choiceStart_; // per state, into choices_ (size stateCount + 1)
     std::vector<const BakedChoice*> choices_;
     BlockTags tags_;
+    std::shared_ptr<const BlockRules> rules_;
 };
 
 // '*' wildcard match against a block id without namespace ("oak_stairs" ~ "*_stairs").

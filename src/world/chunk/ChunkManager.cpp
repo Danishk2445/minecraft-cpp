@@ -3,7 +3,9 @@
 #include <algorithm>
 
 #include "core/Log.h"
+#include "world/block/BlockGetter.h"
 #include "world/block/BlockRegistry.h"
+#include "world/block/BlockRules.h"
 #include "world/light/LightEngine.h"
 
 #include <unordered_set>
@@ -112,12 +114,14 @@ void ChunkManager::submitMerge(Entry& e) {
         for (int dx = -1; dx <= 1; ++dx)
             decos[size_t((dz + 1) * 3 + dx + 1)] = find({e.pos.x + dx, e.pos.z + dz})->decoration;
     const BlockRegistry* reg = &registry_;
+    auto gen = generator_;
     submit(
         e, e.dist * 4 + 2,
-        [reg, terrain = e.terrain, decos, pos = e.pos] {
+        [reg, gen, terrain = e.terrain, decos, pos = e.pos] {
             auto c = std::make_unique<Chunk>(*terrain); // shares section storage until written
             struct Pending {
                 uint8_t step;
+                uint16_t feature;
                 uint8_t source;
                 uint32_t seq;
                 const BlockWrite* write;
@@ -128,23 +132,56 @@ void ChunkManager::submitMerge(Entry& e) {
                 const auto& writes = decos[i]->writes;
                 for (size_t k = 0; k < writes.size(); ++k)
                     if (ChunkPos::of(writes[k].pos) == pos)
-                        pending.push_back({writes[k].step, uint8_t(i), uint32_t(k), &writes[k]});
+                        pending.push_back({writes[k].step, writes[k].feature, uint8_t(i), uint32_t(k), &writes[k]});
             }
             // Fixed order regardless of which job finished first: deterministic worlds.
+            // Feature-major within a step, so (say) every source's trees land before
+            // any source's flowers, as vanilla's per-step feature order intends.
             std::sort(pending.begin(), pending.end(), [](const Pending& a, const Pending& b) {
                 if (a.step != b.step) return a.step < b.step;
+                if (a.feature != b.feature) return a.feature < b.feature;
                 if (a.source != b.source) return a.source < b.source;
                 return a.seq < b.seq;
             });
+            const auto leaves = reg->tag("leaves"), byTrees = reg->tag("replaceable_by_trees");
+            std::vector<BlockPos> placed;
             for (const Pending& p : pending) {
                 const BlockWrite& w = *p.write;
                 const int lx = w.pos.x & 15, lz = w.pos.z & 15;
-                if (w.flags & kWriteIfReplaceable) {
-                    const StateId cur = c->get(lx, w.pos.y, lz);
-                    if (!(reg->info(cur).flags & (kAir | kReplaceable))) continue;
+                const StateId cur = c->get(lx, w.pos.y, lz);
+                bool apply = w.policy == kWriteForce || cur == w.expect;
+                if (!apply && w.policy == kWriteTree)
+                    apply = (reg->info(cur).flags & kAir) || (leaves && reg->hasTag(cur, *leaves)) ||
+                            (byTrees && reg->hasTag(cur, *byTrees));
+                if (apply) {
+                    c->set(lx, w.pos.y, lz, w.state);
+                    placed.push_back(w.pos);
                 }
-                c->set(lx, w.pos.y, lz, w.state);
             }
+            // Post-processing (vanilla marks feature blocks for it): a plant or dripstone
+            // whose support in its own column was replaced by another source's feature
+            // (moss under an azalea turned into a clay pool) is removed, bottom up so
+            // stacked blocks follow their base.
+            struct ChunkView final : BlockGetter {
+                const BlockRegistry& r;
+                const Chunk& chunk;
+                ChunkView(const BlockRegistry& reg, const Chunk& ch) : r(reg), chunk(ch) {}
+                const BlockRegistry& registry() const override { return r; }
+                StateId getBlock(const BlockPos& p) const override {
+                    return ChunkPos::of(p) == chunk.pos ? chunk.get(p.x & 15, p.y, p.z & 15) : StateId(0);
+                }
+            };
+            const ChunkView view(*reg, *c);
+            std::sort(placed.begin(), placed.end(), [](const BlockPos& a, const BlockPos& b) { return a.y < b.y; });
+            const StateId water = reg->defaultState("water");
+            for (const BlockPos& p : placed) {
+                const StateId s = c->get(p.x & 15, p.y, p.z & 15);
+                if ((reg->info(s).flags & kAir) || !reg->rules().supportedFromColumn(s)) continue;
+                if (reg->rules().canSurvive(view, s, p)) continue;
+                const bool wet = reg->boolValue(s, "waterlogged") || reg->info(s).flags & kWaterlogged;
+                c->set(p.x & 15, p.y, p.z & 15, wet ? water : BlockRegistry::kAirState);
+            }
+            gen->finalizeChunk(*c);
             return c;
         },
         [this](Entry& en, std::unique_ptr<Chunk> c) {

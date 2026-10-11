@@ -1,4 +1,5 @@
 #include "world/block/BlockRegistry.h"
+#include "world/block/BlockRules.h"
 
 #include <algorithm>
 #include <charconv>
@@ -542,9 +543,11 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         const Json* skipSameJ = firstField(propRules, name, "skip_same");
         const Json* replaceableJ = firstField(propRules, name, "replaceable");
         const Json* aoShadeJ = firstField(propRules, name, "ao_shade");
+        const Json* collisionJ = firstField(propRules, name, "collision");
+        const Json* solidJ = firstField(propRules, name, "solid");
         const bool liquid = b.className == "liquid";
         const bool waterPlant = b.className == "water_plant" || b.className == "tall_water_plant" ||
-                                name == "bubble_column";
+                                b.className == "kelp" || name == "bubble_column";
 
         for (uint32_t local = 0; local < b.stateCount; ++local) {
             const StateId s = b.stateAt(local);
@@ -608,11 +611,21 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
                 if (rep) si.flags |= kReplaceable;
             }
 
+            {
+                bool collision = true;
+                if (collisionJ) collision = collisionJ->is_boolean() ? collisionJ->get<bool>()
+                                                                    : Expr(collisionJ->get<std::string>(), get).eval() != 0;
+                const bool solid = !(solidJ && solidJ->is_boolean() && !solidJ->get<bool>());
+                if (collision && solid && !(si.flags & kAir) && !liquid) si.flags |= kBlocksMotion;
+            }
+
             bool opaqueCube = true;
             for (uint16_t c : coverage) opaqueCube &= c == 0xFFFF;
             if (opaqueCube && !liquid) si.flags |= kOpaqueCube;
-            for (int d = 0; d < 6; ++d)
+            for (int d = 0; d < 6; ++d) {
                 if (coverage[size_t(d)] == 0xFFFF) si.lightBlockingFaces |= uint8_t(1u << d);
+                if (shape[size_t(d)] == 0xFFFF && !liquid) si.sturdyFaces |= uint8_t(1u << d);
+            }
 
             int opacity = (si.flags & kOpaqueCube) ? 15 : 0;
             if (si.fluid.kind != FluidKind::None) opacity = std::max(opacity, 1);
@@ -637,6 +650,8 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
             start = end + 1;
         }
     }
+
+    rules_ = std::make_shared<const BlockRules>(*this);
 
     for (const auto& p : problems) log::warn("block registry: {}", p);
     log::info("Block registry: {} blocks, {} states, {} properties, {} tags", blocks_.size(), info_.size(),

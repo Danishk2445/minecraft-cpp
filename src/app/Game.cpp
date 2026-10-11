@@ -20,6 +20,7 @@
 #include "world/biome/Biome.h"
 #include "world/gen/ChunkGenerator.h"
 #include "world/gen/OverworldGenerator.h"
+#include "world/gen/feature/BiomeDecorator.h"
 #include "world/level/Level.h"
 
 namespace mc {
@@ -99,7 +100,17 @@ bool Game::initWorld() {
     } else if (opts_.worldType == "debug") {
         generator = std::make_shared<DebugGenerator>(*registry_);
     } else {
-        overworld_ = std::make_shared<OverworldGenerator>(*registry_, *biomes_, opts_.seed);
+        auto decorator = std::make_shared<BiomeDecorator>();
+        if (!decorator->load(opts_.dataDir, *registry_, *biomes_, &err)) {
+            int shown = 0;
+            for (size_t start = 0; start < err.size() && shown < 30; ++shown) {
+                const size_t end = err.find('\n', start);
+                log::warn("features: {}", err.substr(start, end - start));
+                if (end == std::string::npos) break;
+                start = end + 1;
+            }
+        }
+        overworld_ = std::make_shared<OverworldGenerator>(*registry_, *biomes_, opts_.seed, std::move(decorator));
         generator = overworld_;
     }
     level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);

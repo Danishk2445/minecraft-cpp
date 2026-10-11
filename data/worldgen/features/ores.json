@@ -1,0 +1,1405 @@
+{
+ "_comment": "Vanilla OreFeatures/OrePlacements: blob sizes, counts and height distributions.",
+ "ore_dirt": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "dirt"
+    }
+   ],
+   "size": 33
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 7
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 0
+     },
+     "max_inclusive": {
+      "absolute": 160
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_gravel": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "gravel"
+    }
+   ],
+   "size": 33
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 14
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "below_top": 0
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_granite_upper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "granite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 64
+     },
+     "max_inclusive": {
+      "absolute": 128
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_granite_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "granite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 0
+     },
+     "max_inclusive": {
+      "absolute": 60
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diorite_upper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "diorite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 64
+     },
+     "max_inclusive": {
+      "absolute": 128
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diorite_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "diorite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 0
+     },
+     "max_inclusive": {
+      "absolute": 60
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_andesite_upper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "andesite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 64
+     },
+     "max_inclusive": {
+      "absolute": 128
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_andesite_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "andesite"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 0
+     },
+     "max_inclusive": {
+      "absolute": 60
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_tuff": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "tuff"
+    }
+   ],
+   "size": 64
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 0
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_coal_upper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "coal_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_coal_ore"
+    }
+   ],
+   "size": 17
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 30
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 136
+     },
+     "max_inclusive": {
+      "below_top": 0
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_coal_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "coal_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_coal_ore"
+    }
+   ],
+   "size": 17,
+   "discard_chance_on_air_exposure": 0.5
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 20
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": 0
+     },
+     "max_inclusive": {
+      "absolute": 192
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_iron_upper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "iron_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_iron_ore"
+    }
+   ],
+   "size": 9
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 90
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": 80
+     },
+     "max_inclusive": {
+      "absolute": 384
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_iron_middle": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "iron_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_iron_ore"
+    }
+   ],
+   "size": 9
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 10
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -24
+     },
+     "max_inclusive": {
+      "absolute": 56
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_iron_small": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "iron_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_iron_ore"
+    }
+   ],
+   "size": 4
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 10
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 72
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_gold": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "gold_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_gold_ore"
+    }
+   ],
+   "size": 9,
+   "discard_chance_on_air_exposure": 0.5
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -64
+     },
+     "max_inclusive": {
+      "absolute": 32
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_gold_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "gold_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_gold_ore"
+    }
+   ],
+   "size": 9,
+   "discard_chance_on_air_exposure": 0.5
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": [
+     0,
+     1
+    ]
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": -64
+     },
+     "max_inclusive": {
+      "absolute": -48
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_gold_extra": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "gold_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_gold_ore"
+    }
+   ],
+   "size": 9
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 50
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 32
+     },
+     "max_inclusive": {
+      "absolute": 256
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_redstone": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "redstone_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_redstone_ore"
+    }
+   ],
+   "size": 8
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 15
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_redstone_lower": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "redstone_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_redstone_ore"
+    }
+   ],
+   "size": 8
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 8
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "above_bottom": -32
+     },
+     "max_inclusive": {
+      "above_bottom": 32
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diamond": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "diamond_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_diamond_ore"
+    }
+   ],
+   "size": 4,
+   "discard_chance_on_air_exposure": 0.5
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 7
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "above_bottom": -80
+     },
+     "max_inclusive": {
+      "above_bottom": 80
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diamond_medium": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "diamond_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_diamond_ore"
+    }
+   ],
+   "size": 8,
+   "discard_chance_on_air_exposure": 0.5
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": -64
+     },
+     "max_inclusive": {
+      "absolute": -4
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diamond_large": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "diamond_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_diamond_ore"
+    }
+   ],
+   "size": 12,
+   "discard_chance_on_air_exposure": 0.7
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 9
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "above_bottom": -80
+     },
+     "max_inclusive": {
+      "above_bottom": 80
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_diamond_buried": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "diamond_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_diamond_ore"
+    }
+   ],
+   "size": 8,
+   "discard_chance_on_air_exposure": 1.0
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "above_bottom": -80
+     },
+     "max_inclusive": {
+      "above_bottom": 80
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_lapis": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "lapis_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_lapis_ore"
+    }
+   ],
+   "size": 7
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -32
+     },
+     "max_inclusive": {
+      "absolute": 32
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_lapis_buried": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "lapis_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_lapis_ore"
+    }
+   ],
+   "size": 7,
+   "discard_chance_on_air_exposure": 1.0
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 64
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_infested": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "infested_stone"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "infested_deepslate"
+    }
+   ],
+   "size": 9
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 14
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 63
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_emerald": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "emerald_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_emerald_ore"
+    }
+   ],
+   "size": 3
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 100
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -16
+     },
+     "max_inclusive": {
+      "absolute": 480
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_copper": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "copper_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_copper_ore"
+    }
+   ],
+   "size": 10
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 16
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -16
+     },
+     "max_inclusive": {
+      "absolute": 112
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_copper_large": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "stone_ore_replaceables"
+     },
+     "state": "copper_ore"
+    },
+    {
+     "target": {
+      "tag": "deepslate_ore_replaceables"
+     },
+     "state": "deepslate_copper_ore"
+    }
+   ],
+   "size": 20
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 16
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "trapezoid",
+     "min_inclusive": {
+      "absolute": -16
+     },
+     "max_inclusive": {
+      "absolute": 112
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ore_clay": {
+  "type": "ore",
+  "config": {
+   "targets": [
+    {
+     "target": {
+      "tag": "base_stone_overworld"
+     },
+     "state": "clay"
+    }
+   ],
+   "size": 33
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 46
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 256
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "disk_sand": {
+  "type": "disk",
+  "config": {
+   "state_provider": {
+    "fallback": "sand",
+    "rules": [
+     {
+      "if_true": {
+       "type": "matching_blocks",
+       "blocks": "air",
+       "offset": [
+        0,
+        -1,
+        0
+       ]
+      },
+      "then": "sandstone"
+     }
+    ]
+   },
+   "target": {
+    "type": "matching_blocks",
+    "blocks": [
+     "dirt",
+     "grass_block"
+    ]
+   },
+   "radius": [
+    2,
+    6
+   ],
+   "half_height": 2
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "matching_fluids",
+     "fluids": "water"
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "disk_clay": {
+  "type": "disk",
+  "config": {
+   "state_provider": "clay",
+   "target": {
+    "type": "matching_blocks",
+    "blocks": [
+     "dirt",
+     "clay"
+    ]
+   },
+   "radius": [
+    2,
+    3
+   ],
+   "half_height": 1
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "matching_fluids",
+     "fluids": "water"
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "disk_gravel": {
+  "type": "disk",
+  "config": {
+   "state_provider": "gravel",
+   "target": {
+    "type": "matching_blocks",
+    "blocks": [
+     "dirt",
+     "grass_block"
+    ]
+   },
+   "radius": [
+    2,
+    5
+   ],
+   "half_height": 2
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "matching_fluids",
+     "fluids": "water"
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ }
+}

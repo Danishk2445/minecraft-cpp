@@ -1,6 +1,8 @@
 #include <cmath>
 #include <memory>
+#include <map>
 #include <set>
+#include <tuple>
 
 #include <gtest/gtest.h>
 
@@ -15,6 +17,8 @@
 #include "world/gen/BiomeLayout.h"
 #include "world/gen/OverworldGenerator.h"
 #include "world/gen/TerrainSplines.h"
+#include "world/gen/feature/BiomeDecorator.h"
+#include "world/gen/feature/DecorationRegion.h"
 
 using namespace mc;
 
@@ -182,8 +186,11 @@ TEST_F(WorldgenFixture, TerrainIsAPureFunction) {
     EXPECT_NE(hashChunk(a), hashChunk(c));
 }
 
+std::shared_ptr<BiomeDecorator> loadDecorator(const BlockRegistry& reg, const BiomeRegistry& biomes);
+
 TEST_F(WorldgenFixture, OverworldPipelineIsDeterministic) {
-    auto gen = std::make_shared<OverworldGenerator>(*registry, *biomes, 99);
+    // Decorated: features read neighbor snapshots and MERGE combines nine sources.
+    auto gen = std::make_shared<OverworldGenerator>(*registry, *biomes, 99, loadDecorator(*registry, *biomes));
     const std::vector<ChunkPos> wanted = {{0, 0}, {2, -2}, {4, 4}, {-3, 1}};
     // Thread counts: inline, one worker, many workers.
     const auto inlineRun = pipelineHashes(gen, 0, {0, 0}, 2, wanted);
@@ -229,4 +236,285 @@ TEST_F(WorldgenFixture, BiomeDistribution) {
         EXPECT_LT(oceanShare, 0.40) << "seed " << seed;
         EXPECT_GT(peaks, 0) << "seed " << seed;
     }
+}
+
+namespace {
+
+// Flat stone below y 0; DECORATE emits scripted writes per source chunk.
+class ScriptedGenerator final : public ChunkGenerator {
+public:
+    ScriptedGenerator(const BlockRegistry& reg) : stone_(reg.defaultState("stone")) {}
+    std::string_view type() const override { return "scripted"; }
+    void generateTerrain(Chunk& c) const override {
+        for (int y = kWorldMinY; y < 0; ++y)
+            for (int z = 0; z < 16; ++z)
+                for (int x = 0; x < 16; ++x) c.set(x, y, z, stone_);
+    }
+    void decorate(const TerrainNeighborhood& t, DecorationResult& out) const override {
+        for (const auto& [src, w] : writes)
+            if (src == t.center) out.writes.push_back(w);
+    }
+    glm::dvec3 spawnPoint() const override { return {0, 1, 0}; }
+    std::vector<std::pair<ChunkPos, BlockWrite>> writes;
+
+private:
+    StateId stone_;
+};
+
+} // namespace
+
+TEST_F(WorldgenFixture, MergeAppliesWritePolicies) {
+    auto gen = std::make_shared<ScriptedGenerator>(*registry);
+    const StateId glass = registry->defaultState("glass"), log = registry->defaultState("oak_log");
+    const StateId leaves = registry->defaultState("oak_leaves"), gold = registry->defaultState("gold_block");
+    auto w = [](BlockPos p, StateId s, StateId expect, uint16_t feature, uint8_t policy) {
+        return BlockWrite{p, s, expect, feature, 9, policy};
+    };
+    // Same block from two sources: the lower feature index lands first, and the later
+    // if-unchanged write sees a changed block and backs off.
+    gen->writes.push_back({{0, 0}, w({15, 1, 8}, glass, 0, 1, kWriteIfUnchanged)});
+    gen->writes.push_back({{1, 0}, w({15, 1, 8}, log, 0, 0, kWriteIfUnchanged)});
+    // A tree write goes over another source's leaves.
+    gen->writes.push_back({{0, 0}, w({16, 1, 8}, leaves, 0, 0, kWriteTree)});
+    gen->writes.push_back({{1, 0}, w({16, 1, 8}, log, 0, 1, kWriteTree)});
+    // ...but an if-unchanged write does not, and a forced one always does.
+    gen->writes.push_back({{0, 0}, w({17, 1, 8}, leaves, 0, 0, kWriteIfUnchanged)});
+    gen->writes.push_back({{1, 0}, w({17, 1, 8}, glass, 0, 1, kWriteIfUnchanged)});
+    gen->writes.push_back({{0, 0}, w({18, 1, 8}, leaves, 0, 0, kWriteIfUnchanged)});
+    gen->writes.push_back({{1, 0}, w({18, 1, 8}, gold, 0, 1, kWriteForce)});
+    // Writes stay deterministic when the same feature writes from two sources (source order).
+    gen->writes.push_back({{1, 0}, w({19, 1, 8}, glass, 0, 2, kWriteIfUnchanged)});
+    gen->writes.push_back({{0, 0}, w({19, 1, 8}, gold, 0, 2, kWriteIfUnchanged)});
+    for (int threads : {0, 4}) {
+        JobSystem jobs(threads);
+        ChunkManager cm(*registry, gen, jobs);
+        cm.setView({0, 0}, 2);
+        for (int i = 0; i < 2000 && !cm.viewReady(); ++i) {
+            cm.update();
+            jobs.waitIdle();
+        }
+        ASSERT_TRUE(cm.viewReady());
+        EXPECT_EQ(cm.getBlock({15, 1, 8}), log);
+        EXPECT_EQ(cm.getBlock({16, 1, 8}), log);
+        EXPECT_EQ(cm.getBlock({17, 1, 8}), leaves);
+        EXPECT_EQ(cm.getBlock({18, 1, 8}), gold);
+        EXPECT_EQ(cm.getBlock({19, 1, 8}), gold); // source (0,0) sorts before (1,0)
+    }
+}
+
+TEST_F(WorldgenFixture, DecorationRegionTracksHeightmapsAndOverlay) {
+    Chunk c({0, 0});
+    const StateId stone = registry->defaultState("stone"), water = registry->defaultState("water");
+    const StateId grass = registry->defaultState("short_grass"), leaves = registry->defaultState("oak_leaves");
+    for (int y = kWorldMinY; y <= 60; ++y) c.set(3, y, 3, stone);
+    for (int y = 61; y <= 63; ++y) c.set(3, y, 3, water);
+    TerrainNeighborhood n;
+    n.center = {0, 0};
+    n.chunks[4] = std::make_shared<const Chunk>(c);
+    DecorationResult out;
+    DecorationRegion r(*registry, *biomes, n, 7, out);
+    EXPECT_EQ(r.height(Heightmap::OceanFloor, 3, 3), 61);
+    EXPECT_EQ(r.height(Heightmap::WorldSurface, 3, 3), 64);
+    EXPECT_EQ(r.height(Heightmap::MotionBlocking, 3, 3), 64);
+    EXPECT_EQ(r.height(Heightmap::WorldSurface, 4, 4), kWorldMinY);
+    // Writes are visible to later reads and keep the cached heightmaps current.
+    r.setFeature(9, 5);
+    EXPECT_TRUE(r.setBlock({3, 70, 3}, leaves, kWriteTree));
+    EXPECT_EQ(r.getBlock({3, 70, 3}), leaves);
+    EXPECT_EQ(r.height(Heightmap::MotionBlocking, 3, 3), 71);
+    EXPECT_EQ(r.height(Heightmap::MotionBlockingNoLeaves, 3, 3), 64);
+    EXPECT_TRUE(r.setBlock({4, 0, 4}, grass));
+    EXPECT_EQ(r.height(Heightmap::WorldSurface, 4, 4), 1);
+    EXPECT_EQ(r.height(Heightmap::OceanFloor, 4, 4), kWorldMinY); // plants do not block motion
+    // Out of the 3x3 (only the center exists here) nothing is written.
+    EXPECT_FALSE(r.setBlock({20, 0, 0}, stone));
+    ASSERT_EQ(out.writes.size(), 2u);
+    EXPECT_EQ(out.writes[0].expect, BlockRegistry::kAirState);
+    EXPECT_EQ(out.writes[0].feature, 5);
+    EXPECT_EQ(out.writes[0].policy, kWriteTree);
+}
+
+std::shared_ptr<BiomeDecorator> loadDecorator(const BlockRegistry& reg, const BiomeRegistry& biomes) {
+    auto d = std::make_shared<BiomeDecorator>();
+    std::string err;
+    d->load(MC_DEFAULT_DATA_DIR, reg, biomes, &err);
+    return d;
+}
+
+// Per-chunk ore counts over a 9x9-chunk area, against bands derived from
+// vanilla's placements (blob sizes, counts, height ranges, air discards).
+TEST_F(WorldgenFixture, OreCountsPerChunk) {
+    auto gen = std::make_shared<OverworldGenerator>(*registry, *biomes, 4242, loadDecorator(*registry, *biomes));
+    JobSystem jobs(8);
+    ChunkManager cm(*registry, gen, jobs);
+    cm.setLightFunction([](const Neighborhood&, Chunk&) {});
+    cm.setView({0, 0}, 4);
+    for (int i = 0; i < 4000 && !cm.viewReady(); ++i) {
+        cm.update();
+        jobs.waitIdle();
+    }
+    ASSERT_TRUE(cm.viewReady());
+    std::map<std::string, double> count;
+    std::map<std::string, int> maxY, minY;
+    int chunks = 0;
+    for (int cz = -4; cz <= 4; ++cz)
+        for (int cx = -4; cx <= 4; ++cx) {
+            const Chunk* c = cm.chunk({cx, cz});
+            ASSERT_NE(c, nullptr);
+            ++chunks;
+            for (int y = kWorldMinY; y <= kWorldMaxY; ++y)
+                for (int z = 0; z < 16; ++z)
+                    for (int x = 0; x < 16; ++x) {
+                        std::string id(shortId(registry->blockOf(c->get(x, y, z)).id));
+                        if (id.starts_with("deepslate_") && id.ends_with("_ore")) id.erase(0, 10);
+                        if (!id.ends_with("_ore")) continue;
+                        count[id] += 1;
+                        maxY[id] = std::max(maxY.contains(id) ? maxY[id] : -1000, y);
+                        minY[id] = std::min(minY.contains(id) ? minY[id] : 1000, y);
+                    }
+        }
+    for (auto& [id, n] : count) n /= chunks;
+    // Measured once (seed 4242) and widened by about +-40%: catches broken blobs,
+    // counts or height ranges without pinning the exact random layout.
+    const std::map<std::string, std::pair<double, double>> bands = {
+        {"coal_ore", {100, 230}},  {"copper_ore", {90, 210}},   {"iron_ore", {45, 105}}, {"gold_ore", {15, 38}},
+        {"diamond_ore", {14, 34}}, {"redstone_ore", {20, 48}}, {"lapis_ore", {14, 34}},
+    };
+    for (const auto& [id, band] : bands) {
+        EXPECT_GE(count[id], band.first) << id;
+        EXPECT_LE(count[id], band.second) << id;
+    }
+    EXPECT_LE(maxY["diamond_ore"], 16 + 3); // blobs reach a few blocks past their center range
+    EXPECT_LE(maxY["redstone_ore"], 15 + 3);
+    EXPECT_LE(maxY["lapis_ore"], 64 + 3);
+    EXPECT_GE(minY["coal_ore"], -8);
+}
+
+namespace {
+
+// The nearest sample (64-block grid, spline surface) whose surface biome is `id`.
+std::optional<glm::ivec2> findBiome(const OverworldGenerator& gen, const BiomeRegistry& biomes, std::string_view id) {
+    for (int r = 0; r <= 8192; r += 64)
+        for (int dz = -r; dz <= r; dz += 64)
+            for (int dx = -r; dx <= r; dx += 64) {
+                if (std::max(std::abs(dx), std::abs(dz)) != r) continue;
+                if (shortId(biomes.get(gen.biomeAt(dx, gen.estimatedSurface(dx, dz), dz)).id) == id) return glm::ivec2(dx, dz);
+            }
+    return std::nullopt;
+}
+
+} // namespace
+
+TEST_F(WorldgenFixture, FreezeAddsSnowAndIce) {
+    auto gen = std::make_shared<OverworldGenerator>(*registry, *biomes, 31, loadDecorator(*registry, *biomes));
+    const StateId snow = registry->defaultState("snow"), ice = registry->defaultState("ice");
+    const TagId leaves = *registry->tag("leaves");
+    int coldColumns = 0, warmColumns = 0;
+    for (std::string_view biome : {"snowy_plains", "frozen_ocean", "plains"}) {
+        const auto at = findBiome(*gen, *biomes, biome);
+        ASSERT_TRUE(at.has_value()) << biome;
+        const ChunkPos center = ChunkPos::of(BlockPos{at->x, 0, at->y});
+        JobSystem jobs(8);
+        ChunkManager cm(*registry, gen, jobs);
+        cm.setLightFunction([](const Neighborhood&, Chunk&) {});
+        cm.setView(center, 1);
+        for (int i = 0; i < 2000 && !cm.viewReady(); ++i) {
+            cm.update();
+            jobs.waitIdle();
+        }
+        ASSERT_TRUE(cm.viewReady());
+        for (int dz = -1; dz <= 1; ++dz)
+            for (int dx = -1; dx <= 1; ++dx) {
+                const Chunk& c = *cm.chunk({center.x + dx, center.z + dz});
+                for (int z = 0; z < 16; ++z)
+                    for (int x = 0; x < 16; ++x) {
+                        // The motion-blocking top, as the freeze pass sees it.
+                        int y = kWorldMaxY;
+                        while (y > kWorldMinY && !countsForHeightmap(*registry, leaves, Heightmap::MotionBlocking, c.get(x, y, z))) --y;
+                        const int si = sectionIndexOfY(y + 1);
+                        const Biome& b = biomes->get(c.sections[size_t(si)].biomes[size_t(
+                            ((((y + 1 - kWorldMinY) & 15) >> 2) << 4) | ((z >> 2) << 2) | (x >> 2))]);
+                        const int wx = c.pos.minBlockX() + x, wz = c.pos.minBlockZ() + z;
+                        const StateId top = c.get(x, y, z), above = c.get(x, y + 1, z);
+                        const bool water = registry->info(top).fluid.kind == FluidKind::Water && registry->blockOf(top).className == "liquid";
+                        if (water && b.coldEnoughToSnow(wx, y, wz)) {
+                            ++coldColumns;
+                            ADD_FAILURE() << "unfrozen cold water at " << wx << "," << y << "," << wz;
+                        } else if (top == ice) {
+                            ++coldColumns;
+                            EXPECT_TRUE(b.coldEnoughToSnow(wx, y, wz));
+                        } else if (b.coldEnoughToSnow(wx, y + 1, wz) && !water) {
+                            ++coldColumns;
+                            // Snow on top unless a plant took the spot.
+                            if (above != snow) {
+                                EXPECT_FALSE(registry->info(above).flags & kAir) << wx << "," << y + 1 << "," << wz;
+                            }
+                            if (above == snow && registry->blockOf(top).id == "minecraft:grass_block") {
+                                EXPECT_EQ(registry->value(top, "snowy"), "true");
+                            }
+                        } else {
+                            ++warmColumns;
+                            EXPECT_NE(above, snow) << wx << "," << y + 1 << "," << wz;
+                        }
+                    }
+            }
+    }
+    EXPECT_GT(coldColumns, 256);
+    EXPECT_GT(warmColumns, 256);
+}
+
+// Trees span chunk borders (a source chunk writes into its 3x3), so a tree cut at a
+// border leaves orphaned leaves. Every leaf must reach a log within 6 steps
+// through leaves, which is also vanilla's leaf-decay rule.
+TEST_F(WorldgenFixture, TreesAreNotCutAtChunkBorders) {
+    auto gen = std::make_shared<OverworldGenerator>(*registry, *biomes, 77, loadDecorator(*registry, *biomes));
+    const TagId leavesTag = *registry->tag("leaves"), logsTag = *registry->tag("logs");
+    int leaves = 0, orphans = 0;
+    for (std::string_view biome : {"forest", "dark_forest", "jungle", "old_growth_spruce_taiga", "savanna"}) {
+        const auto at = findBiome(*gen, *biomes, biome);
+        ASSERT_TRUE(at.has_value()) << biome;
+        const ChunkPos center = ChunkPos::of(BlockPos{at->x, 0, at->y});
+        JobSystem jobs(8);
+        ChunkManager cm(*registry, gen, jobs);
+        cm.setLightFunction([](const Neighborhood&, Chunk&) {});
+        cm.setView(center, 2);
+        for (int i = 0; i < 4000 && !cm.viewReady(); ++i) {
+            cm.update();
+            jobs.waitIdle();
+        }
+        ASSERT_TRUE(cm.viewReady());
+        auto get = [&](const BlockPos& p) { return cm.getBlock(p); };
+        // Leaves in the 3x3 center chunks; the search may step into the ring around them.
+        for (int cz = center.z - 1; cz <= center.z + 1; ++cz)
+            for (int cx = center.x - 1; cx <= center.x + 1; ++cx) {
+                const Chunk* c = cm.chunk({cx, cz});
+                for (int y = 40; y < 260; ++y)
+                    for (int z = 0; z < 16; ++z)
+                        for (int x = 0; x < 16; ++x) {
+                            const StateId s = c->get(x, y, z);
+                            if (!registry->hasTag(s, leavesTag) || registry->value(s, "persistent") == "true") continue;
+                            ++leaves;
+                            // Breadth-first through leaves, at most 6 steps.
+                            std::vector<BlockPos> frontier{BlockPos(cx * 16 + x, y, cz * 16 + z)}, next;
+                            std::set<std::tuple<int, int, int>> seen{{frontier[0].x, frontier[0].y, frontier[0].z}};
+                            bool found = false;
+                            for (int step = 0; step < 6 && !found && !frontier.empty(); ++step) {
+                                next.clear();
+                                for (const BlockPos& p : frontier)
+                                    for (Direction d : kDirections) {
+                                        const BlockPos n = p.offset(d);
+                                        const StateId ns = get(n);
+                                        if (registry->hasTag(ns, logsTag)) found = true;
+                                        else if (registry->hasTag(ns, leavesTag) && seen.insert({n.x, n.y, n.z}).second)
+                                            next.push_back(n);
+                                    }
+                                frontier.swap(next);
+                            }
+                            orphans += !found;
+                        }
+            }
+    }
+    if (leaves == 0) GTEST_SKIP() << "no tree features loaded";
+    EXPECT_GT(leaves, 2000);
+    EXPECT_LE(orphans, leaves / 100) << orphans << " orphaned leaves of " << leaves;
 }

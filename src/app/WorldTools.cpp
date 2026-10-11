@@ -19,6 +19,7 @@
 #include "world/block/BlockRegistry.h"
 #include "world/chunk/ChunkManager.h"
 #include "world/gen/OverworldGenerator.h"
+#include "world/gen/feature/BiomeDecorator.h"
 #include "world/light/LightEngine.h"
 
 namespace mc {
@@ -33,6 +34,8 @@ struct Context {
     BlockModels models;
     BlockRegistry registry;
     BiomeRegistry biomes;
+    std::shared_ptr<BiomeDecorator> decorator = std::make_shared<BiomeDecorator>();
+    std::string registryErrors, decoratorErrors;
 
     bool load(const CliOptions& o) {
         pack = std::make_unique<ResourcePack>(o.assetsDir);
@@ -45,12 +48,16 @@ struct Context {
         baker = std::make_unique<ModelBaker>(*store, *atlas);
         models.load(*pack, *store, *baker);
         std::string err;
-        if (!registry.build(models, *atlas, o.dataDir, &err)) log::warn("block registry: {}", err);
+        if (!registry.build(models, *atlas, o.dataDir, &registryErrors)) log::warn("block registry: {}", registryErrors);
         if (!biomes.load(o.dataDir, o.assetsDir, &err)) {
             log::error("biomes: {}", err);
             return false;
         }
+        decorator->load(o.dataDir, registry, biomes, &decoratorErrors);
         return true;
+    }
+    std::shared_ptr<OverworldGenerator> generator(int64_t seed) const {
+        return std::make_shared<OverworldGenerator>(registry, biomes, seed, decorator);
     }
 };
 
@@ -80,7 +87,8 @@ uint32_t mapColor(std::string_view id) {
 }
 
 int dumpColumn(const Context& ctx, const CliOptions& o) {
-    const OverworldGenerator gen(ctx.registry, ctx.biomes, o.seed);
+    const auto genPtr = ctx.generator(o.seed);
+    const OverworldGenerator& gen = *genPtr;
     std::printf("%s", gen.describeColumn(o.dumpColumn->x, o.dumpColumn->y).c_str());
     std::printf("terrain top %d\n", gen.terrainTop(o.dumpColumn->x, o.dumpColumn->y));
     const glm::dvec3 sp = gen.spawnPoint();
@@ -141,6 +149,20 @@ int biomeMap(const Context& ctx, const CliOptions& o) {
             p[2] = uint8_t(std::clamp((c & 255) * shade, 0.0, 255.0));
             p[3] = 255;
         }
+    // Interior samples: the 5x5 samples around are all the same biome.
+    std::vector<glm::ivec3> inside(ctx.biomes.size(), glm::ivec3(0, 0, -1));
+    for (int row = 2; row + 2 < n; ++row)
+        for (int col = 2; col + 2 < n; ++col) {
+            const BiomeId b = biome[size_t(row) * size_t(n) + size_t(col)];
+            bool uniform = true;
+            for (int dr = -2; dr <= 2 && uniform; ++dr)
+                for (int dc = -2; dc <= 2 && uniform; ++dc)
+                    uniform = biome[size_t(row + dr) * size_t(n) + size_t(col + dc)] == b;
+            if (!uniform) continue;
+            const int dx = (col - n / 2) * step, dz = (row - n / 2) * step;
+            glm::ivec3& best = inside[b];
+            if (best.z < 0 || dx * dx + dz * dz < best.z) best = {center.x + dx, center.y + dz, dx * dx + dz * dz};
+        }
     const size_t total = height.size();
     std::vector<std::pair<size_t, BiomeId>> order;
     for (size_t b = 0; b < counts.size(); ++b)
@@ -148,9 +170,11 @@ int biomeMap(const Context& ctx, const CliOptions& o) {
     std::sort(order.rbegin(), order.rend());
     std::printf("seed %lld, %dx%d blocks around %d,%d (step %d) in %.0f ms\n", o.seed, n * step, n * step, center.x,
                 center.y, step, sw.millis());
-    for (const auto& [count, b] : order)
-        std::printf("  %-26s %6.2f%%  nearest %d,%d\n", std::string(shortId(ctx.biomes.get(b).id)).c_str(),
-                    100.0 * double(count) / double(total), nearest[b].x, nearest[b].y);
+    for (const auto& [count, b] : order) {
+        const glm::ivec3 in = inside[b].z >= 0 ? inside[b] : nearest[b];
+        std::printf("  %-26s %6.2f%%  nearest %d,%d  inside %d,%d\n", std::string(shortId(ctx.biomes.get(b).id)).c_str(),
+                    100.0 * double(count) / double(total), nearest[b].x, nearest[b].y, in.x, in.y);
+    }
     const size_t hi = size_t(std::max_element(height.begin(), height.end()) - height.begin());
     std::printf("biomes %zu, ocean %.1f%%, highest estimate y %d at %d,%d\n", order.size(),
                 100.0 * double(ocean) / double(total), height[hi], center.x + (int(hi % size_t(n)) - n / 2) * step,
@@ -162,11 +186,13 @@ int biomeMap(const Context& ctx, const CliOptions& o) {
     return 0;
 }
 
-// Vertical cross-section of TERRAIN-stage chunks: x across, y up (2 px per block).
+// Vertical cross-section of block-final chunks (terrain plus decoration from the
+// real pipeline): x across, y up, 2 px per block.
 int slice(const Context& ctx, const CliOptions& o) {
-    const OverworldGenerator gen(ctx.registry, ctx.biomes, o.seed);
+    auto genPtr = ctx.generator(o.seed);
+    const OverworldGenerator& gen = *genPtr;
     const glm::dvec3 at = o.pos.value_or(gen.spawnPoint());
-    const int z = int(std::floor(at.z)), width = std::min(o.mapSize, 4096);
+    const int z = int(std::floor(at.z)), width = std::min(o.mapSize, 1024);
     const int x0 = int(std::floor(at.x)) - width / 2;
     std::map<std::string_view, uint32_t, std::less<>> palette = {
         {"stone", 0x7F7F7F}, {"deepslate", 0x4D4D52}, {"water", 0x3F76E4}, {"lava", 0xFF7A00}, {"bedrock", 0x222222},
@@ -176,12 +202,18 @@ int slice(const Context& ctx, const CliOptions& o) {
         {"packed_ice", 0x8DB4FA}, {"calcite", 0xDFE0DC}, {"terracotta", 0x985E43}, {"mud", 0x3C393D},
     };
     Image img(width * 2, kWorldHeight * 2, 0x000000FFu);
-    std::vector<std::unique_ptr<Chunk>> chunks;
-    for (int cx = x0 >> 4; cx <= (x0 + width - 1) >> 4; ++cx) {
-        auto c = std::make_unique<Chunk>(ChunkPos(cx, z >> 4));
-        gen.generateTerrain(*c);
-        chunks.push_back(std::move(c));
+    // Run the pipeline over a square that covers the slice's row of chunks.
+    const int cx0 = x0 >> 4, cx1 = (x0 + width - 1) >> 4;
+    JobSystem jobs(o.threads);
+    ChunkManager cm(ctx.registry, genPtr, jobs);
+    cm.setLightFunction([](const Neighborhood&, Chunk&) {}); // light is not needed
+    cm.setView(ChunkPos((cx0 + cx1) / 2, z >> 4), (cx1 - cx0) / 2 + 1);
+    while (!cm.viewReady()) {
+        cm.update();
+        jobs.drainMain(1.0);
     }
+    std::vector<const Chunk*> chunks;
+    for (int cx = cx0; cx <= cx1; ++cx) chunks.push_back(cm.chunk(ChunkPos(cx, z >> 4)));
     size_t underground = 0, caveAir = 0;
     for (const auto& c : chunks)
         for (int lz = 0; lz < 16; ++lz)
@@ -196,7 +228,7 @@ int slice(const Context& ctx, const CliOptions& o) {
         for (int y = kWorldMinY; y <= kWorldMaxY; ++y) {
             const StateId s = c.get(x & 15, y, z & 15);
             uint32_t rgb = 0xA8C8FF; // air above ground: sky
-            if (s != 0) {
+            if (!(ctx.registry.info(s).flags & kAir)) {
                 const std::string_view id = shortId(ctx.registry.blockOf(s).id);
                 auto it = palette.find(id);
                 if (it != palette.end()) {
@@ -209,7 +241,7 @@ int slice(const Context& ctx, const CliOptions& o) {
             } else if (y < kWorldMaxY) {
                 // Air with something solid above it is cave air.
                 for (int yy = y + 1; yy <= std::min(kWorldMaxY, y + 200); ++yy)
-                    if (c.get(x & 15, yy, z & 15) != 0) {
+                    if (!(ctx.registry.info(c.get(x & 15, yy, z & 15)).flags & kAir)) {
                         rgb = 0x101010;
                         break;
                     }
@@ -234,7 +266,7 @@ int slice(const Context& ctx, const CliOptions& o) {
 
 // Generates and lights a square of chunks through the real pipeline.
 int benchGen(const Context& ctx, const CliOptions& o) {
-    auto gen = std::make_shared<OverworldGenerator>(ctx.registry, ctx.biomes, o.seed);
+    auto gen = ctx.generator(o.seed);
     JobSystem jobs(o.threads);
     // The view of radius r needs lit chunks out to r + 1: pick r so about N chunks get lit.
     const int r = std::max(0, int(std::ceil((std::sqrt(double(o.benchGen)) - 1.0) / 2.0)) - 1);
@@ -256,14 +288,41 @@ int benchGen(const Context& ctx, const CliOptions& o) {
     return 0;
 }
 
+// Loads all data and lists every problem found (also the ones the game only logs).
+int checkData(const Context& ctx) {
+    int problems = 0;
+    auto report = [&](const char* what, const std::string& text) {
+        for (size_t start = 0; start < text.size();) {
+            const size_t end = text.find('\n', start);
+            const std::string line = text.substr(start, end - start);
+            if (!line.empty()) {
+                std::printf("%s: %s\n", what, line.c_str());
+                ++problems;
+            }
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+    };
+    report("blocks", ctx.registryErrors);
+    report("features", ctx.decoratorErrors);
+    const FeatureSet& features = ctx.decorator->features();
+    size_t ordered = 0;
+    for (size_t s = 0; s < ctx.decorator->stepCount(); ++s) ordered += ctx.decorator->order(s).size();
+    std::printf("%zu blocks, %zu states, %zu tags, %zu biomes, %zu placed features (%zu in biome sets); %d problem(s)\n",
+                ctx.registry.blockCount(), ctx.registry.stateCount(), ctx.registry.tags().size(), ctx.biomes.size(),
+                features.size(), ordered, problems);
+    return problems == 0 ? 0 : 1;
+}
+
 } // namespace
 
 std::optional<int> runWorldTools(const CliOptions& o) {
-    if (!o.dumpColumn && o.biomeMap.empty() && o.slice.empty() && o.benchGen <= 0) return std::nullopt;
+    if (!o.dumpColumn && o.biomeMap.empty() && o.slice.empty() && o.benchGen <= 0 && !o.checkData) return std::nullopt;
     Stopwatch sw;
     Context ctx;
     if (!ctx.load(o)) return 1;
     log::info("World tool context loaded in {:.0f} ms", sw.millis());
+    if (o.checkData) return checkData(ctx);
     if (o.dumpColumn) return dumpColumn(ctx, o);
     if (!o.biomeMap.empty()) return biomeMap(ctx, o);
     if (!o.slice.empty()) return slice(ctx, o);

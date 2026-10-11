@@ -8,7 +8,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
 - [x] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
 - [x] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
-- [ ] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
+- [x] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
 - [ ] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
 - [ ] M7 Entity models: ModelPart, block-entity renderers, player model, F5
 - [ ] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
@@ -66,3 +66,11 @@ Recorded per milestone.
   - Spawn: the nearest land column on a square spiral of 16-block steps that is not ocean, river, beach or peaks. Vanilla searches climate parameter space instead. The free camera starts 12 blocks above it until the player arrives in M6.
   - The biome statistics test samples 32768² blocks per seed, not 4096². The continentalness noise varies over about 2,000 blocks, so 4096² samples range from 16% to 53% ocean. Over large areas ocean is 29–31%.
   - Fluid side faces are hidden only by a neighbor whose face is fully covered. Vanilla also compares the fluid's height with the neighbor's shape.
+- **M5:**
+  - Feature data (`data/worldgen/features/*.json`, `biome_features.json`) reproduces vanilla's configured and placed features from memory; there are no vanilla data files. The 1.21.5 additions (bushes, dry grass, leaf litter, wildflowers, firefly bushes, fallen trees, cactus flowers) are the least certain.
+  - Features decide against the TERRAIN snapshots of their 3×3 area plus their own source's writes, so features from neighboring source chunks cannot see each other. MERGE applies writes feature by feature and skips stale ones; a post-pass removes column-supported blocks (plants, dripstone, carpets) whose support another source replaced. Overlapping trees from different sources can keep leaf distances that are too large (about 3% of leaves); leaf decay arrives in M11.
+  - Not generated: structures (monster rooms, geodes, fossils, desert wells), mangrove swamps, pale gardens and the deep dark (as planned). Bee nests have no bees. Springs stay single source blocks until fluids tick (M11).
+  - Underwater magma almost never appears: it needs flooded caves at least two blocks below the sea floor, which the aquifer stand-in rarely makes.
+  - Noise-driven counts and states (flower patches, coral, kelp, bamboo, meadow flowers) use stand-in noises, and geometry uses `std::sin`/`std::cos` rather than vanilla's lookup tables. Worlds are not seed-compatible anyway.
+  - Ice spikes and groves get snow-block surfaces (vanilla mixes in powder snow). Snow and ice ignore block light, which does not exist yet at generation time. Mushrooms survive regardless of light during generation.
+  - Every top-level random call is sequenced: C++ leaves the order of operands such as `nextInt() - nextInt()` unspecified, and worlds must not depend on the compiler.

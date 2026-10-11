@@ -57,6 +57,7 @@ struct CliOptions {
     int mapStep = 4;                       // biome map: blocks per pixel
     int benchGen = 0;                      // generate and light about N chunks, report throughput, exit
     std::filesystem::path slice;           // write a vertical x/y cross-section PNG of the terrain, then exit
+    bool checkData = false;                // load blocks, tags, biomes and features; report every problem; exit
 
     std::string logLevel = "info";
     bool help = false;

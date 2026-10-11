@@ -1,0 +1,700 @@
+{
+ "_comment": "Decoration steps (vanilla GenerationStep.Decoration) and feature sets; biomes.json picks a set per biome. Lists are ordered; a set's 'include' lists come first.",
+ "steps": [
+  "raw_generation",
+  "lakes",
+  "local_modifications",
+  "underground_structures",
+  "surface_structures",
+  "strongholds",
+  "underground_ores",
+  "underground_decoration",
+  "fluid_springs",
+  "vegetal_decoration",
+  "top_layer_modification"
+ ],
+ "sets": {
+  "base": {
+   "_comment": "vanilla globalOverworldGeneration + default ores (underwater magma after copper), soft disks, springs and glow lichen",
+   "lakes": [
+    "lake_lava_underground",
+    "lake_lava_surface"
+   ],
+   "underground_ores": [
+    "ore_dirt",
+    "ore_gravel",
+    "ore_granite_upper",
+    "ore_granite_lower",
+    "ore_diorite_upper",
+    "ore_diorite_lower",
+    "ore_andesite_upper",
+    "ore_andesite_lower",
+    "ore_tuff",
+    "ore_coal_upper",
+    "ore_coal_lower",
+    "ore_iron_upper",
+    "ore_iron_middle",
+    "ore_iron_small",
+    "ore_gold",
+    "ore_gold_lower",
+    "ore_redstone",
+    "ore_redstone_lower",
+    "ore_diamond",
+    "ore_diamond_medium",
+    "ore_diamond_large",
+    "ore_diamond_buried",
+    "ore_lapis",
+    "ore_lapis_buried",
+    "ore_copper",
+    "underwater_magma",
+    "disk_sand",
+    "disk_clay",
+    "disk_gravel"
+   ],
+   "fluid_springs": [
+    "spring_water",
+    "spring_lava"
+   ],
+   "vegetal_decoration": [
+    "glow_lichen"
+   ]
+  },
+  "plains": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_tall_grass_2",
+    "trees_plains",
+    "flower_plains",
+    "patch_grass_plain",
+    "patch_bush",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "sunflower_plains": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_tall_grass_2",
+    "patch_sunflower",
+    "trees_plains",
+    "flower_plains",
+    "patch_grass_plain",
+    "patch_bush",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "snowy_plains": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_snowy",
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "ice_spikes": {
+   "include": [
+    "base"
+   ],
+   "surface_structures": [
+    "ice_spike",
+    "ice_patch"
+   ],
+   "vegetal_decoration": [
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "desert": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_dry_grass_desert",
+    "patch_dead_bush_2",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane_desert",
+    "patch_pumpkin",
+    "patch_cactus_desert"
+   ]
+  },
+  "savanna": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_tall_grass",
+    "trees_savanna",
+    "flower_warm",
+    "patch_grass_savanna",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "windswept_savanna": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_windswept_savanna",
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "badlands": {
+   "include": [
+    "base"
+   ],
+   "underground_ores": [
+    "ore_gold_extra"
+   ],
+   "vegetal_decoration": [
+    "patch_grass_badlands",
+    "patch_dry_grass_badlands",
+    "patch_dead_bush_badlands",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane_badlands",
+    "patch_cactus_decorated"
+   ]
+  },
+  "wooded_badlands": {
+   "include": [
+    "badlands"
+   ],
+   "vegetal_decoration": [
+    "trees_badlands"
+   ]
+  },
+  "forest": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "forest_flowers",
+    "trees_birch_and_oak",
+    "flower_default",
+    "patch_grass_forest",
+    "patch_bush",
+    "patch_leaf_litter",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "flower_forest": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "forest_flowers",
+    "flower_flower_forest",
+    "trees_flower_forest",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "birch_forest": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "forest_flowers",
+    "wildflowers_birch_forest",
+    "trees_birch",
+    "flower_default",
+    "patch_grass_forest",
+    "patch_bush",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "old_growth_birch_forest": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "forest_flowers",
+    "wildflowers_birch_forest",
+    "birch_tall",
+    "flower_default",
+    "patch_grass_forest",
+    "patch_bush",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "dark_forest": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "dark_forest_vegetation",
+    "forest_flowers",
+    "flower_default",
+    "patch_grass_forest",
+    "patch_leaf_litter",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "taiga": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_large_fern",
+    "trees_taiga",
+    "flower_default",
+    "patch_grass_taiga_2",
+    "brown_mushroom_taiga",
+    "red_mushroom_taiga",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "patch_berry_common"
+   ]
+  },
+  "snowy_taiga": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_large_fern",
+    "trees_taiga",
+    "flower_default",
+    "patch_grass_taiga_2",
+    "brown_mushroom_taiga",
+    "red_mushroom_taiga",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "patch_berry_common"
+   ]
+  },
+  "old_growth_pine_taiga": {
+   "include": [
+    "base"
+   ],
+   "local_modifications": [
+    "forest_rock"
+   ],
+   "vegetal_decoration": [
+    "patch_large_fern",
+    "trees_old_growth_pine_taiga",
+    "flower_default",
+    "patch_grass_taiga",
+    "patch_dead_bush",
+    "brown_mushroom_old_growth",
+    "red_mushroom_old_growth",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "patch_berry_rare"
+   ]
+  },
+  "old_growth_spruce_taiga": {
+   "include": [
+    "base"
+   ],
+   "local_modifications": [
+    "forest_rock"
+   ],
+   "vegetal_decoration": [
+    "patch_large_fern",
+    "trees_old_growth_spruce_taiga",
+    "flower_default",
+    "patch_grass_taiga",
+    "patch_dead_bush",
+    "brown_mushroom_old_growth",
+    "red_mushroom_old_growth",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "patch_berry_rare"
+   ]
+  },
+  "jungle": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "bamboo_light",
+    "trees_jungle",
+    "flower_warm",
+    "patch_grass_jungle",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "vines",
+    "patch_melon"
+   ]
+  },
+  "sparse_jungle": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_sparse_jungle",
+    "flower_warm",
+    "patch_grass_jungle",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "vines",
+    "patch_melon_sparse"
+   ]
+  },
+  "bamboo_jungle": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "bamboo",
+    "bamboo_vegetation",
+    "flower_warm",
+    "patch_grass_jungle",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "vines",
+    "patch_melon"
+   ]
+  },
+  "swamp": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_swamp",
+    "flower_swamp",
+    "patch_grass_normal",
+    "patch_dead_bush",
+    "patch_waterlily",
+    "brown_mushroom_swamp",
+    "red_mushroom_swamp",
+    "patch_sugar_cane_swamp",
+    "patch_pumpkin",
+    "seagrass_swamp",
+    "patch_firefly_bush_swamp",
+    "patch_firefly_bush_near_water_swamp"
+   ]
+  },
+  "mushroom_fields": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "mushroom_island_vegetation",
+    "brown_mushroom_taiga",
+    "red_mushroom_taiga",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "meadow": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_meadow",
+    "flower_meadow",
+    "wildflowers_meadow",
+    "patch_tall_grass_2",
+    "patch_grass_plain"
+   ]
+  },
+  "cherry_grove": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "patch_tall_grass",
+    "patch_grass_plain",
+    "flower_cherry",
+    "trees_cherry"
+   ]
+  },
+  "grove": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "trees_grove"
+   ],
+   "fluid_springs": [
+    "spring_lava_frozen"
+   ]
+  },
+  "snowy_slopes": {
+   "include": [
+    "base"
+   ],
+   "fluid_springs": [
+    "spring_lava_frozen"
+   ]
+  },
+  "peaks": {
+   "include": [
+    "base"
+   ],
+   "fluid_springs": [
+    "spring_lava_frozen"
+   ]
+  },
+  "windswept_hills": {
+   "include": [
+    "base"
+   ],
+   "underground_ores": [
+    "ore_emerald",
+    "ore_infested"
+   ],
+   "vegetal_decoration": [
+    "trees_windswept_hills",
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "windswept_forest": {
+   "include": [
+    "base"
+   ],
+   "underground_ores": [
+    "ore_emerald",
+    "ore_infested"
+   ],
+   "vegetal_decoration": [
+    "trees_windswept_forest",
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "river": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin",
+    "seagrass_river",
+    "patch_firefly_bush_near_water"
+   ]
+  },
+  "frozen_river": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "flower_default",
+    "patch_grass_normal",
+    "brown_mushroom_normal",
+    "red_mushroom_normal",
+    "patch_sugar_cane",
+    "patch_pumpkin"
+   ]
+  },
+  "beach": {
+   "include": [
+    "base"
+   ]
+  },
+  "snowy_beach": {
+   "include": [
+    "base"
+   ]
+  },
+  "stony_shore": {
+   "include": [
+    "base"
+   ]
+  },
+  "ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_normal",
+    "kelp_cold"
+   ]
+  },
+  "deep_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_deep",
+    "kelp_cold"
+   ]
+  },
+  "cold_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_cold",
+    "kelp_cold"
+   ]
+  },
+  "deep_cold_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_deep_cold",
+    "kelp_cold"
+   ]
+  },
+  "lukewarm_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_warm",
+    "kelp_warm",
+    "sea_pickle"
+   ]
+  },
+  "deep_lukewarm_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "seagrass_deep_warm",
+    "kelp_warm",
+    "sea_pickle"
+   ]
+  },
+  "warm_ocean": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "warm_ocean_vegetation",
+    "seagrass_warm",
+    "sea_pickle"
+   ]
+  },
+  "frozen_ocean": {
+   "include": [
+    "base"
+   ],
+   "local_modifications": [
+    "iceberg_packed",
+    "iceberg_blue"
+   ],
+   "surface_structures": [
+    "blue_ice"
+   ]
+  },
+  "lush_caves": {
+   "include": [
+    "base"
+   ],
+   "vegetal_decoration": [
+    "lush_caves_ceiling_vegetation",
+    "cave_vines",
+    "lush_caves_clay",
+    "lush_caves_vegetation",
+    "rooted_azalea_tree",
+    "spore_blossom",
+    "classic_vines_cave_feature"
+   ]
+  },
+  "dripstone_caves": {
+   "lakes": [
+    "lake_lava_underground",
+    "lake_lava_surface"
+   ],
+   "local_modifications": [
+    "large_dripstone"
+   ],
+   "underground_ores": [
+    "ore_dirt",
+    "ore_gravel",
+    "ore_granite_upper",
+    "ore_granite_lower",
+    "ore_diorite_upper",
+    "ore_diorite_lower",
+    "ore_andesite_upper",
+    "ore_andesite_lower",
+    "ore_tuff",
+    "ore_coal_upper",
+    "ore_coal_lower",
+    "ore_iron_upper",
+    "ore_iron_middle",
+    "ore_iron_small",
+    "ore_gold",
+    "ore_gold_lower",
+    "ore_redstone",
+    "ore_redstone_lower",
+    "ore_diamond",
+    "ore_diamond_medium",
+    "ore_diamond_large",
+    "ore_diamond_buried",
+    "ore_lapis",
+    "ore_lapis_buried",
+    "ore_copper_large",
+    "underwater_magma",
+    "disk_sand",
+    "disk_clay",
+    "disk_gravel"
+   ],
+   "fluid_springs": [
+    "spring_water",
+    "spring_lava"
+   ],
+   "vegetal_decoration": [
+    "glow_lichen",
+    "dripstone_cluster",
+    "pointed_dripstone"
+   ]
+  }
+ }
+}

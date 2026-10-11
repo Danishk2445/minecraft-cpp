@@ -1,0 +1,1710 @@
+{
+ "_comment": "Vanilla TreeFeatures/TreePlacements and the tree parts of VegetationFeatures/VegetationPlacements (1.21.5+: leaf litter, fallen trees). '*_checked' and other plain tree names carry the sapling-survival filter vanilla's TreePlacements add; trees_*, birch_tall, bamboo_vegetation, dark_forest_vegetation, mushroom_island_vegetation and rooted_azalea_tree are what biomes run.",
+ "oak_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "fancy_oak_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "acacia_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "acacia_log",
+   "trunk_placer": {"type": "forking_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 2},
+   "foliage_provider": "acacia_leaves",
+   "foliage_placer": {"type": "acacia_foliage_placer", "radius": 2, "offset": 0},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "acacia_sapling"}}
+  ]
+ },
+ "spruce_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 1},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "spruce_foliage_placer",
+    "radius": {"type": "uniform", "min_inclusive": 2, "max_inclusive": 3},
+    "offset": {"type": "uniform", "min_inclusive": 0, "max_inclusive": 2},
+    "trunk_height": {"type": "uniform", "min_inclusive": 1, "max_inclusive": 2}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 2, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "spruce_sapling"}}
+  ]
+ },
+ "pine_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 6, "height_rand_a": 4, "height_rand_b": 0},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "pine_foliage_placer",
+    "radius": 1,
+    "offset": 1,
+    "height": {"type": "uniform", "min_inclusive": 3, "max_inclusive": 4}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 2, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "spruce_sapling"}}
+  ]
+ },
+ "spruce_on_snow": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 1},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "spruce_foliage_placer",
+    "radius": {"type": "uniform", "min_inclusive": 2, "max_inclusive": 3},
+    "offset": {"type": "uniform", "min_inclusive": 0, "max_inclusive": 2},
+    "trunk_height": {"type": "uniform", "min_inclusive": 1, "max_inclusive": 2}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 2, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "environment_scan",
+    "direction_of_search": "up",
+    "max_steps": 8,
+    "target_condition": {"type": "not", "predicate": {"type": "matching_blocks", "blocks": "powder_snow"}}
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "any_of",
+     "predicates": [
+      {"type": "matching_blocks", "offset": [0, -1, 0], "blocks": ["snow_block", "powder_snow"]},
+      {"type": "would_survive", "state": "spruce_sapling"}
+     ]
+    }
+   }
+  ]
+ },
+ "pine_on_snow": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 6, "height_rand_a": 4, "height_rand_b": 0},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "pine_foliage_placer",
+    "radius": 1,
+    "offset": 1,
+    "height": {"type": "uniform", "min_inclusive": 3, "max_inclusive": 4}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 2, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "environment_scan",
+    "direction_of_search": "up",
+    "max_steps": 8,
+    "target_condition": {"type": "not", "predicate": {"type": "matching_blocks", "blocks": "powder_snow"}}
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "any_of",
+     "predicates": [
+      {"type": "matching_blocks", "offset": [0, -1, 0], "blocks": ["snow_block", "powder_snow"]},
+      {"type": "would_survive", "state": "spruce_sapling"}
+     ]
+    }
+   }
+  ]
+ },
+ "mega_spruce_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "giant_trunk_placer", "base_height": 13, "height_rand_a": 2, "height_rand_b": 14},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "mega_pine_foliage_placer",
+    "radius": 0,
+    "offset": 0,
+    "crown_height": {"type": "uniform", "min_inclusive": 13, "max_inclusive": 17}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 1, "upper_size": 2},
+   "decorators": [{"type": "alter_ground", "provider": "podzol"}],
+   "ignore_vines": false,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "spruce_sapling"}}
+  ]
+ },
+ "mega_pine_checked": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "giant_trunk_placer", "base_height": 13, "height_rand_a": 2, "height_rand_b": 14},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "mega_pine_foliage_placer",
+    "radius": 0,
+    "offset": 0,
+    "crown_height": {"type": "uniform", "min_inclusive": 3, "max_inclusive": 7}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 1, "upper_size": 2},
+   "decorators": [{"type": "alter_ground", "provider": "podzol"}],
+   "ignore_vines": false,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "spruce_sapling"}}
+  ]
+ },
+ "jungle_tree": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "jungle_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 8, "height_rand_b": 0},
+   "foliage_provider": "jungle_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {"type": "cocoa", "probability": 0.2},
+    {"type": "trunk_vine"},
+    {"type": "leave_vine", "probability": 0.25}
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "jungle_sapling"}}
+  ]
+ },
+ "mega_jungle_tree": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "jungle_log",
+   "trunk_placer": {
+    "type": "mega_jungle_trunk_placer",
+    "base_height": 10,
+    "height_rand_a": 2,
+    "height_rand_b": 19
+   },
+   "foliage_provider": "jungle_leaves",
+   "foliage_placer": {"type": "jungle_foliage_placer", "radius": 2, "offset": 0, "height": 2},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 1, "upper_size": 2},
+   "decorators": [{"type": "trunk_vine"}, {"type": "leave_vine", "probability": 0.25}],
+   "ignore_vines": false,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "jungle_sapling"}}
+  ]
+ },
+ "jungle_bush": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "jungle_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 1, "height_rand_a": 0, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "bush_foliage_placer", "radius": 2, "offset": 1, "height": 2},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 0, "lower_size": 0, "upper_size": 0},
+   "decorators": [],
+   "ignore_vines": false,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "oak_bees_002": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 0.02}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "birch_bees_0002": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 0.002}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "birch_bees_002": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 0.02}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "fancy_oak_bees_002": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [{"type": "beehive", "probability": 0.02}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "fancy_oak_bees": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [{"type": "beehive", "probability": 1.0}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "super_birch_bees_0002": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 6},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 0.002}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "super_birch_bees": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 6},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 1.0}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "oak_bees_005": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "beehive", "probability": 0.05}],
+   "ignore_vines": true,
+   "force_dirt": false
+  }
+ },
+ "fancy_oak_bees_005": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [{"type": "beehive", "probability": 0.05}],
+   "ignore_vines": true,
+   "force_dirt": false
+  }
+ },
+ "oak_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "birch_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "fancy_oak_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "dark_oak_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "dark_oak_log",
+   "trunk_placer": {"type": "dark_oak_trunk_placer", "base_height": 6, "height_rand_a": 2, "height_rand_b": 1},
+   "foliage_provider": "dark_oak_leaves",
+   "foliage_placer": {"type": "dark_oak_foliage_placer", "radius": 0, "offset": 0},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "three_layers_feature_size",
+    "limit": 1,
+    "upper_limit": 1,
+    "lower_size": 0,
+    "middle_size": 1,
+    "upper_size": 2
+   },
+   "decorators": [
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "dark_oak_sapling"}}
+  ]
+ },
+ "oak_bees_0002_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {"type": "beehive", "probability": 0.002},
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "birch_bees_0002_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "birch_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "birch_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {"type": "beehive", "probability": 0.002},
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "fancy_oak_bees_0002_leaf_litter": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "fancy_trunk_placer", "base_height": 3, "height_rand_a": 11, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "fancy_foliage_placer", "radius": 2, "offset": 4, "height": 4},
+   "dirt_provider": "dirt",
+   "minimum_size": {
+    "type": "two_layers_feature_size",
+    "limit": 0,
+    "lower_size": 0,
+    "upper_size": 0,
+    "min_clipped_height": 4
+   },
+   "decorators": [
+    {"type": "beehive", "probability": 0.002},
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "fallen_oak_tree": {
+  "type": "fallen_tree",
+  "config": {
+   "trunk_provider": "oak_log[axis=y]",
+   "log_length": {"type": "uniform", "min_inclusive": 4, "max_inclusive": 7},
+   "stump_decorators": [],
+   "log_decorators": [
+    {
+     "type": "attached_to_logs",
+     "probability": 0.1,
+     "directions": ["up"],
+     "block_provider": {
+      "type": "weighted_state_provider",
+      "entries": [{"data": "red_mushroom", "weight": 2}, {"data": "brown_mushroom", "weight": 1}]
+     }
+    }
+   ]
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "fallen_birch_tree": {
+  "type": "fallen_tree",
+  "config": {
+   "trunk_provider": "birch_log[axis=y]",
+   "log_length": {"type": "uniform", "min_inclusive": 5, "max_inclusive": 8},
+   "stump_decorators": [],
+   "log_decorators": [
+    {
+     "type": "attached_to_logs",
+     "probability": 0.1,
+     "directions": ["up"],
+     "block_provider": {
+      "type": "weighted_state_provider",
+      "entries": [{"data": "red_mushroom", "weight": 2}, {"data": "brown_mushroom", "weight": 1}]
+     }
+    }
+   ]
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "fallen_super_birch_tree": {
+  "type": "fallen_tree",
+  "config": {
+   "trunk_provider": "birch_log[axis=y]",
+   "log_length": {"type": "uniform", "min_inclusive": 5, "max_inclusive": 15},
+   "stump_decorators": [],
+   "log_decorators": [
+    {
+     "type": "attached_to_logs",
+     "probability": 0.1,
+     "directions": ["up"],
+     "block_provider": {
+      "type": "weighted_state_provider",
+      "entries": [{"data": "red_mushroom", "weight": 2}, {"data": "brown_mushroom", "weight": 1}]
+     }
+    }
+   ]
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "fallen_jungle_tree": {
+  "type": "fallen_tree",
+  "config": {
+   "trunk_provider": "jungle_log[axis=y]",
+   "log_length": {"type": "uniform", "min_inclusive": 4, "max_inclusive": 11},
+   "stump_decorators": [{"type": "trunk_vine"}],
+   "log_decorators": [
+    {
+     "type": "attached_to_logs",
+     "probability": 0.1,
+     "directions": ["up"],
+     "block_provider": {
+      "type": "weighted_state_provider",
+      "entries": [{"data": "red_mushroom", "weight": 2}, {"data": "brown_mushroom", "weight": 1}]
+     }
+    }
+   ]
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "jungle_sapling"}}
+  ]
+ },
+ "fallen_spruce_tree": {
+  "type": "fallen_tree",
+  "config": {
+   "trunk_provider": "spruce_log[axis=y]",
+   "log_length": {"type": "uniform", "min_inclusive": 6, "max_inclusive": 10},
+   "stump_decorators": [],
+   "log_decorators": [
+    {
+     "type": "attached_to_logs",
+     "probability": 0.1,
+     "directions": ["up"],
+     "block_provider": {
+      "type": "weighted_state_provider",
+      "entries": [{"data": "red_mushroom", "weight": 2}, {"data": "brown_mushroom", "weight": 1}]
+     }
+    }
+   ]
+  },
+  "placement": [
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "spruce_sapling"}}
+  ]
+ },
+ "huge_brown_mushroom": {
+  "type": "huge_brown_mushroom",
+  "config": {
+   "cap_provider": "brown_mushroom_block[up=true,down=false]",
+   "stem_provider": "mushroom_stem[up=false,down=false]",
+   "foliage_radius": 3
+  }
+ },
+ "huge_red_mushroom": {
+  "type": "huge_red_mushroom",
+  "config": {
+   "cap_provider": "red_mushroom_block[down=false]",
+   "stem_provider": "mushroom_stem[up=false,down=false]",
+   "foliage_radius": 2
+  }
+ },
+ "azalea_tree": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {
+    "type": "bending_trunk_placer",
+    "base_height": 4,
+    "height_rand_a": 2,
+    "height_rand_b": 0,
+    "min_height_for_leaves": 3,
+    "bend_length": {"type": "uniform", "min_inclusive": 1, "max_inclusive": 2}
+   },
+   "foliage_provider": {
+    "type": "weighted_state_provider",
+    "entries": [{"data": "azalea_leaves", "weight": 3}, {"data": "flowering_azalea_leaves", "weight": 1}]
+   },
+   "foliage_placer": {
+    "type": "random_spread_foliage_placer",
+    "radius": 3,
+    "offset": 0,
+    "foliage_height": 2,
+    "leaf_placement_attempts": 50
+   },
+   "dirt_provider": "rooted_dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [],
+   "ignore_vines": false,
+   "force_dirt": true
+  }
+ },
+ "bamboo_vegetation": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fancy_oak_checked", "chance": 0.05},
+    {"feature": "jungle_bush", "chance": 0.15},
+    {"feature": "mega_jungle_tree", "chance": 0.7}
+   ],
+   "default": {
+    "type": "random_patch",
+    "config": {
+     "tries": 32,
+     "xz_spread": 7,
+     "y_spread": 3,
+     "feature": {
+      "type": "simple_block",
+      "config": {
+       "to_place": {
+        "type": "weighted_state_provider",
+        "entries": [{"data": "short_grass", "weight": 3}, {"data": "fern", "weight": 1}]
+       }
+      },
+      "placement": [
+       {
+        "type": "block_predicate_filter",
+        "predicate": {
+         "type": "all_of",
+         "predicates": [
+          {"type": "matching_blocks", "blocks": "air"},
+          {"type": "not", "predicate": {"type": "matching_blocks", "offset": [0, -1, 0], "blocks": "podzol"}}
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 30, "weight": 9}, {"data": 31, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "birch_tall": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fallen_super_birch_tree", "chance": 0.00625},
+    {"feature": "super_birch_bees_0002", "chance": 0.5},
+    {"feature": "fallen_birch_tree", "chance": 0.0125}
+   ],
+   "default": "birch_bees_0002"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "dark_forest_vegetation": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "huge_brown_mushroom", "chance": 0.025},
+    {"feature": "huge_red_mushroom", "chance": 0.05},
+    {"feature": "dark_oak_leaf_litter", "chance": 0.6666667},
+    {"feature": "birch_leaf_litter", "chance": 0.2},
+    {"feature": "fancy_oak_leaf_litter", "chance": 0.1}
+   ],
+   "default": "oak_leaf_litter"
+  },
+  "placement": [
+   {"type": "count", "count": 16},
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "mushroom_island_vegetation": {
+  "type": "simple_random_selector",
+  "config": {"features": ["huge_red_mushroom", "huge_brown_mushroom"]},
+  "placement": [
+   {"type": "in_square"},
+   {"type": "heightmap", "heightmap": "MOTION_BLOCKING"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_badlands": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 4, "height_rand_a": 2, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 2, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [
+    {
+     "type": "place_on_ground",
+     "tries": 96,
+     "radius": 4,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1}
+      ]
+     }
+    },
+    {
+     "type": "place_on_ground",
+     "tries": 150,
+     "radius": 2,
+     "height": 2,
+     "block_state_provider": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {"data": "leaf_litter[facing=north,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=1]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=2]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=3]", "weight": 1},
+       {"data": "leaf_litter[facing=north,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=east,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=south,segment_amount=4]", "weight": 1},
+       {"data": "leaf_litter[facing=west,segment_amount=4]", "weight": 1}
+      ]
+     }
+    }
+   ],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 5, "weight": 9}, {"data": 6, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "trees_birch": {
+  "type": "random_selector",
+  "config": {"features": [{"feature": "fallen_birch_tree", "chance": 0.0125}], "default": "birch_bees_0002"},
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "birch_sapling"}}
+  ]
+ },
+ "trees_birch_and_oak": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fallen_birch_tree", "chance": 0.0025},
+    {"feature": "birch_bees_0002_leaf_litter", "chance": 0.2},
+    {"feature": "fancy_oak_bees_0002_leaf_litter", "chance": 0.1},
+    {"feature": "fallen_oak_tree", "chance": 0.0125}
+   ],
+   "default": "oak_bees_0002_leaf_litter"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_cherry": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "cherry_log",
+   "trunk_placer": {
+    "type": "cherry_trunk_placer",
+    "base_height": 7,
+    "height_rand_a": 1,
+    "height_rand_b": 0,
+    "branch_count": {
+     "type": "weighted_list",
+     "distribution": [{"data": 1, "weight": 1}, {"data": 2, "weight": 1}, {"data": 3, "weight": 1}]
+    },
+    "branch_horizontal_length": {"type": "uniform", "min_inclusive": 2, "max_inclusive": 4},
+    "branch_start_offset_from_top": {"type": "uniform", "min_inclusive": -4, "max_inclusive": -3},
+    "branch_end_offset_from_top": {"type": "uniform", "min_inclusive": -1, "max_inclusive": 0}
+   },
+   "foliage_provider": "cherry_leaves",
+   "foliage_placer": {
+    "type": "cherry_foliage_placer",
+    "radius": 4,
+    "offset": 0,
+    "height": 5,
+    "wide_bottom_layer_hole_chance": 0.25,
+    "corner_hole_chance": 0.5,
+    "hanging_leaves_chance": 0.16666667,
+    "hanging_leaves_extension_chance": 0.33333334
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 2},
+   "decorators": [{"type": "beehive", "probability": 0.05}],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "cherry_sapling"}}
+  ]
+ },
+ "trees_flower_forest": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "birch_bees_002", "chance": 0.2},
+    {"feature": "fancy_oak_bees_002", "chance": 0.1}
+   ],
+   "default": "oak_bees_002"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 6, "weight": 9}, {"data": 7, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_grove": {
+  "type": "random_selector",
+  "config": {"features": [{"feature": "pine_on_snow", "chance": 0.33333334}], "default": "spruce_on_snow"},
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_jungle": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fancy_oak_checked", "chance": 0.1},
+    {"feature": "jungle_bush", "chance": 0.5},
+    {"feature": "mega_jungle_tree", "chance": 0.33333334},
+    {"feature": "fallen_jungle_tree", "chance": 0.0125}
+   ],
+   "default": "jungle_tree"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 50, "weight": 9}, {"data": 51, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_meadow": {
+  "type": "random_selector",
+  "config": {"features": [{"feature": "fancy_oak_bees", "chance": 0.5}], "default": "super_birch_bees"},
+  "placement": [
+   {"type": "rarity_filter", "chance": 100},
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_old_growth_pine_taiga": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "mega_spruce_checked", "chance": 0.025641026},
+    {"feature": "mega_pine_checked", "chance": 0.30769232},
+    {"feature": "pine_checked", "chance": 0.33333334},
+    {"feature": "fallen_spruce_tree", "chance": 0.0125}
+   ],
+   "default": "spruce_checked"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_old_growth_spruce_taiga": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "mega_spruce_checked", "chance": 0.33333334},
+    {"feature": "pine_checked", "chance": 0.33333334},
+    {"feature": "fallen_spruce_tree", "chance": 0.0125}
+   ],
+   "default": "spruce_checked"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_plains": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fancy_oak_bees_005", "chance": 0.33333334},
+    {"feature": "fallen_oak_tree", "chance": 0.0125}
+   ],
+   "default": "oak_bees_005"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 0, "weight": 19}, {"data": 1, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "trees_savanna": {
+  "type": "random_selector",
+  "config": {"features": [{"feature": "acacia_checked", "chance": 0.8}], "default": "oak_checked"},
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 1, "weight": 9}, {"data": 2, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_snowy": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "spruce_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 2, "height_rand_b": 1},
+   "foliage_provider": "spruce_leaves",
+   "foliage_placer": {
+    "type": "spruce_foliage_placer",
+    "radius": {"type": "uniform", "min_inclusive": 2, "max_inclusive": 3},
+    "offset": {"type": "uniform", "min_inclusive": 0, "max_inclusive": 2},
+    "trunk_height": {"type": "uniform", "min_inclusive": 1, "max_inclusive": 2}
+   },
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 2, "lower_size": 0, "upper_size": 2},
+   "decorators": [],
+   "ignore_vines": true,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 0, "weight": 9}, {"data": 1, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "any_of",
+     "predicates": [
+      {"type": "matching_blocks", "offset": [0, -1, 0], "blocks": ["snow_block", "powder_snow"]},
+      {"type": "would_survive", "state": "spruce_sapling"}
+     ]
+    }
+   }
+  ]
+ },
+ "trees_sparse_jungle": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "fancy_oak_checked", "chance": 0.1},
+    {"feature": "jungle_bush", "chance": 0.5},
+    {"feature": "fallen_jungle_tree", "chance": 0.0125}
+   ],
+   "default": "jungle_tree"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 2, "weight": 9}, {"data": 3, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_swamp": {
+  "type": "tree",
+  "config": {
+   "trunk_provider": "oak_log",
+   "trunk_placer": {"type": "straight_trunk_placer", "base_height": 5, "height_rand_a": 3, "height_rand_b": 0},
+   "foliage_provider": "oak_leaves",
+   "foliage_placer": {"type": "blob_foliage_placer", "radius": 3, "offset": 0, "height": 3},
+   "dirt_provider": "dirt",
+   "minimum_size": {"type": "two_layers_feature_size", "limit": 1, "lower_size": 0, "upper_size": 1},
+   "decorators": [{"type": "leave_vine", "probability": 0.25}],
+   "ignore_vines": false,
+   "force_dirt": false
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 2, "weight": 9}, {"data": 3, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 2},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"},
+   {"type": "block_predicate_filter", "predicate": {"type": "would_survive", "state": "oak_sapling"}}
+  ]
+ },
+ "trees_taiga": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "pine_checked", "chance": 0.33333334},
+    {"feature": "fallen_spruce_tree", "chance": 0.0125}
+   ],
+   "default": "spruce_checked"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 10, "weight": 9}, {"data": 11, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_windswept_forest": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "spruce_checked", "chance": 0.666},
+    {"feature": "fancy_oak_checked", "chance": 0.1}
+   ],
+   "default": "oak_checked"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 3, "weight": 9}, {"data": 4, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_windswept_hills": {
+  "type": "random_selector",
+  "config": {
+   "features": [
+    {"feature": "spruce_checked", "chance": 0.666},
+    {"feature": "fancy_oak_checked", "chance": 0.1}
+   ],
+   "default": "oak_checked"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 0, "weight": 9}, {"data": 1, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "trees_windswept_savanna": {
+  "type": "random_selector",
+  "config": {"features": [{"feature": "acacia_checked", "chance": 0.8}], "default": "oak_checked"},
+  "placement": [
+   {
+    "type": "count",
+    "count": {"type": "weighted_list", "distribution": [{"data": 2, "weight": 9}, {"data": 3, "weight": 1}]}
+   },
+   {"type": "in_square"},
+   {"type": "surface_water_depth_filter", "max_water_depth": 0},
+   {"type": "heightmap", "heightmap": "OCEAN_FLOOR_WG"},
+   {"type": "biome"}
+  ]
+ },
+ "rooted_azalea_tree": {
+  "type": "root_system",
+  "config": {
+   "feature": "azalea_tree",
+   "required_vertical_space_for_tree": 3,
+   "root_radius": 3,
+   "root_replaceable": "#azalea_root_replaceable",
+   "root_state_provider": "rooted_dirt",
+   "root_placement_attempts": 20,
+   "root_column_max_height": 100,
+   "hanging_root_radius": 3,
+   "hanging_roots_vertical_span": 2,
+   "hanging_root_state_provider": "hanging_roots",
+   "hanging_root_placement_attempts": 20,
+   "allowed_vertical_water_for_tree": 2,
+   "allowed_tree_position": {
+    "type": "all_of",
+    "predicates": [
+     {
+      "type": "any_of",
+      "predicates": [
+       {"type": "matching_blocks", "blocks": ["air", "cave_air", "void_air"]},
+       {"type": "matching_block_tag", "tag": "replaceable_by_trees"}
+      ]
+     },
+     {"type": "matching_block_tag", "offset": [0, -1, 0], "tag": "azalea_grows_on"}
+    ]
+   }
+  },
+  "placement": [
+   {"type": "count", "count": {"type": "uniform", "min_inclusive": 1, "max_inclusive": 2}},
+   {"type": "in_square"},
+   {
+    "type": "height_range",
+    "height": {"type": "uniform", "min_inclusive": {"above_bottom": 0}, "max_inclusive": {"absolute": 256}}
+   },
+   {
+    "type": "environment_scan",
+    "direction_of_search": "up",
+    "max_steps": 12,
+    "target_condition": {"type": "solid"},
+    "allowed_search_condition": {"type": "matching_blocks", "blocks": ["air", "cave_air"]}
+   },
+   {"type": "random_offset", "xz_spread": 0, "y_spread": -1},
+   {"type": "biome"}
+  ]
+ }
+}

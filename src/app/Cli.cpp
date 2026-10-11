@@ -160,6 +160,8 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.mapStep) && o.mapStep > 0; }},
         {"--slice", "FILE", "write a vertical cross-section PNG (x/y plane at --pos z, --map-size blocks wide), then exit",
          [](CliOptions& o, std::string_view v) { return o.slice = v, true; }},
+        {"--check-data", "", "load blocks, tags, biomes and worldgen features, print every problem, then exit (1 if any)",
+         [](CliOptions& o, std::string_view) { return o.checkData = true, true; }},
         {"--bench-gen", "N", "generate and light about N chunks around --pos (or 0,0), print chunks per second, then exit",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.benchGen) && o.benchGen > 0; }},
         {"--golden-tiles", "FILE", "with --dump-model-sheets: also save the tiles of the states listed in FILE",

@@ -1,0 +1,3731 @@
+{
+ "_comment": "Vanilla VegetationFeatures/VegetationPlacements (1.21.5+: bushes, dry grass, leaf litter, wildflowers, firefly bushes, cactus flowers), AquaticFeatures/AquaticPlacements and the vegetation and ice parts of MiscOverworldPlacements/CavePlacements. Configured features are inlined in each placed feature that uses them.",
+ "bamboo_light": {
+  "type": "bamboo",
+  "config": {
+   "probability": 0.0
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "bamboo": {
+  "type": "bamboo",
+  "config": {
+   "probability": 0.2
+  },
+  "placement": [
+   {
+    "type": "noise_based_count",
+    "noise_to_count_ratio": 160,
+    "noise_factor": 80.0,
+    "noise_offset": 0.3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "vines": {
+  "type": "vines",
+  "config": {},
+  "placement": [
+   {
+    "type": "count",
+    "count": 127
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 64
+     },
+     "max_inclusive": {
+      "absolute": 100
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_sunflower": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "sunflower"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_pumpkin": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "pumpkin"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 300
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_plain": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "short_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "noise_threshold_count",
+    "noise_level": -0.8,
+    "below_noise": 5,
+    "above_noise": 10
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_forest": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "short_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_badlands": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "short_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_savanna": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "short_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 20
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_normal": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "short_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 5
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_taiga_2": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "short_grass",
+        "weight": 1
+       },
+       {
+        "data": "fern",
+        "weight": 4
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_taiga": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "short_grass",
+        "weight": 1
+       },
+       {
+        "data": "fern",
+        "weight": 4
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 7
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_grass_jungle": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "short_grass",
+        "weight": 3
+       },
+       {
+        "data": "fern",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "not",
+         "predicate": {
+          "type": "matching_blocks",
+          "blocks": "podzol",
+          "offset": [
+           0,
+           -1,
+           0
+          ]
+         }
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 25
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_dead_bush_2": {
+  "type": "random_patch",
+  "config": {
+   "tries": 4,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "dead_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_dead_bush": {
+  "type": "random_patch",
+  "config": {
+   "tries": 4,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "dead_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_dead_bush_badlands": {
+  "type": "random_patch",
+  "config": {
+   "tries": 4,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "dead_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 20
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_dry_grass_badlands": {
+  "type": "random_patch",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "short_dry_grass",
+        "weight": 1
+       },
+       {
+        "data": "tall_dry_grass",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_dry_grass_desert": {
+  "type": "random_patch",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "short_dry_grass",
+        "weight": 1
+       },
+       {
+        "data": "tall_dry_grass",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_melon": {
+  "type": "random_patch",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "melon"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "replaceable"
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": "empty"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_melon_sparse": {
+  "type": "random_patch",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "melon"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "replaceable"
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": "empty"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 64
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_berry_common": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "sweet_berry_bush[age=3]"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 32
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_berry_rare": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "sweet_berry_bush[age=3]"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 384
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_waterlily": {
+  "type": "random_patch",
+  "config": {
+   "tries": 10,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "lily_pad"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_tall_grass_2": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "tall_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "noise_threshold_count",
+    "noise_level": -0.8,
+    "below_noise": 0,
+    "above_noise": 7
+   },
+   {
+    "type": "rarity_filter",
+    "chance": 32
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_tall_grass": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "tall_grass"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 5
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_large_fern": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "large_fern"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 5
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_bush": {
+  "type": "random_patch",
+  "config": {
+   "tries": 24,
+   "xz_spread": 5,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_leaf_litter": {
+  "type": "random_patch",
+  "config": {
+   "tries": 32,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "leaf_litter[segment_amount=1,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=1,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=1,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=1,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=2,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=2,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=2,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=2,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=3,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=3,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=3,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "leaf_litter[segment_amount=3,facing=west]",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "matching_blocks",
+         "blocks": "grass_block",
+         "offset": [
+          0,
+          -1,
+          0
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "WORLD_SURFACE_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_cactus_desert": {
+  "type": "random_patch",
+  "config": {
+   "tries": 10,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 1,
+        "max_inclusive": 3
+       },
+       "provider": "cactus"
+      },
+      {
+       "height": {
+        "type": "weighted_list",
+        "distribution": [
+         {
+          "data": 0,
+          "weight": 3
+         },
+         {
+          "data": 1,
+          "weight": 1
+         }
+        ]
+       },
+       "provider": "cactus_flower"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "cactus"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_cactus_decorated": {
+  "type": "random_patch",
+  "config": {
+   "tries": 10,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 1,
+        "max_inclusive": 3
+       },
+       "provider": "cactus"
+      },
+      {
+       "height": {
+        "type": "weighted_list",
+        "distribution": [
+         {
+          "data": 0,
+          "weight": 3
+         },
+         {
+          "data": 1,
+          "weight": 1
+         }
+        ]
+       },
+       "provider": "cactus_flower"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "cactus"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 13
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_sugar_cane_swamp": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 0,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 2,
+        "max_inclusive": 4
+       },
+       "provider": "sugar_cane"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "sugar_cane"
+        },
+        {
+         "type": "any_of",
+         "predicates": [
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            -1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            1
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            -1
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_sugar_cane_desert": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 0,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 2,
+        "max_inclusive": 4
+       },
+       "provider": "sugar_cane"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "sugar_cane"
+        },
+        {
+         "type": "any_of",
+         "predicates": [
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            -1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            1
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            -1
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_sugar_cane_badlands": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 0,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 2,
+        "max_inclusive": 4
+       },
+       "provider": "sugar_cane"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "sugar_cane"
+        },
+        {
+         "type": "any_of",
+         "predicates": [
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            -1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            1
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            -1
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 5
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_sugar_cane": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 0,
+   "feature": {
+    "type": "block_column",
+    "config": {
+     "direction": "up",
+     "allowed_placement": {
+      "type": "matching_blocks",
+      "blocks": "air"
+     },
+     "prioritize_tip": false,
+     "layers": [
+      {
+       "height": {
+        "type": "biased_to_bottom",
+        "min_inclusive": 2,
+        "max_inclusive": 4
+       },
+       "provider": "sugar_cane"
+      }
+     ]
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "all_of",
+       "predicates": [
+        {
+         "type": "matching_blocks",
+         "blocks": "air"
+        },
+        {
+         "type": "would_survive",
+         "state": "sugar_cane"
+        },
+        {
+         "type": "any_of",
+         "predicates": [
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            -1,
+            -1,
+            0
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            1
+           ]
+          },
+          {
+           "type": "matching_fluids",
+           "fluids": [
+            "water",
+            "flowing_water"
+           ],
+           "offset": [
+            0,
+            -1,
+            -1
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 6
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_firefly_bush_near_water": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "firefly_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING_NO_LEAVES"
+   },
+   {
+    "type": "biome"
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "all_of",
+     "predicates": [
+      {
+       "type": "matching_blocks",
+       "blocks": "air"
+      },
+      {
+       "type": "would_survive",
+       "state": "firefly_bush"
+      },
+      {
+       "type": "any_of",
+       "predicates": [
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          1,
+          -1,
+          0
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          -1,
+          -1,
+          0
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          0,
+          -1,
+          1
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          0,
+          -1,
+          -1
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "patch_firefly_bush_swamp": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "firefly_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 8
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "patch_firefly_bush_near_water_swamp": {
+  "type": "random_patch",
+  "config": {
+   "tries": 20,
+   "xz_spread": 4,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "firefly_bush"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "all_of",
+     "predicates": [
+      {
+       "type": "matching_blocks",
+       "blocks": "air"
+      },
+      {
+       "type": "would_survive",
+       "state": "firefly_bush"
+      },
+      {
+       "type": "any_of",
+       "predicates": [
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          1,
+          -1,
+          0
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          -1,
+          -1,
+          0
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          0,
+          -1,
+          1
+         ]
+        },
+        {
+         "type": "matching_fluids",
+         "fluids": [
+          "water",
+          "flowing_water"
+         ],
+         "offset": [
+          0,
+          -1,
+          -1
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "brown_mushroom_normal": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "brown_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 256
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "red_mushroom_normal": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "red_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 512
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "brown_mushroom_taiga": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "brown_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "red_mushroom_taiga": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "red_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 256
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "brown_mushroom_old_growth": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "brown_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "rarity_filter",
+    "chance": 4
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "red_mushroom_old_growth": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "red_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 171
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "brown_mushroom_swamp": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "brown_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "red_mushroom_swamp": {
+  "type": "random_patch",
+  "config": {
+   "tries": 96,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "red_mushroom"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 64
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_warm": {
+  "type": "flower",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "poppy",
+        "weight": 2
+       },
+       {
+        "data": "dandelion",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 16
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_default": {
+  "type": "flower",
+  "config": {
+   "tries": 64,
+   "xz_spread": 7,
+   "y_spread": 3,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "poppy",
+        "weight": 2
+       },
+       {
+        "data": "dandelion",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 32
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_flower_forest": {
+  "type": "flower",
+  "config": {
+   "tries": 96,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "noise_provider",
+      "seed": 2345,
+      "noise": {
+       "firstOctave": 0,
+       "amplitudes": [
+        1.0
+       ]
+      },
+      "scale": 0.020833334,
+      "states": [
+       "dandelion",
+       "poppy",
+       "allium",
+       "azure_bluet",
+       "red_tulip",
+       "orange_tulip",
+       "white_tulip",
+       "pink_tulip",
+       "oxeye_daisy",
+       "cornflower",
+       "lily_of_the_valley"
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "rarity_filter",
+    "chance": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_swamp": {
+  "type": "flower",
+  "config": {
+   "tries": 64,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": "blue_orchid"
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 32
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_plains": {
+  "type": "flower",
+  "config": {
+   "tries": 64,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "noise_threshold_provider",
+      "seed": 2345,
+      "noise": {
+       "firstOctave": 0,
+       "amplitudes": [
+        1.0
+       ]
+      },
+      "scale": 0.005,
+      "threshold": -0.8,
+      "high_chance": 0.33333334,
+      "default_state": "dandelion",
+      "low_states": [
+       "orange_tulip",
+       "red_tulip",
+       "pink_tulip",
+       "white_tulip"
+      ],
+      "high_states": [
+       "poppy",
+       "azure_bluet",
+       "oxeye_daisy",
+       "cornflower"
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "noise_threshold_count",
+    "noise_level": -0.8,
+    "below_noise": 15,
+    "above_noise": 4
+   },
+   {
+    "type": "rarity_filter",
+    "chance": 32
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_cherry": {
+  "type": "flower",
+  "config": {
+   "tries": 96,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "pink_petals[flower_amount=1,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=1,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=1,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=1,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=2,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=2,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=2,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=2,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=3,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=3,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=3,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=3,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=4,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=4,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=4,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "pink_petals[flower_amount=4,facing=west]",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "noise_threshold_count",
+    "noise_level": -0.8,
+    "below_noise": 5,
+    "above_noise": 10
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "flower_meadow": {
+  "type": "flower",
+  "config": {
+   "tries": 96,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "dual_noise_provider",
+      "seed": 2345,
+      "variety": [
+       1,
+       3
+      ],
+      "noise": {
+       "firstOctave": -3,
+       "amplitudes": [
+        1.0
+       ]
+      },
+      "scale": 1.0,
+      "slow_noise": {
+       "firstOctave": -10,
+       "amplitudes": [
+        1.0
+       ]
+      },
+      "slow_scale": 1.0,
+      "states": [
+       "tall_grass",
+       "allium",
+       "poppy",
+       "azure_bluet",
+       "dandelion",
+       "cornflower",
+       "oxeye_daisy",
+       "short_grass"
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "wildflowers_birch_forest": {
+  "type": "flower",
+  "config": {
+   "tries": 64,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "wildflowers[flower_amount=1,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=west]",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "rarity_filter",
+    "chance": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "wildflowers_meadow": {
+  "type": "flower",
+  "config": {
+   "tries": 8,
+   "xz_spread": 6,
+   "y_spread": 2,
+   "feature": {
+    "type": "simple_block",
+    "config": {
+     "to_place": {
+      "type": "weighted_state_provider",
+      "entries": [
+       {
+        "data": "wildflowers[flower_amount=1,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=1,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=2,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=3,facing=west]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=north]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=east]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=south]",
+        "weight": 1
+       },
+       {
+        "data": "wildflowers[flower_amount=4,facing=west]",
+        "weight": 1
+       }
+      ]
+     }
+    },
+    "placement": [
+     {
+      "type": "block_predicate_filter",
+      "predicate": {
+       "type": "matching_blocks",
+       "blocks": "air"
+      }
+     }
+    ]
+   }
+  },
+  "placement": [
+   {
+    "type": "noise_threshold_count",
+    "noise_level": -0.8,
+    "below_noise": 5,
+    "above_noise": 10
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "forest_flowers": {
+  "type": "simple_random_selector",
+  "config": {
+   "features": [
+    {
+     "type": "random_patch",
+     "config": {
+      "tries": 96,
+      "xz_spread": 7,
+      "y_spread": 3,
+      "feature": {
+       "type": "simple_block",
+       "config": {
+        "to_place": "lilac"
+       },
+       "placement": [
+        {
+         "type": "block_predicate_filter",
+         "predicate": {
+          "type": "matching_blocks",
+          "blocks": "air"
+         }
+        }
+       ]
+      }
+     }
+    },
+    {
+     "type": "random_patch",
+     "config": {
+      "tries": 96,
+      "xz_spread": 7,
+      "y_spread": 3,
+      "feature": {
+       "type": "simple_block",
+       "config": {
+        "to_place": "rose_bush"
+       },
+       "placement": [
+        {
+         "type": "block_predicate_filter",
+         "predicate": {
+          "type": "matching_blocks",
+          "blocks": "air"
+         }
+        }
+       ]
+      }
+     }
+    },
+    {
+     "type": "random_patch",
+     "config": {
+      "tries": 96,
+      "xz_spread": 7,
+      "y_spread": 3,
+      "feature": {
+       "type": "simple_block",
+       "config": {
+        "to_place": "peony"
+       },
+       "placement": [
+        {
+         "type": "block_predicate_filter",
+         "predicate": {
+          "type": "matching_blocks",
+          "blocks": "air"
+         }
+        }
+       ]
+      }
+     }
+    },
+    {
+     "type": "no_bonemeal_flower",
+     "config": {
+      "tries": 96,
+      "xz_spread": 7,
+      "y_spread": 3,
+      "feature": {
+       "type": "simple_block",
+       "config": {
+        "to_place": "lily_of_the_valley"
+       },
+       "placement": [
+        {
+         "type": "block_predicate_filter",
+         "predicate": {
+          "type": "matching_blocks",
+          "blocks": "air"
+         }
+        }
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 7
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "count",
+    "count": {
+     "type": "clamped",
+     "min_inclusive": 0,
+     "max_inclusive": 3,
+     "source": {
+      "type": "uniform",
+      "min_inclusive": -1,
+      "max_inclusive": 3
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_warm": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.3
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 80
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_normal": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.3
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 48
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_cold": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.3
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 32
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_river": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.4
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 48
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_swamp": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.6
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 64
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_deep_warm": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.8
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 80
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_deep": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.8
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 48
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "seagrass_deep_cold": {
+  "type": "seagrass",
+  "config": {
+   "probability": 0.8
+  },
+  "placement": [
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "count",
+    "count": 40
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "sea_pickle": {
+  "type": "sea_pickle",
+  "config": {
+   "count": 20
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 16
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "kelp_cold": {
+  "type": "kelp",
+  "config": {},
+  "placement": [
+   {
+    "type": "noise_based_count",
+    "noise_to_count_ratio": 120,
+    "noise_factor": 80.0,
+    "noise_offset": 0.0
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "kelp_warm": {
+  "type": "kelp",
+  "config": {},
+  "placement": [
+   {
+    "type": "noise_based_count",
+    "noise_to_count_ratio": 80,
+    "noise_factor": 80.0,
+    "noise_offset": 0.0
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "warm_ocean_vegetation": {
+  "type": "simple_random_selector",
+  "config": {
+   "features": [
+    {
+     "type": "coral_tree"
+    },
+    {
+     "type": "coral_claw"
+    },
+    {
+     "type": "coral_mushroom"
+    }
+   ]
+  },
+  "placement": [
+   {
+    "type": "noise_based_count",
+    "noise_to_count_ratio": 20,
+    "noise_factor": 400.0,
+    "noise_offset": 0.0
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "OCEAN_FLOOR_WG"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "forest_rock": {
+  "type": "forest_rock",
+  "config": {
+   "state": "mossy_cobblestone"
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "iceberg_packed": {
+  "type": "iceberg",
+  "config": {
+   "state": "packed_ice"
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 16
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "iceberg_blue": {
+  "type": "iceberg",
+  "config": {
+   "state": "blue_ice"
+  },
+  "placement": [
+   {
+    "type": "rarity_filter",
+    "chance": 200
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "blue_ice": {
+  "type": "blue_ice",
+  "config": {},
+  "placement": [
+   {
+    "type": "count",
+    "count": {
+     "type": "uniform",
+     "min_inclusive": 0,
+     "max_inclusive": 19
+    }
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "absolute": 30
+     },
+     "max_inclusive": {
+      "absolute": 61
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ice_spike": {
+  "type": "ice_spike",
+  "config": {
+   "base_blocks": [
+    "snow_block"
+   ]
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 3
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "ice_patch": {
+  "type": "disk",
+  "config": {
+   "state_provider": {
+    "fallback": "packed_ice",
+    "rules": []
+   },
+   "target": {
+    "type": "matching_blocks",
+    "blocks": [
+     "dirt",
+     "grass_block",
+     "podzol",
+     "coarse_dirt",
+     "mycelium",
+     "snow_block",
+     "ice"
+    ]
+   },
+   "radius": {
+    "type": "uniform",
+    "min_inclusive": 2,
+    "max_inclusive": 3
+   },
+   "half_height": 1
+  },
+  "placement": [
+   {
+    "type": "count",
+    "count": 2
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "heightmap",
+    "heightmap": "MOTION_BLOCKING"
+   },
+   {
+    "type": "random_offset",
+    "xz_spread": 0,
+    "y_spread": -1
+   },
+   {
+    "type": "block_predicate_filter",
+    "predicate": {
+     "type": "matching_blocks",
+     "blocks": [
+      "snow_block"
+     ]
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ },
+ "classic_vines_cave_feature": {
+  "type": "vines",
+  "config": {},
+  "placement": [
+   {
+    "type": "count",
+    "count": 256
+   },
+   {
+    "type": "in_square"
+   },
+   {
+    "type": "height_range",
+    "height": {
+     "type": "uniform",
+     "min_inclusive": {
+      "above_bottom": 0
+     },
+     "max_inclusive": {
+      "absolute": 256
+     }
+    }
+   },
+   {
+    "type": "biome"
+   }
+  ]
+ }
+}

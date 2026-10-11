@@ -1,23 +1,18 @@
 [
   {"_comment": "For each field the first rule (top to bottom) that matches a block and defines the field wins. Expressions: number | prop?a:b | prop*k+c | prop:v0,v1,..."},
-
+  {"match": ["air", "cave_air", "void_air", "water", "lava", "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "bush", "short_dry_grass", "tall_dry_grass", "firefly_bush", "seagrass", "tall_seagrass", "kelp", "kelp_plant", "sugar_cane", "vine", "glow_lichen", "sculk_vein", "resin_clump", "brown_mushroom", "red_mushroom", "crimson_fungus", "warped_fungus", "crimson_roots", "warped_roots", "nether_sprouts", "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "pitcher_crop", "melon_stem", "pumpkin_stem", "attached_melon_stem", "attached_pumpkin_stem", "nether_wart", "sweet_berry_bush", "cave_vines", "cave_vines_plant", "weeping_vines", "weeping_vines_plant", "twisting_vines", "twisting_vines_plant", "hanging_roots", "pale_hanging_moss", "spore_blossom", "small_dripleaf", "big_dripleaf_stem", "pink_petals", "wildflowers", "leaf_litter", "cactus_flower", "*_sapling", "mangrove_propagule", "dandelion", "poppy", "blue_orchid", "allium", "azure_bluet", "*_tulip", "oxeye_daisy", "cornflower", "lily_of_the_valley", "wither_rose", "torchflower", "open_eyeblossom", "closed_eyeblossom", "sunflower", "lilac", "rose_bush", "peony", "pitcher_plant", "*torch", "redstone_wire", "*rail", "*_sign", "*_banner", "*_button", "*_pressure_plate", "lever", "tripwire", "tripwire_hook", "fire", "soul_fire", "nether_portal", "end_portal", "end_gateway", "light", "structure_void", "cobweb", "bubble_column", "*_coral", "*_coral_fan", "*_coral_wall_fan", "frogspawn", "powder_snow"], "collision": false},
+  {"match": ["snow"], "collision": "layers:0,1,1,1,1,1,1,1"},
+  {"_comment": "solid: vanilla isSolid() (forceSolidOff/On), which with collision decides blocksMotion and so the motion-blocking and ocean-floor heightmaps"},
+  {"match": ["snow", "cobweb", "bamboo_sapling"], "solid": false},
   {"match": ["*_leaves", "grass_block", "mangrove_roots"], "layer": "cutout_mipped"},
-
   {"match": ["glass", "*_stained_glass", "tinted_glass", "barrier"], "ao_shade": false},
-  {"match": ["glass", "*_stained_glass", "tinted_glass", "ice", "frosted_ice", "slime_block", "honey_block",
-             "*glass_pane", "iron_bars"], "skip_same": true},
-  {"match": ["air", "cave_air", "void_air", "water", "lava", "short_grass", "tall_grass", "fern", "large_fern",
-             "dead_bush", "bush", "vine", "seagrass", "tall_seagrass", "fire", "soul_fire", "light", "structure_void",
-             "glow_lichen", "hanging_roots", "crimson_roots", "warped_roots", "nether_sprouts", "leaf_litter",
-             "resin_clump", "sculk_vein", "short_dry_grass", "tall_dry_grass"], "replaceable": true},
+  {"match": ["glass", "*_stained_glass", "tinted_glass", "ice", "frosted_ice", "slime_block", "honey_block", "*glass_pane", "iron_bars"], "skip_same": true},
+  {"match": ["air", "cave_air", "void_air", "water", "lava", "short_grass", "tall_grass", "fern", "large_fern", "dead_bush", "bush", "vine", "seagrass", "tall_seagrass", "fire", "soul_fire", "light", "structure_void", "glow_lichen", "hanging_roots", "crimson_roots", "warped_roots", "nether_sprouts", "leaf_litter", "resin_clump", "sculk_vein", "short_dry_grass", "tall_dry_grass"], "replaceable": true},
   {"match": ["snow"], "replaceable": "layers:0,1,0,0,0,0,0,0,0"},
-
   {"match": ["*_leaves"], "opacity": 1},
   {"match": ["ice", "frosted_ice", "slime_block", "honey_block", "cobweb"], "opacity": 1},
   {"match": ["tinted_glass"], "opacity": 15},
-
-  {"match": ["lava", "fire", "glowstone", "jack_o_lantern", "lantern", "sea_lantern", "shroomlight", "beacon",
-             "conduit", "end_gateway", "end_portal", "*_froglight", "lava_cauldron"], "emission": 15},
+  {"match": ["lava", "fire", "glowstone", "jack_o_lantern", "lantern", "sea_lantern", "shroomlight", "beacon", "conduit", "end_gateway", "end_portal", "*_froglight", "lava_cauldron"], "emission": 15},
   {"match": ["redstone_lamp"], "emission": "lit?15:0"},
   {"match": ["copper_bulb", "waxed_copper_bulb"], "emission": "lit?15:0"},
   {"match": ["exposed_copper_bulb", "waxed_exposed_copper_bulb"], "emission": "lit?12:0"},
@@ -42,7 +37,6 @@
   {"match": ["large_amethyst_bud"], "emission": 4},
   {"match": ["magma_block"], "emission": 3},
   {"match": ["medium_amethyst_bud", "firefly_bush"], "emission": 2},
-  {"match": ["small_amethyst_bud", "brewing_stand", "brown_mushroom", "dragon_egg", "end_portal_frame",
-             "sculk_sensor", "calibrated_sculk_sensor"], "emission": 1},
+  {"match": ["small_amethyst_bud", "brewing_stand", "brown_mushroom", "dragon_egg", "end_portal_frame", "sculk_sensor", "calibrated_sculk_sensor"], "emission": 1},
   {"match": ["light"], "emission": "level"}
 ]

@@ -1,6 +1,7 @@
-// OverworldGenerator.h -- 1.18-style overworld terrain (TERRAIN stage): climate
-// noises, terrain splines, 3D density with caves, aquifer-lite fluids, surface
-// rules, bedrock and carvers. Vanilla-like, not seed-compatible.
+// OverworldGenerator.h -- 1.18-style overworld. TERRAIN: climate noises, terrain
+// splines, 3D density with caves, aquifer stand-in, surface rules, bedrock and
+// carvers. DECORATE: biome features through the BiomeDecorator. End of MERGE:
+// snow and ice. Vanilla-like, not seed-compatible.
 #pragma once
 
 #include <array>
@@ -15,17 +16,22 @@
 namespace mc {
 
 class BlockRegistry;
+class BiomeDecorator;
 
 class OverworldGenerator final : public ChunkGenerator {
 public:
     static constexpr int kSeaLevel = 63;
 
-    OverworldGenerator(const BlockRegistry& blocks, const BiomeRegistry& biomes, int64_t seed);
+    // Without a decorator, DECORATE adds nothing (bare terrain).
+    OverworldGenerator(const BlockRegistry& blocks, const BiomeRegistry& biomes, int64_t seed,
+                       std::shared_ptr<const BiomeDecorator> decorator = nullptr);
     ~OverworldGenerator() override;
 
     std::string_view type() const override { return "default"; }
     void generateTerrain(Chunk& chunk) const override;
     void decorate(const TerrainNeighborhood& terrain, DecorationResult& out) const override;
+    // Snow and ice on cold columns (vanilla freeze_top_layer).
+    void finalizeChunk(Chunk& chunk) const override;
     glm::dvec3 spawnPoint() const override;
 
     // Climate at a block column (y-independent parameters) plus depth at y.
@@ -47,6 +53,7 @@ private:
     const BlockRegistry& blocks_;
     const BiomeRegistry& biomes_;
     int64_t seed_;
+    std::shared_ptr<const BiomeDecorator> decorator_;
     std::unique_ptr<Impl> impl_;
     glm::dvec3 spawn_;
 };

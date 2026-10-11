@@ -309,6 +309,15 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - About 10–13% of the volume between y −56 and 40 is cave air (`--slice` reports it).
 - **Fluids and aquifers:** see the M4 deviations in `docs/STATUS.md`. The flood line is `estimate − 6`, with a 3-block stone barrier below it; lava fills air below y −54.
 - **Cave biomes:** vanilla nearest-point rule. Surface biomes sit at depth 0 and 1, and lush caves (humidity ≥ 0.7) and dripstone caves (continentalness ≥ 0.8) span depth 0.2..0.9. A cave biome wins when its squared parameter distance is below `min(depth², (1 − depth)²)`.
+- **Decoration (DECORATE and MERGE):**
+  - Data: `data/worldgen/features/*.json` define features in vanilla's JSON shape (`type`, `config`, `placement`); `data/worldgen/biome_features.json` names the decoration steps and per-biome feature sets (with `include`); `biomes.json` picks a set per biome.
+  - Within a step every feature has one global index, a stable topological merge of all sets' lists. A chunk runs, step by step in that order, each feature that any biome in the chunk has; the `biome` placement filter keeps positions whose own biome has it. Each (chunk, step, feature) gets its own seeded Xoroshiro.
+  - Placement chains run depth first, like vanilla's lazy streams: later positions see earlier placements.
+  - DECORATE reads the TERRAIN snapshots of the 3×3 chunks plus the source chunk's own earlier writes, and may write anywhere in the 3×3. Every write records the block it expected and its feature index.
+  - MERGE sorts writes by (step, feature, source, sequence) — so all sources' trees land before any source's flowers — and applies each write if the block is unchanged; tree writes may also replace air, leaves and `replaceable_by_trees` (vanilla `validTreePos`); forced writes always apply.
+  - Heightmaps (WORLD_SURFACE_WG, OCEAN_FLOOR_WG, MOTION_BLOCKING, MOTION_BLOCKING_NO_LEAVES) are cached per column and kept current by writes. "Blocks motion" comes from the `collision` and `solid` rules in `data/blocks/properties.json` until M6 adds shapes.
+  - Feature code: `world/gen/feature/` — `BasicFeatures` (ore, disk, simple_block, random_patch, selectors, block_column), `Trees`/`TreePlacers`/`TreeDecorators` (8 trunk placers, 11 foliage placers, vines, cocoa, bee nests, podzol, leaf litter, huge mushrooms, fallen trees, root systems), `Vegetation*` (seagrass, kelp, sea pickles, coral, bamboo, vines, icebergs, blue ice, ice spikes, forest rocks) and `Cave*` (lakes, springs, glow lichen, underwater magma, vegetation patches, dripstone). `--check-data` reports any definition that does not resolve.
+  - After MERGE, `finalizeChunk` runs vanilla's freeze_top_layer: at the MOTION_BLOCKING top, still water freezes to ice and air gets a snow layer (snowy grass below) where the height-adjusted biome temperature is below 0.15. Temperature falls by `(noise·8 + y − 80)·0.05/40` above y 80; frozen oceans thaw in noise patches.
 - **Colormap lookup:** `x = (int)((1-T)·255)`, `y = (int)((1-D·T)·255)` with T and D clamped to [0,1]. Fixed colors: birch #80A755, spruce #619961, lily pad #208030.
 
 ## UI

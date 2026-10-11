@@ -34,7 +34,13 @@ struct Biome {
     uint32_t grassColor = 0, foliageColor = 0, dryFoliageColor = 0;
 
     // Snow instead of rain at this height (vanilla height-adjusted temperature, no noise).
+    bool frozenModifier = false; // vanilla temperature_modifier "frozen" (frozen oceans: patches thaw)
     bool coldAt(int y) const;
+    // Vanilla Biome.getTemperature: the frozen-ocean modifier, then cooling with
+    // height above y 80 (seaLevel + 17) with a little noise.
+    float temperatureAt(int x, int y, int z) const;
+    // Snow falls and water freezes below 0.15 (vanilla coldEnoughToSnow).
+    bool coldEnoughToSnow(int x, int y, int z) const { return temperatureAt(x, y, z) < 0.15f; }
 };
 
 class BiomeRegistry {

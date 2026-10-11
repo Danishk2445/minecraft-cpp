@@ -7,6 +7,10 @@
 
 #include "resources/ResourcePack.h"
 #include "world/block/BlockRegistry.h"
+#include "world/block/BlockRules.h"
+#include "world/gen/feature/BiomeDecorator.h"
+#include "world/gen/feature/DecorationRegion.h"
+#include "world/gen/feature/FeatureUtil.h"
 #include "world/gen/TerrainSplines.h"
 
 namespace mc {
@@ -51,7 +55,7 @@ struct OverworldGenerator::Impl {
 
     // Block states.
     StateId air, stone, deepslate, water, lava, bedrock, grass, dirt, coarseDirt, podzol, mycelium, sand, redSand,
-        sandstone, redSandstone, gravel, clay, snowBlock, packedIce, calcite, terracotta, mud;
+        sandstone, redSandstone, gravel, clay, snowBlock, packedIce, calcite, terracotta, mud, ice, snowLayer;
     std::array<StateId, 64> badlandsBands{};
     std::unordered_map<std::string, BiomeId> biomeIds;
 
@@ -155,8 +159,9 @@ struct OverworldGenerator::Impl {
     }
 };
 
-OverworldGenerator::OverworldGenerator(const BlockRegistry& blocks, const BiomeRegistry& biomes, int64_t seed)
-    : blocks_(blocks), biomes_(biomes), seed_(seed), impl_(std::make_unique<Impl>()) {
+OverworldGenerator::OverworldGenerator(const BlockRegistry& blocks, const BiomeRegistry& biomes, int64_t seed,
+                                       std::shared_ptr<const BiomeDecorator> decorator)
+    : blocks_(blocks), biomes_(biomes), seed_(seed), decorator_(std::move(decorator)), impl_(std::make_unique<Impl>()) {
     const Xoroshiro base(seed);
     Impl& m = *impl_;
     m.shift = NormalNoise(base, "offset", -3, {1, 1, 1, 0});
@@ -211,6 +216,8 @@ OverworldGenerator::OverworldGenerator(const BlockRegistry& blocks, const BiomeR
     m.calcite = S("calcite");
     m.terracotta = S("terracotta");
     m.mud = S("mud");
+    m.ice = S("ice");
+    m.snowLayer = S("snow");
     // Badlands bands: seeded runs of colored terracotta over plain terracotta.
     {
         const char* colors[] = {"orange_terracotta", "yellow_terracotta", "brown_terracotta", "red_terracotta",
@@ -303,9 +310,73 @@ std::string OverworldGenerator::describeColumn(int x, int z) const {
     return out;
 }
 
-void OverworldGenerator::decorate(const TerrainNeighborhood&, DecorationResult&) const {}
+void OverworldGenerator::decorate(const TerrainNeighborhood& terrain, DecorationResult& out) const {
+    if (!decorator_) return;
+    DecorationRegion region(blocks_, biomes_, terrain, seed_, out);
+    decorator_->decorate(region);
+}
 
 namespace {
+
+// The chunk alone as a BlockGetter (for snow survival checks within one column).
+class ChunkView final : public BlockGetter {
+public:
+    ChunkView(const BlockRegistry& reg, const Chunk& c) : reg_(reg), c_(c) {}
+    const BlockRegistry& registry() const override { return reg_; }
+    StateId getBlock(const BlockPos& p) const override {
+        if (ChunkPos::of(p) != c_.pos) return 0;
+        return c_.get(p.x & 15, p.y, p.z & 15);
+    }
+
+private:
+    const BlockRegistry& reg_;
+    const Chunk& c_;
+};
+
+} // namespace
+
+// Vanilla SnowAndFreezeFeature over the final blocks: ice on cold still water at
+// the surface, a snow layer on cold tops (trees included), snowy grass below it.
+void OverworldGenerator::finalizeChunk(Chunk& chunk) const {
+    const Impl& m = *impl_;
+    const TagId leaves = blocks_.tag("leaves").value_or(TagId(0));
+    const ChunkView view(blocks_, chunk);
+    const BlockRules& rules = blocks_.rules();
+    const int x0 = chunk.pos.minBlockX(), z0 = chunk.pos.minBlockZ();
+    const int chunkTop = std::min(chunk.topY(), kWorldMaxY);
+    for (int z = 0; z < 16; ++z)
+        for (int x = 0; x < 16; ++x) {
+            int y = chunkTop;
+            while (y >= kWorldMinY && !countsForHeightmap(blocks_, leaves, Heightmap::MotionBlocking, chunk.get(x, y, z))) --y;
+            const int top = y + 1; // MOTION_BLOCKING height
+            if (top > kWorldMaxY) continue;
+            const int wx = x0 + x, wz = z0 + z;
+            const int si = sectionIndexOfY(std::clamp(top, kWorldMinY, kWorldMaxY));
+            const BiomeId bid = chunk.sections[size_t(si)].biomes[size_t(((((top - kWorldMinY) & 15) >> 2) << 4) |
+                                                                          ((z >> 2) << 2) | (x >> 2))];
+            const Biome& biome = biomes_.get(bid);
+            const StateId below = chunk.get(x, top - 1, z);
+            if (below == m.water && biome.coldEnoughToSnow(wx, top - 1, wz)) {
+                chunk.set(x, top - 1, z, m.ice);
+                continue;
+            }
+            const StateId here = chunk.get(x, top, z);
+            if (!biome.coldEnoughToSnow(wx, top, wz)) continue;
+            if (here != 0 && blocks_.info(here).block != blocks_.info(m.snowLayer).block) continue;
+            if (!rules.snowCanSurvive(view, {wx, top, wz})) continue;
+            chunk.set(x, top, z, m.snowLayer);
+            if (!blocks_.value(below, "snowy").empty()) chunk.set(x, top - 1, z, withProp(blocks_, below, "snowy", true));
+        }
+}
+
+namespace {
+
+// Vanilla (nextFloat() - nextFloat()) * nextFloat(), evaluated left to right like Java.
+float wobble(Xoroshiro& r) {
+    const float a = r.nextFloat();
+    const float b = r.nextFloat();
+    return (a - b) * r.nextFloat();
+}
 
 // Vanilla carvers, run for the target chunk from every start chunk within 8:
 // "cave" (worm tunnels and rooms), "cave_extra_underground" (the same, deeper)
@@ -357,7 +428,10 @@ private:
             for (int t = 0; t < tunnels; ++t) {
                 const float yaw = r.nextFloat() * float(kPi) * 2.0f;
                 const float pitch = (r.nextFloat() - 0.5f) / 4.0f;
-                float thickness = r.nextFloat() * 2.0f + r.nextFloat();
+                // Random calls are sequenced one per statement: C++ leaves the order of
+                // operands unspecified, and worlds must not depend on the compiler.
+                float thickness = r.nextFloat() * 2.0f;
+                thickness += r.nextFloat();
                 if (r.nextInt(10) == 0) thickness *= r.nextFloat() * r.nextFloat() * 3.0f + 1.0f;
                 const int length = kRange - r.nextInt(kRange / 4);
                 tunnel(r.nextLong(), x, y, z, hs, vs, thickness, yaw, pitch, 0, length, skip);
@@ -383,13 +457,15 @@ private:
             yaw += yawD * 0.1f;
             pitchD *= 0.9f;
             yawD *= 0.75f;
-            pitchD += (r.nextFloat() - r.nextFloat()) * r.nextFloat() * 2.0f;
-            yawD += (r.nextFloat() - r.nextFloat()) * r.nextFloat() * 4.0f;
+            pitchD += wobble(r) * 2.0f;
+            yawD += wobble(r) * 4.0f;
             if (i == split && thickness > 1.0f) {
-                tunnel(r.nextLong(), x, y, z, hs, vs, r.nextFloat() * 0.5f + 0.5f, yaw - float(kPi) / 2.0f, pitch / 3.0f,
-                       i, end, skip);
-                tunnel(r.nextLong(), x, y, z, hs, vs, r.nextFloat() * 0.5f + 0.5f, yaw + float(kPi) / 2.0f, pitch / 3.0f,
-                       i, end, skip);
+                const int64_t seedA = r.nextLong();
+                const float thickA = r.nextFloat() * 0.5f + 0.5f;
+                tunnel(seedA, x, y, z, hs, vs, thickA, yaw - float(kPi) / 2.0f, pitch / 3.0f, i, end, skip);
+                const int64_t seedB = r.nextLong();
+                const float thickB = r.nextFloat() * 0.5f + 0.5f;
+                tunnel(seedB, x, y, z, hs, vs, thickB, yaw + float(kPi) / 2.0f, pitch / 3.0f, i, end, skip);
                 return;
             }
             if (r.nextInt(4) == 0) continue;
@@ -407,7 +483,8 @@ private:
         double z = cz * 16 + r.nextInt(16);
         float yaw = r.nextFloat() * float(kPi) * 2.0f;
         float pitch = -0.125f + r.nextFloat() * 0.25f;
-        const float thickness = r.nextFloat() * 4.0f + r.nextFloat() * 2.0f; // trapezoid(0, 6, plateau 2)
+        float thickness = r.nextFloat() * 4.0f; // trapezoid(0, 6, plateau 2)
+        thickness += r.nextFloat() * 2.0f;
         const int length = int(112 * (0.75 + r.nextDouble() * 0.25));
         Xoroshiro t(r.nextLong());
         // Width varies with height in smooth runs (initWidthFactors).
@@ -434,8 +511,8 @@ private:
             yaw += yawD * 0.05f;
             pitchD *= 0.8f;
             yawD *= 0.5f;
-            pitchD += (t.nextFloat() - t.nextFloat()) * t.nextFloat() * 2.0f;
-            yawD += (t.nextFloat() - t.nextFloat()) * t.nextFloat() * 4.0f;
+            pitchD += wobble(t) * 2.0f;
+            yawD += wobble(t) * 4.0f;
             if (t.nextInt(4) == 0) continue;
             if (!canReach(x, z, i, length, thickness)) return;
             carveEllipsoid(x, y, z, h, v, skip);
@@ -637,16 +714,21 @@ void OverworldGenerator::generateTerrain(Chunk& chunk) const {
             const bool steep = std::abs(topAt(x + 1, z) - topAt(x - 1, z)) >= 4 || std::abs(topAt(x, z + 1) - topAt(x, z - 1)) >= 4;
             int depth = -1;            // solid blocks since the last open block above
             bool underwater = false;   // the open block above that run was fluid
+            int waterTop = kWorldMinY; // the top of that water
             int runTop = kWorldMaxY;
             for (int y = std::min(kWorldMaxY, std::max(top[size_t(z * 16 + x)], kSeaLevel) + 1); y >= kWorldMinY; --y) {
                 const StateId cur = chunk.get(x, y, z);
                 if (cur != m.stone && cur != m.deepslate) {
+                    if (cur == m.water && !(underwater && depth == -1)) waterTop = y;
                     depth = -1;
                     underwater = cur == m.water;
                     continue;
                 }
                 ++depth;
                 if (depth == 0) runTop = y;
+                // Vanilla waterStartCheck(-6, -1): floors more than 6 blocks under water
+                // get the deep-water material (gravel, or sand in warm oceans).
+                const bool deepWater = underwater && waterTop - runTop > 6;
                 if (y < est - 16 || depth > surfaceDepth + 6) continue; // not a near-surface run
                 const Biome& b = biomeOf(x, runTop, z);
                 const std::string& surf = b.surface;
@@ -660,13 +742,10 @@ void OverworldGenerator::generateTerrain(Chunk& chunk) const {
                     else if (depth <= surfaceDepth + 4) put = m.sandstone;
                 } else if (surf == "beach") {
                     beachy(m.sand, m.sandstone);
-                } else if (surf == "ocean" || surf == "deep_ocean" || surf == "frozen_ocean") {
-                    if (depth <= surfaceDepth) put = (surf == "ocean" && sn > -0.2) ? m.sand : m.gravel;
-                } else if (surf == "warm_ocean") {
-                    if (depth <= surfaceDepth) put = m.sand;
-                } else if (surf == "river") {
-                    if (depth <= surfaceDepth)
-                        put = underwater ? (sn > 0.0 ? m.sand : m.gravel) : (depth == 0 ? m.grass : m.dirt);
+                } else if (surf == "warm_ocean" && (deepWater || b.id == "minecraft:warm_ocean")) {
+                    beachy(m.sand, m.sandstone);
+                } else if (deepWater) {
+                    if (depth <= surfaceDepth) put = m.gravel;
                 } else if (surf == "stony_shore" || surf == "stony_peaks") {
                     if (surf == "stony_peaks" && depth == 0 && m.surfaceSecondary.value(wx, 0, wz) > 0.4) put = m.calcite;
                 } else if (surf == "jagged_peaks" || surf == "frozen_peaks" || surf == "snowy_slopes") {
@@ -676,6 +755,14 @@ void OverworldGenerator::generateTerrain(Chunk& chunk) const {
                     } else if (depth == 1 && surf == "snowy_slopes" && !steep) {
                         put = m.snowBlock;
                     }
+                } else if (surf == "grove" && !steep) {
+                    // Vanilla groves: snow blocks over dirt (powder snow patches become snow blocks here).
+                    if (depth == 0 && !underwater) put = m.snowBlock;
+                    else if (depth <= surfaceDepth) put = m.dirt;
+                } else if (surf == "ice_spikes") {
+                    // Snow blocks over dirt (packed-ice spikes and patches stand on them).
+                    if (depth == 0 && !underwater) put = m.snowBlock;
+                    else if (depth <= surfaceDepth) put = m.dirt;
                 } else if (surf == "gravelly_hills") {
                     if (depth <= surfaceDepth && m.gravelPatches.value(wx, 0, wz) > -0.1) put = m.gravel;
                     else if (depth == 0 && !steep) put = m.grass;
@@ -689,7 +776,7 @@ void OverworldGenerator::generateTerrain(Chunk& chunk) const {
                                                  surf == "windswept_savanna" || surf == "old_growth_taiga");
                     if (rocky) continue;
                     if (depth == 0) {
-                        if (underwater) put = surf == "swamp" && sn > 0.1 ? m.clay : m.dirt;
+                        if (underwater) put = m.dirt; // shallow water: sand, clay and gravel disks patch it
                         else if (surf == "mushroom") put = m.mycelium;
                         else if (surf == "old_growth_taiga" && sn > 0.21) put = m.podzol;
                         else if (surf == "old_growth_taiga" && sn < -0.1) put = m.coarseDirt;
