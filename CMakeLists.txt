@@ -89,22 +89,40 @@ else()
     message(WARNING "GTest not found: unit tests are disabled")
 endif()
 
-# GL smoke tests: run the real executable under Xvfb (Mesa llvmpipe) and check
-# the screenshot. They are skipped when xvfb-run is unavailable.
+# GL tests: run the real executable under Xvfb (Mesa llvmpipe) and check its
+# output. They are skipped when xvfb-run or Python is unavailable.
 find_program(XVFB_RUN xvfb-run)
 find_package(Python3 COMPONENTS Interpreter)
 if(XVFB_RUN AND Python3_FOUND)
-    add_test(NAME gl_clear_screenshot
-        COMMAND ${CMAKE_COMMAND} -E env --unset=WAYLAND_DISPLAY __GLX_VENDOR_LIBRARY_NAME=mesa
-                ${XVFB_RUN} -a -s "-screen 0 1280x720x24"
-                $<TARGET_FILE:minecraft> --x11 --gamedir ${CMAKE_BINARY_DIR}/test-run
-                --size 320x240 --frames 3 --screenshot ${CMAKE_BINARY_DIR}/test-run/m0_clear.png --exit)
-    set_tests_properties(gl_clear_screenshot PROPERTIES LABELS gl TIMEOUT 120)
-    add_test(NAME gl_clear_screenshot_check
-        COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_image.py
-                ${CMAKE_BINARY_DIR}/test-run/m0_clear.png --size 320x240 --no-magenta
-                --region 0,0,320,240 --mean-rgb 120,167,255 --tol 2)
-    set_tests_properties(gl_clear_screenshot_check PROPERTIES LABELS gl DEPENDS gl_clear_screenshot)
+    set(MC_TEST_RUN ${CMAKE_BINARY_DIR}/test-run)
+    set(MC_XVFB ${CMAKE_COMMAND} -E env --unset=WAYLAND_DISPLAY __GLX_VENDOR_LIBRARY_NAME=mesa
+        ${XVFB_RUN} -a -s "-screen 0 1280x720x24")
+
+    # mc_gl_test(<name> <minecraft args...>)
+    function(mc_gl_test name)
+        add_test(NAME ${name}
+            COMMAND ${MC_XVFB} $<TARGET_FILE:minecraft> --x11 --gamedir ${MC_TEST_RUN} ${ARGN}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(${name} PROPERTIES LABELS gl TIMEOUT 300 RESOURCE_LOCK xvfb)
+    endfunction()
+    # mc_py_test(<name> <depends> <script> <args...>)
+    function(mc_py_test name depends script)
+        add_test(NAME ${name}
+            COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/${script} ${ARGN}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(${name} PROPERTIES LABELS gl DEPENDS ${depends})
+    endfunction()
+
+    # M1: every block state renders (no missing textures, nothing unexpectedly empty)
+    # and the tricky states match their golden tiles.
+    mc_gl_test(gl_model_sheets --dump-model-sheets ${MC_TEST_RUN}/sheets --golden-tiles tests/golden/tiles.txt)
+    mc_py_test(gl_golden_tiles gl_model_sheets compare_tiles.py ${MC_TEST_RUN}/sheets/tiles tests/golden/tiles)
+
+    # M1: the 3D gallery draws with depth, culling and mipmaps; the corner is clear sky.
+    mc_gl_test(gl_gallery_screenshot --size 1280x720 --frames 3 --pos 120,9,-4 --look -30,40
+        --screenshot ${MC_TEST_RUN}/gallery.png --exit)
+    mc_py_test(gl_gallery_check gl_gallery_screenshot check_image.py ${MC_TEST_RUN}/gallery.png
+        --size 1280x720 --no-magenta --min-colors 500 --region 0,560,60,720 --mean-rgb 120,167,255 --tol 2)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

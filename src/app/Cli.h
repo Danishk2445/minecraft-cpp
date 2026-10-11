@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 namespace mc {
 
 struct CliOptions {
@@ -29,6 +31,14 @@ struct CliOptions {
     int ticks = 0;
     std::string screenshot;
     bool exitAfter = false;
+
+    // Camera / world placement
+    std::optional<glm::dvec3> pos;  // --pos X,Y,Z
+    std::optional<glm::vec2> look;  // --look YAW,PITCH (degrees)
+
+    // Tools
+    std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit
+    std::filesystem::path goldenTiles;     // states whose tiles are also saved individually
 
     std::string logLevel = "info";
     bool help = false;

@@ -1,5 +1,6 @@
 #include "app/Cli.h"
 
+#include <array>
 #include <charconv>
 #include <format>
 #include <functional>
@@ -18,6 +19,24 @@ bool parseSize(std::string_view s, int& w, int& h) {
     const size_t x = s.find('x');
     return x != std::string_view::npos && parseInt(s.substr(0, x), w) && parseInt(s.substr(x + 1), h) && w > 0 &&
            h > 0;
+}
+
+template <size_t N>
+bool parseFloats(std::string_view s, std::array<double, N>& out) {
+    for (size_t i = 0; i < N; ++i) {
+        const size_t comma = s.find(',');
+        const std::string_view part = s.substr(0, comma);
+        const auto* end = part.data() + part.size();
+        auto [p, ec] = std::from_chars(part.data(), end, out[i]);
+        if (ec != std::errc() || p != end) return false;
+        if (i + 1 < N) {
+            if (comma == std::string_view::npos) return false;
+            s.remove_prefix(comma + 1);
+        } else if (comma != std::string_view::npos) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool parseBool(std::string_view s, bool& out) {
@@ -64,6 +83,24 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return o.screenshot = v, true; }},
         {"--exit", "", "harness: quit once the run conditions are met",
          [](CliOptions& o, std::string_view) { return o.exitAfter = true, true; }},
+        {"--pos", "X,Y,Z", "start the camera at this position",
+         [](CliOptions& o, std::string_view v) {
+             std::array<double, 3> a{};
+             if (!parseFloats(v, a)) return false;
+             o.pos = glm::dvec3(a[0], a[1], a[2]);
+             return true;
+         }},
+        {"--look", "YAW,PITCH", "start the camera with this rotation (degrees)",
+         [](CliOptions& o, std::string_view v) {
+             std::array<double, 2> a{};
+             if (!parseFloats(v, a)) return false;
+             o.look = glm::vec2(float(a[0]), float(a[1]));
+             return true;
+         }},
+        {"--dump-model-sheets", "DIR", "render every block state into tile sheets in DIR, then exit",
+         [](CliOptions& o, std::string_view v) { return o.dumpModelSheets = v, true; }},
+        {"--golden-tiles", "FILE", "with --dump-model-sheets: also save the tiles of the states listed in FILE",
+         [](CliOptions& o, std::string_view v) { return o.goldenTiles = v, true; }},
         {"--log-level", "LEVEL", "debug, info, warn or error",
          [](CliOptions& o, std::string_view v) {
              o.logLevel = v;

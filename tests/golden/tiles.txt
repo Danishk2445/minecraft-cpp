@@ -1,0 +1,37 @@
+# Model-sheet checks (see dumpModelSheets in src/render/Gallery.cpp).
+# Plain lines: states whose 32px tiles are compared against tests/golden/tiles/*.png.
+# "empty-ok" lines: states that legitimately render nothing from the GUI angle.
+empty-ok minecraft:fire[east=false,north=false,south=false,up=true,west=false]
+empty-ok minecraft:soul_fire
+empty-ok minecraft:melon_stem[age=0]
+empty-ok minecraft:pumpkin_stem[age=0]
+minecraft:stone
+minecraft:grass_block[snowy=false]
+minecraft:grass_block[snowy=true]
+minecraft:oak_log[axis=x]
+minecraft:oak_log[axis=y]
+minecraft:oak_stairs[facing=east,half=bottom,shape=straight]
+minecraft:oak_stairs[facing=north,half=top,shape=outer_left]
+minecraft:oak_stairs[facing=south,half=bottom,shape=inner_right]
+minecraft:oak_slab[type=top]
+minecraft:oak_fence_gate[facing=east,in_wall=true,open=false]
+minecraft:oak_fence_gate[facing=north,in_wall=false,open=true]
+minecraft:oak_fence[east=true,north=true,south=false,west=false]
+minecraft:cobblestone_wall[east=tall,north=low,south=none,up=true,west=none]
+minecraft:oak_leaves
+minecraft:birch_leaves
+minecraft:short_grass
+minecraft:sunflower[half=upper]
+minecraft:wall_torch[facing=north]
+minecraft:redstone_wire[east=side,north=up,south=none,west=side]
+minecraft:furnace[facing=north,lit=true]
+minecraft:piston[extended=false,facing=down]
+minecraft:observer[facing=up,powered=false]
+minecraft:water
+minecraft:white_stained_glass
+minecraft:glass_pane[east=true,north=false,south=false,west=true]
+minecraft:chiseled_bookshelf[facing=west,slot_0_occupied=true,slot_1_occupied=false,slot_2_occupied=true,slot_3_occupied=false,slot_4_occupied=true,slot_5_occupied=false]
+minecraft:vine[east=false,north=true,south=false,up=true,west=true]
+minecraft:lever[face=wall,facing=east,powered=true]
+minecraft:oak_door[facing=west,half=lower,hinge=right,open=true]
+minecraft:brewing_stand[has_bottle_0=true,has_bottle_1=false,has_bottle_2=true]

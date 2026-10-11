@@ -4,7 +4,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 
 ## Milestones
 - [x] M0 Skeleton: CMake/presets, GL loader, window/input, fixed-tick loop, jobs, PNG, screenshots, CLI harness
-- [ ] M1 Block models: pack, atlases, model baking, blockstates, gallery, model sheets
+- [x] M1 Block models: pack, atlases, model baking, blockstates, gallery, model sheets
 - [ ] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
 - [ ] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
 - [ ] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
@@ -39,4 +39,9 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 | Sound | None (the pack has no audio) |
 
 ## Deviations from vanilla
-(Recorded per milestone.)
+Recorded per milestone.
+- **M1:**
+  - Random model variants use the 1.21.5+ rule: `JavaRandom(Mth.getSeed(pos)).nextInt(totalWeight)`. Multipart parts restart from one derived seed. Older versions used `abs((int)nextLong()) % total`.
+  - Atlas UVs are pulled 0.1% toward the opposite corner, as in pre-1.21 FaceBakery.
+  - All block-atlas sprites are aligned to 16 texels, so the atlas keeps 4 mip levels. The 8×8 conduit eyes would otherwise cap it at 3.
+  - `paletted_permutations` atlas sources (armor trims) are skipped.

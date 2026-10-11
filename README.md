@@ -38,10 +38,19 @@ Binaries land in `build/<preset>/bin/`.
 
 The game directory (saves, options, screenshots, logs) defaults to `./run`; change it with `--gamedir`.
 
-Controls:
+Until the world arrives (M2), the game opens a gallery that shows every block state the pack defines.
+
+Gallery controls:
+- Click: capture the mouse
+- Mouse: look
+- WASD: move
+- Space / Shift: up / down
+- Ctrl: fast
+- Esc: release the mouse, or quit
 - F2: screenshot
 - F11: fullscreen
-- Esc: quit
+
+`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. The GL tests use it.
 
 ## Tests
 ```sh
