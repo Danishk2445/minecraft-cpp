@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "environment": {
+        "CCACHE_SLOPPINESS": "pch_defines,time_macros,include_file_mtime,include_file_ctime"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (optimized, default)",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (GL debug context)",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer + UBSan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release", "environment": { "CCACHE_SLOPPINESS": "pch_defines,time_macros,include_file_mtime,include_file_ctime" } },
+    { "name": "debug", "configurePreset": "debug", "environment": { "CCACHE_SLOPPINESS": "pch_defines,time_macros,include_file_mtime,include_file_ctime" } },
+    { "name": "asan", "configurePreset": "asan", "environment": { "CCACHE_SLOPPINESS": "pch_defines,time_macros,include_file_mtime,include_file_ctime" } },
+    { "name": "tsan", "configurePreset": "tsan", "environment": { "CCACHE_SLOPPINESS": "pch_defines,time_macros,include_file_mtime,include_file_ctime" } }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "unit", "configurePreset": "release", "output": { "outputOnFailure": true }, "filter": { "include": { "label": "unit" } } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
+      "environment": { "ASAN_OPTIONS": "detect_leaks=0", "UBSAN_OPTIONS": "print_stacktrace=1" } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true }, "filter": { "include": { "label": "unit" } } }
+  ]
+}

@@ -1,4 +1,15 @@
-build/
+# Build trees
+/build/
+/build-*/
+compile_commands.json
+.cache/
 
-# Mojang's vanilla resource pack — not redistributable, supply your own.
-Java Default Textures 1.21.7 - 1.21.8/
+# Game directory (saves, options, screenshots, logs)
+/run/
+
+# Third-party resource pack: kept next to the code, never committed
+/Java Default Textures 1.21.7 - 1.21.8/
+
+# Python
+__pycache__/
+*.pyc
