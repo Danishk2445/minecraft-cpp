@@ -3,6 +3,8 @@
 // ladders, swimming, lava, creative flight and spectator noclip.
 #pragma once
 
+#include <vector>
+
 #include "entity/LivingEntity.h"
 #include "game/Inventory.h"
 
@@ -33,6 +35,21 @@ public:
     float walkSpeed = 0.1f;   // movement_speed attribute
     float flyingSpeed = 0.05f;
     Inventory inventory;
+    // Survival state shown by the HUD; damage, hunger and experience drive it in M10.
+    float health = 20.0f, maxHealth = 20.0f;
+    int foodLevel = 20;
+    float saturation = 5.0f;
+    int airSupply = 300, maxAirSupply = 300;
+    int experienceLevel = 0;
+    float experienceProgress = 0.0f; // toward the next level, 0..1
+    int armorValue = 0;
+    // The first-person hands lag behind the view (vanilla LocalPlayer xBob/yBob).
+    float xBob = 0.0f, yBob = 0.0f, xBobO = 0.0f, yBobO = 0.0f;
+    // Stacks thrown out of menus or the hotbar; item entities pick them up in M10.
+    std::vector<ItemStack> droppedItems;
+    void drop(const ItemStack& stack) {
+        if (!stack.empty()) droppedItems.push_back(stack);
+    }
 
     // One game tick: input, movement and collision, then the body and limb animation.
     void tick(const BlockGetter& level, const PlayerInput& input);

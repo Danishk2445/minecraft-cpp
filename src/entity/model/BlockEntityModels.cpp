@@ -4,6 +4,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "entity/model/EntityModels.h"
 #include "resources/ResourcePack.h"
 
 namespace mc {
@@ -41,6 +42,56 @@ glm::mat4 facingTransform(Direction facing) {
     glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f));
     m = glm::rotate(m, glm::radians(-yRotOf(facing)), kY);
     return glm::translate(m, glm::vec3(-0.5f));
+}
+
+// BedRenderer.renderPiece: lie the model down, then turn it to face `facing`
+// (items draw the foot one block behind the head).
+glm::mat4 bedTransform(Direction facing, float zOffset = 0.0f) {
+    glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.0f, 0.5625f, zOffset});
+    t = glm::rotate(t, kPi / 2, kX);
+    t = glm::translate(t, glm::vec3(0.5f));
+    t = glm::rotate(t, glm::radians(180.0f + yRotOf(facing)), kZ);
+    return glm::translate(t, glm::vec3(-0.5f));
+}
+
+// BannerRenderer: standing banners turn by `degrees` about the block's bottom center.
+glm::mat4 bannerTransform(float degrees) {
+    glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
+    t = glm::rotate(t, glm::radians(-degrees), kY);
+    return glm::scale(t, {2.0f / 3.0f, -2.0f / 3.0f, -2.0f / 3.0f});
+}
+
+// SkullBlockRenderer.renderSkull on the floor: centered, scale (-1, -1, 1), and the
+// head turned by yRot (its parts pivot at the origin).
+glm::mat4 floorSkullTransform(float yRot) {
+    glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
+    t = glm::scale(t, {-1.0f, -1.0f, 1.0f});
+    return glm::rotate(t, glm::radians(yRot), kY);
+}
+
+// ShulkerBoxRenderer: centered, shrunk a hair, turned so the lid faces `facing`,
+// then y and z flipped with the model's 24-unit origin at the block bottom.
+glm::mat4 shulkerTransform(Direction facing) {
+    glm::mat4 r(1.0f);
+    switch (facing) {
+    case Direction::Down: r = glm::rotate(r, kPi, kX); break;
+    case Direction::North: r = glm::rotate(glm::rotate(r, kPi / 2, kX), kPi, kZ); break;
+    case Direction::South: r = glm::rotate(r, kPi / 2, kX); break;
+    case Direction::West: r = glm::rotate(glm::rotate(r, kPi / 2, kX), kPi / 2, kZ); break;
+    case Direction::East: r = glm::rotate(glm::rotate(r, kPi / 2, kX), -kPi / 2, kZ); break;
+    default: break;
+    }
+    glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f));
+    t = glm::scale(t, glm::vec3(0.9995f)) * r;
+    t = glm::scale(t, {1.0f, -1.0f, -1.0f});
+    return glm::translate(t, {0.0f, -1.0f, 0.0f});
+}
+
+// DecoratedPotRenderer: turned about the block's bottom center.
+glm::mat4 potTransform(Direction facing) {
+    glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
+    t = glm::rotate(t, glm::radians(180.0f - yRotOf(facing)), kY);
+    return glm::translate(t, {-0.5f, 0.0f, -0.5f});
 }
 
 // --- Layer definitions (vanilla LayerDefinitions, model units) ---
@@ -264,6 +315,7 @@ struct BlockEntityModels::Impl {
     ModelDefinition bell = bellModel();
     ModelDefinition potBase = decoratedPotBaseModel(), potSides = decoratedPotSidesModel();
     ModelDefinition conduitShell = conduitShellModel();
+    ModelDefinition shield = shieldModel(), trident = tridentModel(); // items
 
     const ModelDefinition& skull(SkullKind k) const {
         switch (k) {
@@ -309,14 +361,9 @@ void BlockEntityModels::pieces(const BlockRegistry& reg, StateId state, std::vec
         add(m.chest[variant], "minecraft:entity/chest/" + base + (variant == 1 ? "_left" : variant == 2 ? "_right" : ""),
             facingTransform(facingOf(reg, state)));
     } else if (cls == "bed") {
-        // BedRenderer.renderPiece: lie the model down, then turn it to face `facing`.
-        glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.0f, 0.5625f, 0.0f});
-        t = glm::rotate(t, kPi / 2, kX);
-        t = glm::translate(t, glm::vec3(0.5f));
-        t = glm::rotate(t, glm::radians(180.0f + yRotOf(facingOf(reg, state))), kZ);
-        t = glm::translate(t, glm::vec3(-0.5f));
         const bool head = reg.value(state, "part") == "head";
-        add(head ? m.bedHead : m.bedFoot, "minecraft:entity/bed/" + std::string(stripSuffix(id, "_bed")), t);
+        add(head ? m.bedHead : m.bedFoot, "minecraft:entity/bed/" + std::string(stripSuffix(id, "_bed")),
+            bedTransform(facingOf(reg, state)));
     } else if (cls == "sign" || cls == "wall_sign") {
         // SignRenderer: centered, turned, wall signs pushed against the wall; scale 2/3 with y and z flipped.
         const bool standing = cls == "sign";
@@ -342,9 +389,7 @@ void BlockEntityModels::pieces(const BlockRegistry& reg, StateId state, std::vec
         // BannerRenderer.renderBanner: pole and bar from banner_base, the flag from
         // the base pattern tinted with the banner's color (patterns: out of scope).
         const bool standing = cls == "banner";
-        glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
-        t = glm::rotate(t, glm::radians(-(standing ? rotationDegrees(reg, state) : yRotOf(facingOf(reg, state)))), kY);
-        t = glm::scale(t, {2.0f / 3.0f, -2.0f / 3.0f, -2.0f / 3.0f});
+        const glm::mat4 t = bannerTransform(standing ? rotationDegrees(reg, state) : yRotOf(facingOf(reg, state)));
         add(standing ? m.banner : m.wallBanner, "minecraft:entity/banner_base", t);
         add(standing ? m.bannerFlag : m.wallBannerFlag, "minecraft:entity/banner/base", t).tint =
             dyeTextureColor(stripSuffix(stripSuffix(id, "_wall_banner"), "_banner"));
@@ -354,45 +399,26 @@ void BlockEntityModels::pieces(const BlockRegistry& reg, StateId state, std::vec
         const auto kind = skullKind(id);
         if (!kind) return;
         glm::mat4 t;
-        float yRot;
         if (cls == "wall_skull") {
             const Direction f = facingOf(reg, state);
             const glm::ivec3 step = normal(f);
             t = glm::translate(glm::mat4(1.0f), {0.5f - float(step.x) * 0.25f, 0.25f, 0.5f - float(step.z) * 0.25f});
-            yRot = yRotOf(opposite(f)); // RotationSegment.convertToSegment(facing.getOpposite())
+            t = glm::scale(t, {-1.0f, -1.0f, 1.0f});
+            // RotationSegment.convertToSegment(facing.getOpposite()); the head parts pivot at the origin.
+            t = glm::rotate(t, glm::radians(yRotOf(opposite(f))), kY);
         } else {
-            t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
-            yRot = rotationDegrees(reg, state);
+            t = floorSkullTransform(rotationDegrees(reg, state));
         }
-        t = glm::scale(t, {-1.0f, -1.0f, 1.0f});
-        t = glm::rotate(t, glm::radians(yRot), kY); // head.yRot (the head parts pivot at the origin)
         add(m.skull(*kind), std::string(kSkullTextures[size_t(*kind)]), t);
     } else if (cls == "shulker_box") {
-        // ShulkerBoxRenderer: centered, shrunk a hair, turned so the lid faces `facing`,
-        // then y and z flipped with the model's 24-unit origin at the block bottom.
-        glm::mat4 r(1.0f);
-        switch (directionFromName(reg.value(state, "facing")).value_or(Direction::Up)) {
-        case Direction::Down: r = glm::rotate(r, kPi, kX); break;
-        case Direction::North: r = glm::rotate(glm::rotate(r, kPi / 2, kX), kPi, kZ); break;
-        case Direction::South: r = glm::rotate(r, kPi / 2, kX); break;
-        case Direction::West: r = glm::rotate(glm::rotate(r, kPi / 2, kX), kPi / 2, kZ); break;
-        case Direction::East: r = glm::rotate(glm::rotate(r, kPi / 2, kX), -kPi / 2, kZ); break;
-        default: break;
-        }
-        glm::mat4 t = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f));
-        t = glm::scale(t, glm::vec3(0.9995f)) * r;
-        t = glm::scale(t, {1.0f, -1.0f, -1.0f});
-        t = glm::translate(t, {0.0f, -1.0f, 0.0f});
         const std::string_view color = stripSuffix(id, "_shulker_box");
         add(m.shulkerBox, color == "shulker_box" ? "minecraft:entity/shulker/shulker"
                                                  : "minecraft:entity/shulker/shulker_" + std::string(color),
-            t);
+            shulkerTransform(directionFromName(reg.value(state, "facing")).value_or(Direction::Up)));
     } else if (cls == "bell") {
         add(m.bell, "minecraft:entity/bell/bell_body", glm::mat4(1.0f)); // the frame is the block model
     } else if (cls == "decorated_pot") {
-        glm::mat4 t = glm::translate(glm::mat4(1.0f), {0.5f, 0.0f, 0.5f});
-        t = glm::rotate(t, glm::radians(180.0f - yRotOf(facingOf(reg, state))), kY);
-        t = glm::translate(t, {-0.5f, 0.0f, -0.5f});
+        const glm::mat4 t = potTransform(facingOf(reg, state));
         add(m.potBase, "minecraft:entity/decorated_pot/decorated_pot_base", t);
         add(m.potSides, "minecraft:entity/decorated_pot/decorated_pot_side", t); // no sherds
     } else if (id == "conduit") {
@@ -400,9 +426,59 @@ void BlockEntityModels::pieces(const BlockRegistry& reg, StateId state, std::vec
     }
 }
 
+void BlockEntityModels::itemPieces(const SpecialModelSpec& spec, std::vector<BlockEntityPiece>& out) const {
+    const Impl& m = *impl_;
+    auto add = [&](const ModelDefinition& model, std::string texture, const glm::mat4& transform) -> BlockEntityPiece& {
+        BlockEntityPiece& p = out.emplace_back();
+        p.model = &model;
+        p.texture = std::move(texture);
+        p.transform = transform;
+        return p;
+    };
+    // "minecraft:red" -> "red"
+    const std::string texture(spec.texture.substr(spec.texture.find(':') == std::string::npos ? 0 : spec.texture.find(':') + 1));
+    // Vanilla's special model renderers draw the block entity as if it stood facing south.
+    switch (spec.type) {
+    case SpecialModel::Chest:
+        add(m.chest[0], "minecraft:entity/chest/" + texture, glm::mat4(1.0f));
+        break;
+    case SpecialModel::Bed:
+        add(m.bedHead, "minecraft:entity/bed/" + texture, bedTransform(Direction::South));
+        add(m.bedFoot, "minecraft:entity/bed/" + texture, bedTransform(Direction::South, -1.0f));
+        break;
+    case SpecialModel::Banner:
+        add(m.banner, "minecraft:entity/banner_base", bannerTransform(0.0f));
+        add(m.bannerFlag, "minecraft:entity/banner/base", bannerTransform(0.0f)).tint = dyeTextureColor(spec.color);
+        break;
+    case SpecialModel::Head:
+    case SpecialModel::PlayerHead: {
+        const auto kind = spec.type == SpecialModel::PlayerHead ? std::optional(SkullKind::Player) : skullKind(spec.kind);
+        if (kind) add(m.skull(*kind), std::string(kSkullTextures[size_t(*kind)]), floorSkullTransform(180.0f));
+        break;
+    }
+    case SpecialModel::ShulkerBox:
+        add(m.shulkerBox, "minecraft:entity/shulker/" + (texture.empty() ? std::string("shulker") : texture),
+            shulkerTransform(Direction::Up));
+        break;
+    case SpecialModel::Conduit:
+        add(m.conduitShell, "minecraft:entity/conduit/base", glm::translate(glm::mat4(1.0f), glm::vec3(0.5f)));
+        break;
+    case SpecialModel::DecoratedPot:
+        add(m.potBase, "minecraft:entity/decorated_pot/decorated_pot_base", potTransform(Direction::South));
+        add(m.potSides, "minecraft:entity/decorated_pot/decorated_pot_side", potTransform(Direction::South));
+        break;
+    case SpecialModel::Shield: // ShieldSpecialRenderer: scale (1, -1, -1), no banner patterns
+        add(m.shield, "minecraft:entity/shield_base_nopattern", glm::scale(glm::mat4(1.0f), {1.0f, -1.0f, -1.0f}));
+        break;
+    case SpecialModel::Trident:
+        add(m.trident, "minecraft:entity/trident", glm::scale(glm::mat4(1.0f), {1.0f, -1.0f, -1.0f}));
+        break;
+    }
+}
+
 std::vector<std::string> BlockEntityModels::textures() const {
     std::vector<std::string> t;
-    for (const char* base : {"normal", "trapped"})
+    for (const char* base : {"normal", "trapped", "christmas"})
         for (const char* suffix : {"", "_left", "_right"}) t.push_back(std::string("minecraft:entity/chest/") + base + suffix);
     t.push_back("minecraft:entity/chest/ender");
     for (std::string_view dye : kDyes) {
@@ -421,6 +497,8 @@ std::vector<std::string> BlockEntityModels::textures() const {
     t.push_back("minecraft:entity/decorated_pot/decorated_pot_base");
     t.push_back("minecraft:entity/decorated_pot/decorated_pot_side");
     t.push_back("minecraft:entity/conduit/base");
+    t.push_back("minecraft:entity/shield_base_nopattern"); // items
+    t.push_back("minecraft:entity/trident");
     return t;
 }
 

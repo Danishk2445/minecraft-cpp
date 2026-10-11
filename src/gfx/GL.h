@@ -21,6 +21,7 @@
     X(PFNGLBLENDCOLORPROC, BlendColor) \
     X(PFNGLDEPTHFUNCPROC, DepthFunc) \
     X(PFNGLDEPTHMASKPROC, DepthMask) \
+    X(PFNGLDEPTHRANGEPROC, DepthRange) \
     X(PFNGLCOLORMASKPROC, ColorMask) \
     X(PFNGLCULLFACEPROC, CullFace) \
     X(PFNGLFRONTFACEPROC, FrontFace) \
@@ -189,6 +190,7 @@ MC_GL_FUNCTIONS(MC_GL_DECLARE)
 #define glBlendColor                                  mc_glBlendColor
 #define glDepthFunc                                   mc_glDepthFunc
 #define glDepthMask                                   mc_glDepthMask
+#define glDepthRange                                  mc_glDepthRange
 #define glColorMask                                   mc_glColorMask
 #define glCullFace                                    mc_glCullFace
 #define glFrontFace                                   mc_glFrontFace

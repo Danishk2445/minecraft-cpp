@@ -18,8 +18,12 @@
 #include "resources/Language.h"
 #include "render/EntityRenderer.h"
 #include "render/WorldRenderer.h"
-#include "ui/Font.h"
-#include "ui/GuiBatch.h"
+#include "game/Menu.h"
+#include "ui/GuiGraphics.h"
+#include "ui/Hud.h"
+#include "game/CreativeTabs.h"
+#include "ui/CreativeScreen.h"
+#include "ui/InventoryScreen.h"
 #include "world/light/LightEngine.h"
 #include "world/block/BlockBehavior.h"
 #include "world/block/BlockRegistry.h"
@@ -75,9 +79,14 @@ bool Game::init() {
         return true;
     }
 
-    gui_ = std::make_unique<GuiBatch>();
-    font_ = std::make_unique<Font>();
-    if (!gui_->init() || !font_->load(assets_->pack())) return false;
+    gui_ = std::make_unique<GuiGraphics>();
+    if (!gui_->init(*assets_)) return false;
+    hud_ = std::make_unique<Hud>();
+    if (!opts_.dumpItemIcons.empty()) {
+        exitCode_ = dumpItemIcons(*assets_, gui_->items(), opts_.dumpItemIcons) == 0 ? 0 : 1;
+        toolOnly_ = true;
+        return true;
+    }
     showDebug_ = opts_.debugOverlay;
 
     if (opts_.gallery) {
@@ -103,6 +112,8 @@ bool Game::initWorld() {
     items_ = std::make_unique<ItemRegistry>();
     if (!items_->load(assets_->pack(), *registry_, opts_.dataDir, &err)) log::warn("items: {}", err);
     log::info("Items: {}", items_->size());
+    creativeTabs_ = std::make_unique<CreativeTabs>();
+    if (!creativeTabs_->load(opts_.dataDir, *items_, &err)) log::warn("creative tabs: {}", err);
 
     biomes_ = std::make_unique<BiomeRegistry>();
     if (!biomes_->load(opts_.dataDir, opts_.assetsDir, &err)) {
@@ -215,6 +226,7 @@ void Game::saveWorld(bool wait) {
 }
 
 void Game::shutdown() {
+    closeScreen(); // menus hand their items back before the save
     saveWorld(true);
     // Order matters: jobs reference the registry and assets until the pool is joined.
     overlay_.reset();
@@ -223,7 +235,10 @@ void Game::shutdown() {
     items_.reset();
     level_.reset();
     overworld_.reset();
-    font_.reset();
+    screen_.reset();
+    inventoryMenu_.reset();
+    creativeTabs_.reset();
+    hud_.reset();
     gui_.reset();
     gallery_.reset();
     jobs_.reset();
@@ -276,9 +291,20 @@ int Game::run() {
 void Game::handleGlobalKeys() {
     const Input& in = window_.input();
     if (in.keyPressed(GLFW_KEY_F11)) window_.toggleFullscreen();
-    if (in.keyPressed(GLFW_KEY_F5)) perspective_ = Perspective((int(perspective_) + 1) % 3);
     if (in.keyPressed(GLFW_KEY_F2)) screenshotRequested_ = true;
+    if (screen_) {
+        handleScreenInput();
+        return;
+    }
+    if (in.keyPressed(GLFW_KEY_F5)) perspective_ = Perspective((int(perspective_) + 1) % 3);
     if (in.keyPressed(GLFW_KEY_F3)) showDebug_ = !showDebug_;
+    if (in.keyPressed(GLFW_KEY_E) && player_) {
+        openInventory();
+        return;
+    }
+    // F swaps the main and off hand (not for spectators).
+    if (in.keyPressed(GLFW_KEY_F) && player_ && player_->mode() != GameMode::Spectator)
+        std::swap(player_->inventory.selectedStack(), player_->inventory.offhand);
     if (in.keyPressed(GLFW_KEY_ESCAPE)) {
         if (window_.cursorCaptured()) window_.setCursorCaptured(false);
         else window_.setShouldClose(true);
@@ -297,6 +323,74 @@ void Game::handleGlobalKeys() {
             if (in.keyPressed(GLFW_KEY_1 + i)) selected = i;
         if (const double scroll = in.scrollY(); scroll != 0.0) selected = ((selected - (scroll > 0 ? 1 : -1)) % 9 + 9) % 9;
     }
+}
+
+glm::vec2 Game::guiMouse() const {
+    const glm::ivec2 fb = window_.framebufferSize(), win = window_.windowSize();
+    const glm::dvec2 c = window_.input().cursor();
+    const glm::vec2 px(float(c.x) * float(fb.x) / float(std::max(win.x, 1)), float(c.y) * float(fb.y) / float(std::max(win.y, 1)));
+    return px / float(autoGuiScale(fb));
+}
+
+ScreenContext Game::screenContext() const {
+    ScreenContext ctx;
+    ctx.lang = lang_.get();
+    ctx.items = items_.get();
+    return ctx;
+}
+
+void Game::openScreen(std::unique_ptr<Screen> screen) {
+    if (screen_) closeScreen();
+    screen_ = std::move(screen);
+    window_.setCursorCaptured(false);
+    const glm::ivec2 fb = window_.framebufferSize();
+    screenSize_ = glm::vec2(fb) / float(autoGuiScale(fb));
+    screen_->init(screenSize_);
+    lastGuiMouse_ = guiMouse();
+    guiButtonsDown_ = {};
+}
+
+void Game::closeScreen() {
+    if (!screen_) return;
+    screen_->removed();
+    screen_.reset();
+    window_.setCursorCaptured(true);
+}
+
+void Game::openInventory() {
+    if (!player_ || player_->mode() == GameMode::Spectator) return;
+    if (!inventoryMenu_) inventoryMenu_ = std::make_unique<InventoryMenu>(player_->inventory);
+    if (player_->mode() == GameMode::Creative)
+        openScreen(std::make_unique<CreativeScreen>(screenContext(), *player_, *inventoryMenu_, *creativeTabs_));
+    else
+        openScreen(std::make_unique<InventoryScreen>(screenContext(), *inventoryMenu_, *player_));
+}
+
+void Game::handleScreenInput() {
+    const Input& in = window_.input();
+    const glm::vec2 mouse = guiMouse();
+    for (const Input::KeyEvent& e : in.keyEvents()) {
+        if (e.action == GLFW_RELEASE) continue;
+        if (!screen_->keyPressed(e.key, e.scancode, e.mods) && e.key == GLFW_KEY_ESCAPE && e.action == GLFW_PRESS)
+            screen_->close();
+    }
+    for (char32_t c : in.typedText()) screen_->charTyped(c);
+    for (int b = 0; b < 3; ++b)
+        if (in.mousePressed(b)) {
+            screen_->mouseClicked(mouse, b, in.mods());
+            guiButtonsDown_[size_t(b)] = true;
+        }
+    if (mouse != lastGuiMouse_)
+        for (int b = 0; b < 3; ++b)
+            if (guiButtonsDown_[size_t(b)] && in.mouseDown(b)) screen_->mouseDragged(mouse, b, mouse - lastGuiMouse_);
+    for (int b = 0; b < 3; ++b)
+        if (in.mouseReleased(b) && guiButtonsDown_[size_t(b)]) {
+            screen_->mouseReleased(mouse, b, in.mods());
+            guiButtonsDown_[size_t(b)] = false;
+        }
+    if (in.scrollY() != 0.0) screen_->mouseScrolled(mouse, in.scrollY());
+    lastGuiMouse_ = mouse;
+    if (screen_->closing()) closeScreen();
 }
 
 void Game::updateCamera(double dt) {
@@ -345,6 +439,7 @@ void Game::updateWorld() {
     if (!execDone_ && chunks.viewReady()) {
         execDone_ = true;
         for (const auto& cmd : opts_.exec) runCommand(cmd);
+        if (opts_.screen == "inventory") openInventory();
     }
 }
 
@@ -394,11 +489,14 @@ void Game::tick() {
         } else {
             player_->oldPos = player_->pos;
         }
+        hud_->tick(*player_, [this](const ItemStack& st) { return screenContext().itemName(st); });
+        worldRenderer_->tickHands(*player_);
         // Vanilla Camera.tick: the eye height eases toward the player's (crouching).
         oldEyeHeight_ = eyeHeight_;
         eyeHeight_ += (player_->eyeHeight() - eyeHeight_) * 0.5f;
     }
     attackClicks_ = useClicks_ = pickClicks_ = 0;
+    if (screen_) screen_->tick();
     if (level_) level_->tick();
     // Autosave every 5 minutes, like vanilla.
     if (level_ && tickCount_ % 6000 == 0) saveWorld(false);
@@ -438,7 +536,8 @@ void Game::render(float partialTick) {
             const int stage = breaking_.active && breaking_.pos == target_->pos ? int(breaking_.progress * 10.0f) - 1 : -1;
             overlay_->render(camera_, fb, target_->pos, registry_->outlineShape(level_->getBlock(target_->pos)), stage);
         }
-        renderHud(fb);
+        if (perspective_ == Perspective::FirstPerson) worldRenderer_->renderHands(*player_, *level_, fb, partialTick);
+        renderHud(fb, partialTick);
     } else {
         glViewport(0, 0, fb.x, fb.y);
         glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f); // vanilla daytime sky blue
@@ -614,31 +713,31 @@ void Game::tickInteraction() {
     }
 }
 
-void Game::renderHud(glm::ivec2 fb) {
+void Game::renderHud(glm::ivec2 fb, float partialTick) {
     if (!player_) return;
     gui_->begin(fb, autoGuiScale(fb));
-    const glm::vec2 c = gui_->size() * 0.5f;
-    if (player_->mode() != GameMode::Spectator) {
-        // Crosshair, first person only (the inverted-color sprite arrives with the GUI milestone).
-        if (perspective_ == Perspective::FirstPerson) {
-            gui_->fill(c.x - 4.5f, c.y - 0.5f, c.x + 4.5f, c.y + 0.5f, 0xE0FFFFFF);
-            gui_->fill(c.x - 0.5f, c.y - 4.5f, c.x + 0.5f, c.y + 4.5f, 0xE0FFFFFF);
+    const glm::dvec3 eye = camera_.position;
+    const bool eyeInWater = perspective_ == Perspective::FirstPerson &&
+                            level_->fluid(BlockPos::containing(eye)).kind == FluidKind::Water;
+    ItemModelContext items;
+    items.timeOfDay = worldRenderer_->environment().timeOfDay;
+    items.holderPos = player_->pos;
+    items.holderYaw = player_->yaw;
+    items.spawnPos = glm::dvec3(level_->generator().spawnPoint());
+    items.spin = float(tickCount_ % 200) / 200.0f;
+    gui_->setItemContext(items);
+    hud_->render(*gui_, *player_, perspective_ == Perspective::FirstPerson, eyeInWater,
+                 [this](const ItemStack& stack, float x, float y) {
+                     gui_->item(stack, x, y);
+                     gui_->itemDecorations(stack, x, y);
+                 });
+    if (screen_) {
+        // Re-lay out after a resize.
+        if (gui_->size() != screenSize_) {
+            screenSize_ = gui_->size();
+            screen_->init(screenSize_);
         }
-        // Hotbar: slot numbers and counts with the selected item's name (icons arrive with the GUI milestone).
-        const Inventory& inv = player_->inventory;
-        const float y = gui_->size().y - 14.0f;
-        for (int i = 0; i < 9; ++i) {
-            const float x = c.x - 90.0f + 20.0f * float(i);
-            const bool sel = i == inv.selected;
-            const ItemStack& st = inv.main[size_t(i)];
-            gui_->fill(x, y - 2.0f, x + 18.0f, y + 10.0f, sel ? 0xC0FFFFFF : st.empty() ? 0x60000000 : 0xA0303030);
-            const std::string label = st.empty() ? std::to_string(i + 1) : std::to_string(st.count);
-            font_->draw(*gui_, label, x + 9.0f - float(font_->width(label)) / 2.0f, y, sel ? 0xFF000000 : 0xFFE0E0E0, false);
-        }
-        if (const ItemStack& st = inv.selectedStack(); !st.empty()) {
-            const std::string name = items_->name(*st.item, *lang_);
-            font_->draw(*gui_, name, c.x - float(font_->width(name)) / 2.0f, y - 14.0f, 0xFFFFFFFF, true);
-        }
+        screen_->render(*gui_, guiMouse(), partialTick);
     }
     gui_->end();
 }
@@ -707,8 +806,8 @@ void Game::renderDebugOverlay(glm::ivec2 fb) {
     for (size_t i = 0; i < lines.size(); ++i) {
         if (lines[i].empty()) continue;
         const float y = 2.0f + 9.0f * float(i);
-        gui_->fill(1, y - 1, 2.0f + float(font_->width(lines[i])) + 1.0f, y + 8, 0x90505050);
-        font_->draw(*gui_, lines[i], 2, y, 0xFFE0E0E0, false);
+        gui_->fill(1, y - 1, 2.0f + float(gui_->textWidth(lines[i])) + 1.0f, y + 8, 0x90505050);
+        gui_->text(lines[i], 2, y, 0xFFE0E0E0, false);
     }
     gui_->end();
 }

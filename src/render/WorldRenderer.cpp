@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "render/ClientAssets.h"
+#include "entity/Player.h"
 #include "world/level/Level.h"
 #include "gfx/GL.h"
 
@@ -30,7 +31,7 @@ bool WorldRenderer::init() {
     blockEntities_.build(registry_, assets_.blockEntityModels(), assets_.blockAtlas());
     options_.blockEntities = &blockEntities_;
     if (!particles_.init()) return false;
-    if (!entities_.init(assets_.pack())) return false;
+    if (!entities_.init(assets_)) return false;
     if (!chunks_.init()) return false;
     if (!sky_.init(assets_.pack())) return false;
     lightmap_.init();
@@ -102,6 +103,14 @@ void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int render
     entities_.render(viewProj, fog);
     chunks_.renderTranslucent(camera, viewProj, assets_.blockAtlasTexture(), fog);
     sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick);
+}
+
+void WorldRenderer::renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick) {
+    // Lit at the eyes, like the player model.
+    const glm::dvec3 eye = glm::mix(player.oldPos, player.pos, double(partialTick)) + glm::dvec3(0.0, player.eyeHeight(), 0.0);
+    const uint8_t l = level.lightAt(BlockPos::containing(eye));
+    lightmap_.bind(1);
+    hands_.render(entities_, assets_, player, viewport, partialTick, glm::vec2(float(l & 15), float(l >> 4)));
 }
 
 void WorldRenderer::renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera,

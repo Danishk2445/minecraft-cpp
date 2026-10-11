@@ -386,10 +386,63 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - After MERGE, `finalizeChunk` runs vanilla's freeze_top_layer: at the MOTION_BLOCKING top, still water freezes to ice and air gets a snow layer (snowy grass below) where the height-adjusted biome temperature is below 0.15. Temperature falls by `(noise·8 + y − 80)·0.05/40` above y 80; frozen oceans thaw in noise patches.
 - **Colormap lookup:** `x = (int)((1-T)·255)`, `y = (int)((1-D·T)·255)` with T and D clamped to [0,1]. Fixed colors: birch #80A755, spruce #619961, lily pad #208030.
 
-## UI
-- **GUI scale:** the largest s ≤ max such that `w ≥ 320s` and `h ≥ 240s`, which gives 4 at 1920×1080.
-- **Fonts:**
-  - `font/default.json` is the provider order: space, then bitmap fonts (`nonlatin_european`, `accented`, `ascii`).
-  - Glyph width is the rightmost opaque column + 1, and the advance is width + 1. Space advances 4.
-  - The shadow is offset (1,1) at 25% brightness.
+## UI (`ui/`, `render/ItemRenderer`, `game/Menu`)
+- **GUI scale:** the largest s (up to the option's maximum) with `w ≥ 320s` and `h ≥ 240s`. That gives 4 at 1920×1080 and 3 at 1280×720.
+- **Fonts** (`resources/FontSet`):
+  - `font/default.json` lists the providers in priority order: space (`" "` advances 4), then `include/default` (`nonlatin_european`, `accented`, `ascii`), then unifont (not in the pack). The first provider with a glyph wins.
+  - Bitmap glyphs:
+    - cell size is the image size / the `chars` grid; scale = `height` / cell height;
+    - `advance = (int)(0.5 + actualWidth·scale) + 1`, where actualWidth is the rightmost non-transparent column + 1;
+    - the glyph's top is at `y + 7 − ascent`, so ASCII sits on the line and `accented` reaches 3 pixels above it.
+  - Characters with no glyph draw the missing box: a 5×8 outline that advances 6.
+  - § codes:
+    - colors `0-9 a-f` reset the other formats;
+    - `k` obfuscated (a random glyph of the same width, the same one in the shadow), `l` bold (drawn twice 1 pixel apart, advance +1), `m` strikethrough (y+3.5..4.5), `n` underline (y+8..9), `o` italic (top shifted `1 − 0.25·y`), `r` reset;
+    - unknown codes are dropped.
+  - The shadow is drawn first at (1, 1), with RGB/4. A color whose alpha bits are all 0 counts as opaque.
+- **Sprites** (`textures/gui/sprites`, `atlases/gui.json`), scaled by their `gui.scaling`:
+  - `stretch`;
+  - `tile` (repeated at the nominal size);
+  - `nine_slice`: corners keep their size; edges and center tile, or stretch with `stretch_inner`. Borders shrink to half the target when it is smaller, and a target exactly the nominal width or height collapses to three pieces.
+- **HUD** (vanilla Gui):
+  - hotbar at `(w/2 − 91, h − 22)` and the selection at `(w/2 − 92 + 20·slot, h − 23)`; items at `(w/2 − 88 + 20·i, h − 19)`;
+  - hearts from `(w/2 − 91, h − 39)` with an 8-pixel step, shaking at 4 health or less; food from the right edge `w/2 + 91 − 8i − 9`; armor 10 above the hearts; air above the food;
+  - the XP bar is `(w/2 − 91, h − 29)` 182×5, with `filled = (int)(progress·183)`;
+  - the selected item's name shows for 40 ticks (alpha `timer·256/10`, capped) at `h − 59` (`h − 45` in creative);
+  - the crosshair blends `ONE_MINUS_DST_COLOR, ONE_MINUS_SRC_COLOR`.
+- **Item models** (`resources/ItemDefinitions`, `ItemModelGenerator`, `entity/model/ItemGeometry`):
+  - Definitions are trees of `model` (with tints), `condition`, `select`, `range_dispatch` (the last threshold ≤ value·scale), `special`, `composite`, `empty` and `bundle/selected_item`.
+  - A select or range with no match falls back to its fallback, else the missing model.
+  - `item/generated` layers become the full layer (south uv 0..16, north mirrored) between z 7.5 and 8.5, plus one side element per row or column of edge texels. These are vanilla's spans: each covers min..max across gaps.
+  - Display transform: `T(translation/16)·Rx·Ry·Rz·S(scale)·T(−0.5)`, with translation clamped to ±80 px and scale to ±4. Left hands negate translation x and rotation y and z; a missing left transform copies the right one.
+  - Specials draw the block entity's model as if it stood facing south:
+    - the bed head plus its foot at z −1;
+    - a head turned 180°;
+    - a shulker box opening upward;
+    - the shield and trident scaled (1, −1, −1).
+- **GUI item lighting:**
+  - The level lights `(0.2, 1, −0.7)` and `(−0.2, 1, 0.7)` are turned for icons. For blocks (`gui_light: side`) the matrix is `S(1,−1,1)·RotYXZ(1.0821041, 3.2375858, 0)·RotYXZ(−π/8, 3π/4, 0)`; for flat items (`front`) it is `RotY(−π/8)·RotX(3π/4)`.
+  - Normals are taken after the GUI's `S(16, −16, 16)` (y negated). `shade = min(1, 0.4 + 0.6·Σ max(0, n·l))`.
+  - Each icon gets its own slice of the depth range, so later icons always draw in front.
+- **Items in hand:**
+  - First person (`render/FirstPersonRenderer`, vanilla ItemInHandRenderer): depth is cleared and drawn with a 70° projection. The view-space pose is `Rx((pitch − xBob)·0.1)·Ry((yaw − yBob)·0.1)`, where `xBob += (pitch − xBob)·0.5` per tick.
+  - Items (s = swing):
+    ```
+    T(±(−0.4·sin(√s·π)), 0.2·sin(√s·2π), −0.2·sin(s·π))
+    T(±0.56, −0.52 − 0.6·equip, −0.72)
+    Ry(±(45 − 20·sin(s²π)))·Rz(∓20·sin(√s·π))·Rx(−80·sin(√s·π))·Ry(∓45)
+    ```
+  - The bare arm uses vanilla renderPlayerArm's constants (`0.64, −0.6, −0.72`, then `T(∓1, 3.6, 3.5)·Rz(±120)·Rx(200)·Ry(∓135)·T(±5.6, 0, 0)`), with the arm at zRot 0.1.
+  - The equip height eases toward 1 (0 while a different item is shown) by at most 0.4 per tick. The shown item swaps once the height is below 0.1.
+  - Third person (ItemInHandLayer): `arm pose·Rx(−90)·Ry(180)·T(±1/16, 0.125, −0.625)`, then the third-person display transform.
+- **Menus** (`game/Menu`, vanilla AbstractContainerMenu):
+  - pickup and split clicks: right click takes half rounded up, or places one;
+  - shift-click quick moves through each menu's `quickMoveStack` rules;
+  - drags (QUICK_CRAFT start, slots, end; types split evenly, one each, or full stacks in creative);
+  - double click collects partial stacks first, then full ones;
+  - number keys and F swap with the hotbar and the off hand;
+  - Q throws (Ctrl+Q the stack); clicking outside the window drops the cursor stack;
+  - middle click clones in creative.
+  - Containers hold up to 99 per slot and armor slots 1.
+  - The creative screen implements ItemPickerMenu clicks: copies of tab items, shift for a full stack, the same item adds one, and shift-clicking the hotbar deletes. The survival-inventory tab has a destroy slot.
 - **Containers:** chest screens draw `generic_54.png`: the top `rows·18+17` px, then the bottom 96 px from v=126.

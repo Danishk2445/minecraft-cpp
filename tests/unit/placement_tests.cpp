@@ -1,9 +1,11 @@
 #include <memory>
+#include <set>
 
 #include <gtest/gtest.h>
 
 #include "core/JobSystem.h"
 #include "entity/Player.h"
+#include "game/CreativeTabs.h"
 #include "game/Inventory.h"
 #include "game/Item.h"
 #include "game/Placement.h"
@@ -281,6 +283,45 @@ TEST_F(PlacementFixture, ItemsAndInventory) {
     EXPECT_EQ(inv.main[5].item, item("dirt"));
     inv.consumeSelected(64);
     EXPECT_TRUE(inv.main[5].empty());
+}
+
+// Creative tabs: every item a player can get in vanilla's creative menu is in a tab
+// (the rest is operator-only or not in the menu at all); search matches names and ids.
+TEST_F(PlacementFixture, CreativeTabsAndSearch) {
+    ItemRegistry items;
+    std::string err;
+    ASSERT_TRUE(items.load(*pack, *registry, MC_DEFAULT_DATA_DIR, &err)) << err;
+    Language lang;
+    ASSERT_TRUE(lang.load(*pack));
+    CreativeTabs tabs;
+    ASSERT_TRUE(tabs.load(MC_DEFAULT_DATA_DIR, items, &err)) << err;
+    ASSERT_EQ(tabs.tabs().size(), 11u);
+    EXPECT_EQ(tabs.tabs()[0].id, "building_blocks");
+    EXPECT_EQ(shortId(tabs.tabs()[0].items[0]->id), "oak_log");
+    EXPECT_EQ(shortId(tabs.tabs()[1].items[0]->id), "white_wool");
+    std::set<const Item*> inTabs;
+    for (const CreativeTab& t : tabs.tabs())
+        for (const Item* i : t.items) inTabs.insert(i);
+    std::vector<std::string> missing;
+    for (size_t i = 0; i < items.size(); ++i)
+        if (!inTabs.contains(&items.get(i))) missing.emplace_back(shortId(items.get(i).id));
+    const std::vector<std::string> outsideCreative = {"air", "filled_map", "knowledge_book", "petrified_oak_slab",
+                                                      "written_book"};
+    EXPECT_EQ(missing, outsideCreative);
+    // The search tab: visible tabs only (no operator blocks), each item once.
+    const auto& all = tabs.searchable();
+    EXPECT_EQ(std::set<const Item*>(all.begin(), all.end()).size(), all.size());
+    EXPECT_EQ(std::count(all.begin(), all.end(), items.find("command_block")), 0);
+    auto name = [&](const Item& i) { return items.name(i, lang); };
+    EXPECT_EQ(tabs.search("", name).size(), all.size());
+    auto hits = tabs.search("DIAMOND SW", name);
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_EQ(hits[0], items.find("diamond_sword"));
+    hits = tabs.search("spruce_tr", name); // ids match too
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_EQ(hits[0], items.find("spruce_trapdoor"));
+    EXPECT_GE(tabs.search("oak", name).size(), 20u);
+    EXPECT_TRUE(tabs.search("no such thing", name).empty());
 }
 
 TEST_F(PlacementFixture, HandUseAndScheduledTicks) {

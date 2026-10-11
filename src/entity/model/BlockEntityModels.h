@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "entity/model/ModelPart.h"
+#include "resources/ItemDefinitions.h"
 #include "world/block/BlockRegistry.h"
 
 namespace mc {
@@ -40,6 +41,9 @@ public:
     bool handles(const Block& block) const;
     // The pieces to draw for `state` (empty if none).
     void pieces(const BlockRegistry& reg, StateId state, std::vector<BlockEntityPiece>& out) const;
+    // The pieces of an item's special model in item space (vanilla SpecialModelRenderer),
+    // before the base model's display transform.
+    void itemPieces(const SpecialModelSpec& spec, std::vector<BlockEntityPiece>& out) const;
     // Every texture any piece may use (added to the block atlas).
     std::vector<std::string> textures() const;
     // Every model definition with the textures it reads, for the UV-island test.

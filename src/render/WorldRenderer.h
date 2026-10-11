@@ -9,6 +9,7 @@
 #include "gfx/Camera.h"
 #include "render/ChunkRenderer.h"
 #include "render/EntityRenderer.h"
+#include "render/FirstPersonRenderer.h"
 #include "render/Environment.h"
 #include "render/ParticleRenderer.h"
 #include "render/SkyRenderer.h"
@@ -22,6 +23,7 @@ class BiomeRegistry;
 class ClientAssets;
 class Level;
 class ParticleSystem;
+class Player;
 
 class WorldRenderer {
 public:
@@ -36,6 +38,9 @@ public:
     // entities() since its begin(), and clouds.
     void render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level, float partialTick);
     EntityRenderer& entities() { return entities_; }
+    // First-person hands over the finished world (call after render()).
+    void renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick);
+    void tickHands(const Player& player) { hands_.tick(player); }
     const EnvironmentState& environment() const { return env_; }
     // Particles over the world just drawn (uses its lightmap and camera).
     void renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera, glm::ivec2 viewport,
@@ -56,6 +61,7 @@ private:
     SkyRenderer sky_;
     ParticleRenderer particles_;
     EntityRenderer entities_;
+    FirstPersonRenderer hands_;
     Lightmap lightmap_;
     LightFlicker flicker_;
     EnvironmentState env_;

@@ -16,7 +16,7 @@ import pathlib
 import sys
 
 FUNCTIONS = """
-Enable Disable IsEnabled BlendFunc BlendFuncSeparate BlendEquation BlendColor DepthFunc DepthMask
+Enable Disable IsEnabled BlendFunc BlendFuncSeparate BlendEquation BlendColor DepthFunc DepthMask DepthRange
 ColorMask CullFace FrontFace PolygonOffset PolygonMode Viewport Scissor Clear ClearColor ClearDepth
 LineWidth PixelStorei GetIntegerv GetInteger64v GetFloatv GetBooleanv GetString GetStringi GetError
 Finish Flush ReadPixels ReadBuffer DrawBuffer DrawBuffers Hint

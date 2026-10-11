@@ -29,6 +29,19 @@ bool ClientAssets::load(const std::filesystem::path& packRoot) {
     glObjectLabel(GL_TEXTURE, blockAtlasTex_.id(), -1, "block atlas");
     animator_ = std::make_unique<AtlasAnimator>(blockAtlas_);
 
+    AtlasStats guiStats;
+    auto gui = buildAtlas(*pack_, "gui", 0, &guiStats);
+    for (const auto& e : guiStats.errors) log::warn("gui atlas: {}", e);
+    if (!gui) {
+        log::error("Could not build the GUI sprite atlas");
+        return false;
+    }
+    guiAtlas_ = std::move(*gui);
+    guiAtlasTex_.create(guiAtlas_.width, guiAtlas_.height, 1);
+    guiAtlasTex_.upload(0, 0, 0, guiAtlas_.levels[0]);
+    glObjectLabel(GL_TEXTURE, guiAtlasTex_.id(), -1, "gui atlas");
+    log::info("GUI atlas: {}x{}, {} sprites", guiAtlas_.width, guiAtlas_.height, guiAtlas_.sprites.size());
+
     models_ = std::make_unique<ModelStore>(*pack_);
     baker_ = std::make_unique<ModelBaker>(*models_, blockAtlas_);
     blockModels_.load(*pack_, *models_, *baker_);
@@ -40,6 +53,16 @@ bool ClientAssets::load(const std::filesystem::path& packRoot) {
     log::info("Baked {} block models for {} blockstate files ({} model errors, {} missing textures)",
               baker_->bakedCount(), blockModels_.definitions().size(), baker_->errors().size(),
               baker_->missingTextureCount());
+
+    std::string itemProblems;
+    itemDefinitions_.load(*pack_, *baker_, &itemProblems);
+    for (size_t start = 0; start < itemProblems.size();) {
+        const size_t end = itemProblems.find('\n', start);
+        log::warn("items: {}", itemProblems.substr(start, end - start));
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    log::info("Item definitions: {}", itemDefinitions_.size());
 
     auto loadMap = [&](const char* name) {
         auto img = Image::loadPng(pack_->file("minecraft", std::string("textures/colormap/") + name + ".png"));
@@ -58,6 +81,29 @@ void ClientAssets::tick() {
     animator_->tick([&](const SpriteInfo& s, int level, const Image& texels) {
         blockAtlasTex_.upload(level, s.x >> level, s.y >> level, texels);
     });
+}
+
+const Texture& ClientAssets::texture(std::string_view id) const {
+    auto it = textures_.find(std::string(id));
+    if (it == textures_.end()) {
+        std::unique_ptr<Texture> tex;
+        std::string err;
+        if (auto img = Image::loadPng(pack_->resource(ResourceLocation::parse(id), "textures", ".png"), &err)) {
+            tex = std::make_unique<Texture>();
+            tex->create(img->width, img->height, 1);
+            tex->upload(0, 0, 0, *img);
+        } else {
+            log::warn("texture {}: {}", id, err);
+        }
+        it = textures_.emplace(std::string(id), std::move(tex)).first;
+    }
+    if (it->second) return *it->second;
+    if (!missingTex_.valid()) {
+        const Image checker = missingTextureImage();
+        missingTex_.create(checker.width, checker.height, 1);
+        missingTex_.upload(0, 0, 0, checker);
+    }
+    return missingTex_;
 }
 
 BiomeColors ClientAssets::defaultBiomeColors() const {

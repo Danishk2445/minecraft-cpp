@@ -51,10 +51,12 @@ struct CliOptions {
     std::optional<glm::dvec3> pos;  // --pos X,Y,Z
     std::optional<glm::vec2> look;  // --look YAW,PITCH (degrees)
     std::string perspective = "first"; // first | back | front (F5 views)
+    std::string screen;                // harness: open this screen once the world is ready (inventory)
 
     // Tools
     std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit
     std::filesystem::path goldenTiles;     // states whose tiles are also saved individually
+    std::filesystem::path dumpItemIcons;   // render every item's GUI icon into a sheet, then exit
     std::optional<glm::ivec2> dumpColumn;  // print worldgen diagnostics for a column, then exit
     std::filesystem::path biomeMap;        // write a top-down biome map PNG and statistics, then exit
     int mapSize = 4096;                    // biome map: width/height in blocks

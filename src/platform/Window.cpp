@@ -117,6 +117,12 @@ void Window::setCursorCaptured(bool captured) {
     if (glfwRawMouseMotionSupported())
         glfwSetInputMode(window_, GLFW_RAW_MOUSE_MOTION, captured ? GLFW_TRUE : GLFW_FALSE);
     input_.resetMouseTracking();
+    if (!captured) {
+        // Vanilla releases the mouse at the window's center.
+        const double cx = windowSize_.x / 2.0, cy = windowSize_.y / 2.0;
+        glfwSetCursorPos(window_, cx, cy);
+        input_.onCursor(cx, cy);
+    }
 }
 
 void Window::setTitle(const std::string& title) { glfwSetWindowTitle(window_, title.c_str()); }

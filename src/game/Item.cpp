@@ -23,6 +23,13 @@ bool ItemRegistry::load(const ResourcePack& pack, const BlockRegistry& blocks, c
     const Json blockItems = data->value("block_items", Json::object());
     const Json notBlocks = data->value("not_block_items", Json::array());
     const Json stackRules = data->value("stack_rules", Json::array());
+    const Json equipmentRules = data->value("equipment_rules", Json::array());
+    const Json rarityRules = data->value("rarity_rules", Json::array());
+    auto matches = [](const Json& rule, const std::string& id) {
+        for (const Json& pattern : rule.value("match", Json::array()))
+            if (globMatch(pattern.get<std::string>(), id)) return true;
+        return false;
+    };
 
     // Every item definition in the pack, sorted for stable indices.
     std::vector<std::string> ids;
@@ -44,14 +51,28 @@ bool ItemRegistry::load(const ResourcePack& pack, const BlockRegistry& blocks, c
             item.block = blocks.find(id);
         }
         item.nameKey = (item.block && item.block->id == item.id ? "block.minecraft." : "item.minecraft.") + id;
-        for (const Json& rule : stackRules) {
-            bool hit = false;
-            for (const Json& pattern : rule.value("match", Json::array())) hit |= globMatch(pattern.get<std::string>(), id);
-            if (hit) {
+        for (const Json& rule : stackRules)
+            if (matches(rule, id)) {
                 item.maxStack = rule.value("stack", 64);
                 break;
             }
-        }
+        for (const Json& rule : equipmentRules)
+            if (matches(rule, id)) {
+                const std::string slot = rule.value("slot", std::string());
+                item.equipment = slot == "head"      ? EquipmentSlot::Head
+                                 : slot == "chest"   ? EquipmentSlot::Chest
+                                 : slot == "legs"    ? EquipmentSlot::Legs
+                                 : slot == "feet"    ? EquipmentSlot::Feet
+                                 : slot == "offhand" ? EquipmentSlot::OffHand
+                                                     : EquipmentSlot::MainHand;
+                break;
+            }
+        for (const Json& rule : rarityRules)
+            if (matches(rule, id)) {
+                const std::string r = rule.value("rarity", std::string());
+                item.rarity = r == "epic" ? Rarity::Epic : r == "rare" ? Rarity::Rare : r == "uncommon" ? Rarity::Uncommon : Rarity::Common;
+                break;
+            }
         index_.emplace(item.id, item.index);
         items_.push_back(std::move(item));
     }
@@ -73,6 +94,15 @@ bool ItemRegistry::load(const ResourcePack& pack, const BlockRegistry& blocks, c
         for (const auto& p : problems) *error += p + "\n";
     }
     return problems.empty();
+}
+
+char rarityColorCode(Rarity r) {
+    switch (r) {
+    case Rarity::Uncommon: return 'e';
+    case Rarity::Rare: return 'b';
+    case Rarity::Epic: return 'd';
+    default: return 'f';
+    }
 }
 
 const Item* ItemRegistry::find(std::string_view id) const {

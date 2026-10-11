@@ -11,7 +11,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
 - [x] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
 - [x] M7 Entity models: ModelPart, block-entity renderers, player model, F5
-- [ ] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
+- [x] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
 - [ ] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
 - [ ] M10 Survival: tools, food, armor, loot, item entities, XP, health, crafting, furnaces, containers, beds, signs
 - [ ] M11 Simulation: random ticks, fluids, falling blocks, TNT, fire, farming, weather, particles
@@ -92,3 +92,13 @@ Recorded per milestone.
   - Entity shadows are always on; the option arrives with the options screen (M9).
   - Spectators see their own head at 15% opacity in third person, with the body hidden, as in vanilla.
   - The harness's `--hold forward,attack,...` holds controls down for a whole run. It drives the walking, mining and sneaking screenshots.
+- **M8:**
+  - Unifont is not in the pack, so characters the bitmap fonts lack draw vanilla's missing box.
+  - GUI item icons are drawn one by one with their own depth slices. Vanilla 1.21.6+ renders them into an item atlas first; they look the same.
+  - Item definitions are fully parsed, but items carry no data components yet. Properties that read them take their defaults: damage, dyes, potions, trims, bundles, block state and charge type. Clocks follow the time of day, compasses point at the world spawn (and spin without a holder), and chests switch to the Christmas texture from 24 to 26 December.
+  - Equipment slots (which armor slot an item fits) and rarities (name colors) come from rules in `data/items/items.json`.
+  - Thrown items (Q in a menu, or clicking outside a window with a stack on the cursor) leave the inventory and wait on the player until item entities exist (M10); until then they are lost. Q in the world is not bound yet.
+  - Creative inventory: tab contents are vanilla's order as written from memory (`data/creative_tabs.json`). There is no Saved Hotbars tab, and the Operator Utilities tab stays hidden. Search matches names and ids, not tags or tooltips.
+  - The 2x2 crafting grid accepts items but crafts nothing until recipes (M10). There is no recipe book (out of scope).
+  - First-person hands have no view bobbing (M13). The attack-cooldown dip of the held item arrives with combat (M10).
+  - Items on the ground (item entities) arrive with M10.

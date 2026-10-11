@@ -75,6 +75,8 @@ public:
 
     // Cached by (model, x, y, uvlock). Missing models bake to a magenta cube.
     const BakedModel* bake(const ModelVariant& variant);
+    // The magenta cube itself (vanilla's missing model), without recording an error.
+    const BakedModel* missingModel();
 
     const std::vector<std::string>& errors() const { return errors_; }
     int missingTextureCount() const { return missingTextures_; }
@@ -82,6 +84,7 @@ public:
 
 private:
     std::unique_ptr<BakedModel> bakeUncached(const ModelVariant& v);
+    std::unique_ptr<BakedModel> missingCube() const;
     uint16_t spriteFor(const ResolvedModel& model, const std::string& variable);
 
     ModelStore& models_;

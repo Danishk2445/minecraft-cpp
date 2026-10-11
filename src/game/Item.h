@@ -15,13 +15,23 @@ namespace mc {
 class Language;
 class ResourcePack;
 
+// Where an item can be worn (vanilla EquipmentSlot); MainHand for everything else.
+enum class EquipmentSlot : uint8_t { MainHand, OffHand, Feet, Legs, Chest, Head };
+// Name colors: common white, uncommon yellow, rare aqua, epic light purple.
+enum class Rarity : uint8_t { Common, Uncommon, Rare, Epic };
+
 struct Item {
     std::string id; // "minecraft:oak_planks"
     uint16_t index = 0;
     int maxStack = 64;
     const Block* block = nullptr; // the block it places, if any
     std::string nameKey;          // "block.minecraft.oak_planks" or "item.minecraft.diamond"
+    EquipmentSlot equipment = EquipmentSlot::MainHand;
+    Rarity rarity = Rarity::Common;
 };
+
+// The § color code of a rarity ('f', 'e', 'b' or 'd').
+char rarityColorCode(Rarity r);
 
 class ItemRegistry {
 public:

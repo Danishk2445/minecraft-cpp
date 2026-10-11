@@ -24,6 +24,7 @@ struct SpriteInfo {
     bool transparent = false; // some texel has alpha 0 (any frame)
     bool translucent = false; // some texel has 0 < alpha < 255 (any frame)
     int animation = -1;       // index into Atlas::animations
+    std::optional<GuiScaling> gui; // GUI sprites: how they stretch (mcmeta "gui.scaling")
 
     // Texel coordinates 0..16 (model units) -> atlas UV.
     float u(float px) const { return u0 + (u1 - u0) * px / 16.0f; }

@@ -65,7 +65,8 @@ Controls:
 - WASD: walk; Space: jump (double-tap in creative to fly, then Space/Shift to rise/sink)
 - Shift: sneak (never walks off ledges); Ctrl: sprint
 - Left mouse: break (instant in creative); right mouse: place, or open doors, trapdoors and gates, flip levers, press buttons; middle mouse: pick block (creative)
-- 1–9 or the mouse wheel: hotbar slot
+- 1–9 or the mouse wheel: hotbar slot; F: swap hands
+- E: inventory (creative: the creative inventory with tabs and search). In menus: click, right click (half / one), shift-click, drag to spread, double-click to collect, 1–9 and F to swap with the hotbar or off hand, Q to throw, middle click to copy (creative)
 - Esc: release the mouse, or quit
 - F2: screenshot
 - F3: debug screen (with the targeted block)
@@ -74,7 +75,7 @@ Controls:
 
 Commands (`--exec "/cmd"`): `/tp`, `/setblock`, `/fill`, `/time`, `/gamemode`, `/give <item> [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
 
-`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. The GL tests use it.
+`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen inventory` opens the (creative) inventory once the world is ready, for screenshots.
 
 World generation tools run without a window:
 - `--biome-map FILE [--map-size N] [--map-step N]` writes a shaded top-down biome map around `--pos` (default 0,0), then prints biome shares, the nearest location of each biome, and the highest point.

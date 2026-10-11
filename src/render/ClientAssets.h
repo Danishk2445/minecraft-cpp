@@ -4,11 +4,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 #include "gfx/Texture.h"
 #include "entity/model/BlockEntityModels.h"
 #include "resources/Atlas.h"
 #include "resources/BlockModels.h"
+#include "resources/ItemDefinitions.h"
 #include "resources/Model.h"
 #include "resources/ModelBaker.h"
 #include "resources/ResourcePack.h"
@@ -32,6 +35,17 @@ public:
     ModelStore& modelStore() { return *models_; }
     ModelBaker& baker() { return *baker_; }
 
+    // GUI sprites (textures/gui/sprites, atlases/gui.json) with their scaling metadata.
+    const Atlas& guiAtlas() const { return guiAtlas_; }
+    const Texture& guiAtlasTexture() const { return guiAtlasTex_; }
+    // A standalone texture by id ("minecraft:gui/container/inventory" ->
+    // textures/gui/container/inventory.png), loaded on first use; the missing
+    // checker when absent.
+    const Texture& texture(std::string_view id) const;
+
+    // Item model definitions (items/*.json), baked into the block atlas.
+    const ItemDefinitions& itemDefinitions() const { return itemDefinitions_; }
+
     // Entity models drawn in place of block models (chests, beds, signs, ...).
     const BlockEntityModels& blockEntityModels() const { return *blockEntityModels_; }
 
@@ -46,10 +60,15 @@ private:
     std::unique_ptr<BlockEntityModels> blockEntityModels_;
     Atlas blockAtlas_;
     Texture blockAtlasTex_;
+    Atlas guiAtlas_;
+    Texture guiAtlasTex_;
+    mutable std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
+    mutable Texture missingTex_;
     std::unique_ptr<AtlasAnimator> animator_;
     std::unique_ptr<ModelStore> models_;
     std::unique_ptr<ModelBaker> baker_;
     BlockModels blockModels_;
+    ItemDefinitions itemDefinitions_;
     Colormap grass_, foliage_, dryFoliage_;
 };
 

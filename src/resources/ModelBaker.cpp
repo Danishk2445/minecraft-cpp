@@ -5,6 +5,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "resources/ItemModelGenerator.h"
+
 namespace mc {
 namespace {
 
@@ -229,29 +231,66 @@ const BakedModel* ModelBaker::bake(const ModelVariant& v) {
     return raw;
 }
 
-std::unique_ptr<BakedModel> ModelBaker::bakeUncached(const ModelVariant& v) {
+std::unique_ptr<BakedModel> ModelBaker::missingCube() const {
+    // Magenta cube so the problem is visible in-game.
     auto out = std::make_unique<BakedModel>();
+    ElementDef cube;
+    FaceDef f;
+    const SpriteInfo& missing = atlas_.sprite(atlas_.missing);
+    for (Direction d : kDirections) {
+        f.cull = int(d);
+        BakedQuad q;
+        if (bakeFace(cube, d, f, missing, glm::mat3(1.0f), false, q, atlas_.missing)) out->quads.push_back(q);
+    }
+    out->particleSprite = uint16_t(atlas_.missing);
+    return out;
+}
+
+const BakedModel* ModelBaker::missingModel() {
+    static const std::string kKey = "|missing";
+    auto it = cache_.find(kKey);
+    if (it == cache_.end()) it = cache_.emplace(kKey, missingCube()).first;
+    return it->second.get();
+}
+
+std::unique_ptr<BakedModel> ModelBaker::bakeUncached(const ModelVariant& v) {
     const auto model = models_.resolve(v.model);
     if (!model) {
         errors_.push_back(std::format("missing model {}", v.model));
-        // Magenta cube so the problem is visible in-game.
-        ElementDef cube;
-        FaceDef f;
-        const SpriteInfo& missing = atlas_.sprite(atlas_.missing);
-        for (Direction d : kDirections) {
-            f.cull = int(d);
-            BakedQuad q;
-            if (bakeFace(cube, d, f, missing, glm::mat3(1.0f), false, q, atlas_.missing)) out->quads.push_back(q);
-        }
-        out->particleSprite = uint16_t(atlas_.missing);
-        return out;
+        return missingCube();
     }
+    auto out = std::make_unique<BakedModel>();
     out->ambientOcclusion = model->ambientOcclusion;
     out->guiLightFront = model->guiLightFront;
     out->builtinGenerated = model->builtinGenerated;
     out->display = model->display;
     out->hasDisplay = model->hasDisplay;
     out->particleSprite = model->textures.contains("particle") ? spriteFor(*model, "particle") : uint16_t(atlas_.missing);
+    if (!model->elements && model->builtinGenerated) {
+        // item/generated: extrude layer0, layer1, ... up to the first unbound one.
+        for (int layer = 0; layer < 5; ++layer) {
+            const std::string var = "layer" + std::to_string(layer);
+            if (model->resolveTexture(var).empty()) break;
+            const uint16_t sprite = spriteFor(*model, var);
+            const SpriteInfo& info = atlas_.sprite(sprite);
+            std::vector<Image> still;
+            std::vector<const Image*> frames;
+            if (info.animation >= 0) {
+                for (const auto& mips : atlas_.animations[size_t(info.animation)].frameMips) frames.push_back(&mips[0]);
+            } else {
+                still.push_back(atlas_.spriteImage(sprite));
+                frames.push_back(&still[0]);
+            }
+            for (const ElementDef& el : generateLayerElements(layer, var, frames))
+                for (Direction d : kDirections)
+                    if (const auto& face = el.faces[size_t(d)]) {
+                        BakedQuad q;
+                        if (bakeFace(el, d, *face, info, glm::mat3(1.0f), false, q, sprite)) out->quads.push_back(q);
+                    }
+        }
+        if (out->particleSprite == atlas_.missing && !out->quads.empty()) out->particleSprite = out->quads[0].sprite;
+        return out;
+    }
     if (!model->elements) return out;
 
     const glm::mat3 rot = blockStateRotation(v.x, v.y);

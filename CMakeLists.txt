@@ -202,6 +202,20 @@ if(XVFB_RUN AND Python3_FOUND)
     mc_py_test(gl_block_entities_shulker gl_block_entities check_image.py ${MC_TEST_RUN}/block_entities.png
         --region 140,270,190,315 --mean-rgb 77,131,18 --tol 12)
 
+    # M8: every item's GUI icon draws something and never the missing texture.
+    mc_gl_test(gl_item_icons --dump-item-icons ${MC_TEST_RUN}/item_icons)
+    # M8: the survival and creative inventory screens over the world (panel color C6C6C6).
+    set(MC_SCREEN_SCENE --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
+        --pos 0.5,-58.38,0.5 --look 30,20 --wait-chunks --ticks 3 --screen inventory)
+    mc_gl_test(gl_inventory_screen ${MC_SCREEN_SCENE} --gamemode survival --exec "/give diamond 23"
+        --exec "/give oak_planks 12" --screenshot ${MC_TEST_RUN}/inventory_screen.png --exit)
+    mc_py_test(gl_inventory_screen_check gl_inventory_screen check_image.py ${MC_TEST_RUN}/inventory_screen.png
+        --size 1280x720 --no-magenta --region 660,280,780,300 --mean-rgb 198,198,198 --tol 2)
+    mc_gl_test(gl_creative_screen ${MC_SCREEN_SCENE} --gamemode creative
+        --screenshot ${MC_TEST_RUN}/creative_screen.png --exit)
+    mc_py_test(gl_creative_screen_check gl_creative_screen check_image.py ${MC_TEST_RUN}/creative_screen.png
+        --size 1280x720 --no-magenta --min-colors 1000 --region 700,166,840,172 --mean-rgb 198,198,198 --tol 2)
+
     # M7: the F5 view from behind: the player model (Steve's shirt) with its shadow.
     mc_gl_test(gl_third_person --world-type flat --gamemode creative --render-distance 4 --size 1280x720 --time 6000
         --freeze-time --pos 0.5,-58.38,0.5 --look 30,20 --perspective back --wait-chunks --ticks 5

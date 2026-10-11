@@ -101,6 +101,10 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
     oldYaw = yaw;
     oldPitch = pitch;
     beginLivingTick();
+    xBobO = xBob;
+    yBobO = yBob;
+    xBob += (pitch - xBob) * 0.5f;
+    yBob += (yaw - yBob) * 0.5f;
     const bool mayFly = mode_ == GameMode::Creative || mode_ == GameMode::Spectator;
     if (mode_ == GameMode::Spectator) flying = true;
     else if (in.doubleTapJump && mayFly) flying = !flying;

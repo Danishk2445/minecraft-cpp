@@ -22,8 +22,12 @@ class BiomeRegistry;
 class BlockRegistry;
 class OverworldGenerator;
 class ClientAssets;
-class Font;
-class GuiBatch;
+class GuiGraphics;
+class Hud;
+class CreativeTabs;
+class InventoryMenu;
+class Screen;
+struct ScreenContext;
 class Gallery;
 class Level;
 class WorldRenderer;
@@ -54,7 +58,7 @@ private:
     void runCommand(const std::string& line);
     void updateTitle();
     void renderDebugOverlay(glm::ivec2 fb);
-    void renderHud(glm::ivec2 fb);
+    void renderHud(glm::ivec2 fb, float partialTick);
     PlayerInput readPlayerInput();
     // A key or button held down (with the cursor captured), or the harness's --hold action.
     bool controlDown(int key, std::string_view action) const;
@@ -65,6 +69,13 @@ private:
     void updateTarget(float partialTick);
     void setupCamera(float partialTick);
     void saveWorld(bool wait);
+    // Screens: opening releases the mouse, closing captures it again.
+    void openScreen(std::unique_ptr<Screen> screen);
+    void closeScreen();
+    void handleScreenInput();
+    void openInventory();
+    glm::vec2 guiMouse() const; // the cursor in GUI pixels
+    ScreenContext screenContext() const;
 
     CliOptions opts_;
     Window window_;
@@ -78,8 +89,14 @@ private:
     std::unique_ptr<Gallery> gallery_;
     std::unique_ptr<Level> level_;
     std::unique_ptr<WorldRenderer> worldRenderer_;
-    std::unique_ptr<GuiBatch> gui_;
-    std::unique_ptr<Font> font_;
+    std::unique_ptr<GuiGraphics> gui_;
+    std::unique_ptr<Hud> hud_;
+    std::unique_ptr<Screen> screen_;
+    std::unique_ptr<InventoryMenu> inventoryMenu_;
+    std::unique_ptr<CreativeTabs> creativeTabs_;
+    glm::vec2 lastGuiMouse_{-1.0f};
+    std::array<bool, 3> guiButtonsDown_{};
+    glm::vec2 screenSize_{0.0f};
     bool showDebug_ = false;
     double fps_ = 0.0;
     Commands commands_;

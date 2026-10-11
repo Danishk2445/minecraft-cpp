@@ -8,12 +8,6 @@
 
 namespace mc {
 
-int autoGuiScale(glm::ivec2 fb, int maxScale) {
-    int s = 1;
-    while ((maxScale <= 0 || s < maxScale) && fb.x / (s + 1) >= 320 && fb.y / (s + 1) >= 240) ++s;
-    return s;
-}
-
 GuiBatch::~GuiBatch() {
     if (vbo_) glDeleteBuffers(1, &vbo_);
     if (vao_) glDeleteVertexArrays(1, &vao_);
@@ -49,34 +43,52 @@ void GuiBatch::begin(glm::ivec2 fb, int scale) {
     shader_.use();
     shader_.set("uProj", glm::ortho(0.0f, size_.x, size_.y, 0.0f, -1.0f, 1.0f));
     texture_ = nullptr;
+    blend_ = Blend::Alpha;
     vertices_.clear();
 }
 
-void GuiBatch::quad(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, uint32_t argb) {
+void GuiBatch::setBlend(Blend blend) {
+    if (blend == blend_) return;
+    flush();
+    blend_ = blend;
+    if (blend == Blend::Invert) glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
+    else glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+void GuiBatch::quad(const glm::vec2 (&p)[4], float u0, float v0, float u1, float v1, uint32_t argb) {
     const uint32_t c = ((argb >> 16) & 0xFF) | (argb & 0xFF00) | ((argb & 0xFF) << 16) | (argb & 0xFF000000u);
-    vertices_.insert(vertices_.end(), {{{x0, y0}, {u0, v0}, c},
-                                       {{x0, y1}, {u0, v1}, c},
-                                       {{x1, y1}, {u1, v1}, c},
-                                       {{x1, y1}, {u1, v1}, c},
-                                       {{x1, y0}, {u1, v0}, c},
-                                       {{x0, y0}, {u0, v0}, c}});
+    vertices_.insert(vertices_.end(), {{p[0], {u0, v0}, c},
+                                       {p[1], {u0, v1}, c},
+                                       {p[2], {u1, v1}, c},
+                                       {p[2], {u1, v1}, c},
+                                       {p[3], {u1, v0}, c},
+                                       {p[0], {u0, v0}, c}});
 }
 
-void GuiBatch::fill(float x0, float y0, float x1, float y1, uint32_t argb) {
-    if (texture_ != &white_) {
-        flush();
-        texture_ = &white_;
-    }
-    quad(x0, y0, x1, y1, 0, 0, 1, 1, argb);
-}
-
-void GuiBatch::blit(const Texture& texture, float x0, float y0, float x1, float y1, float u0, float v0, float u1,
-                    float v1, uint32_t argb) {
+void GuiBatch::use(const Texture& texture) {
     if (texture_ != &texture) {
         flush();
         texture_ = &texture;
     }
-    quad(x0, y0, x1, y1, u0, v0, u1, v1, argb);
+}
+
+void GuiBatch::fill(float x0, float y0, float x1, float y1, uint32_t argb) {
+    use(white_);
+    const glm::vec2 p[4] = {{x0, y0}, {x0, y1}, {x1, y1}, {x1, y0}};
+    quad(p, 0, 0, 1, 1, argb);
+}
+
+void GuiBatch::blit(const Texture& texture, float x0, float y0, float x1, float y1, float u0, float v0, float u1,
+                    float v1, uint32_t argb) {
+    use(texture);
+    const glm::vec2 p[4] = {{x0, y0}, {x0, y1}, {x1, y1}, {x1, y0}};
+    quad(p, u0, v0, u1, v1, argb);
+}
+
+void GuiBatch::blitQuad(const Texture& texture, const glm::vec2 (&corners)[4], float u0, float v0, float u1, float v1,
+                        uint32_t argb) {
+    use(texture);
+    quad(corners, u0, v0, u1, v1, argb);
 }
 
 void GuiBatch::flush() {

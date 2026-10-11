@@ -11,6 +11,7 @@
 
 #include <glm/glm.hpp>
 
+#include "entity/model/ItemGeometry.h"
 #include "entity/model/ModelPart.h"
 #include "gfx/Shader.h"
 #include "gfx/Texture.h"
@@ -18,14 +19,14 @@
 
 namespace mc {
 
+class ClientAssets;
 class Level;
 class Player;
-class ResourcePack;
 
 class EntityRenderer {
 public:
     ~EntityRenderer();
-    bool init(const ResourcePack& pack);
+    bool init(const ClientAssets& assets);
 
     // Starts a frame's submissions; positions become relative to `cameraPos`.
     void begin(const glm::dvec3& cameraPos);
@@ -38,7 +39,10 @@ public:
     // Vanilla EntityRenderDispatcher.renderShadow: a dark disc of `radius` on the full
     // blocks under `feet`, fading with height above them, darkness and camera distance.
     void submitShadow(const Level& level, const glm::dvec3& feet, float radius, int skyDarken);
-    // The player model (Steve), posed at `partialTick`, with its shadow.
+    // Item quads (block atlas) placed by `transform` relative to `origin`.
+    void submitItem(const std::vector<ItemQuad>& quads, const glm::dvec3& origin, const glm::mat4& transform,
+                    glm::vec2 light);
+    // The player model (Steve), posed at `partialTick`, with its held items and shadow.
     void submitPlayer(const Player& player, const Level& level, float partialTick, int skyDarken);
 
     // Draws everything submitted. The lightmap must be bound to texture unit 1.
@@ -61,15 +65,15 @@ private:
     // Vertices from `first` to the end, drawn with `tex` in `pass`.
     void addBatch(const Texture* tex, size_t first, Pass pass);
 
-    const ResourcePack* pack_ = nullptr;
+    const ClientAssets* assets_ = nullptr;
     Shader shader_;
     unsigned vao_ = 0, vbo_ = 0;
-    std::unordered_map<std::string, std::unique_ptr<Texture>> textures_;
-    Texture missing_;
     glm::dvec3 cameraPos_{0.0};
     std::vector<Vertex> vertices_;
     std::vector<Batch> batches_;
     std::vector<ModelQuad> quads_;
+    std::vector<ItemQuad> itemQuads_;
+    std::vector<ItemLayer> layers_;
     // Player models at rest and a working copy posed each frame.
     ModelDefinition playerRest_, playerPosed_;
 };

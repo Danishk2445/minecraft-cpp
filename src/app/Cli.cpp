@@ -163,6 +163,12 @@ const std::vector<Option>& options() {
              }
              return true;
          }},
+        {"--screen", "NAME", "harness: open a screen once the spawn area is ready (inventory: the survival or creative one)",
+         [](CliOptions& o, std::string_view v) {
+             if (v != "inventory") return false;
+             o.screen = v;
+             return true;
+         }},
         {"--perspective", "VIEW", "first (default), back or front: first person or the F5 third-person views",
          [](CliOptions& o, std::string_view v) {
              if (v != "first" && v != "back" && v != "front") return false;
@@ -178,6 +184,8 @@ const std::vector<Option>& options() {
          }},
         {"--dump-model-sheets", "DIR", "render every block state into tile sheets in DIR, then exit",
          [](CliOptions& o, std::string_view v) { return o.dumpModelSheets = v, true; }},
+        {"--dump-item-icons", "DIR", "render every item's GUI icon into a sheet in DIR and report empty or missing-texture icons, then exit",
+         [](CliOptions& o, std::string_view v) { return o.dumpItemIcons = v, true; }},
         {"--dump-column", "X,Z", "print terrain generator diagnostics for a block column, then exit",
          [](CliOptions& o, std::string_view v) {
              std::array<double, 2> a{};

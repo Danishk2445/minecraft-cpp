@@ -9,6 +9,8 @@
 #include "entity/model/EntityModels.h"
 #include "entity/model/HumanoidModel.h"
 #include "gfx/GL.h"
+#include "entity/model/ItemGeometry.h"
+#include "render/ClientAssets.h"
 #include "resources/ResourcePack.h"
 #include "world/level/Level.h"
 #include "world/mesh/BlockEntityMeshes.h"
@@ -36,8 +38,8 @@ EntityRenderer::~EntityRenderer() {
     if (vbo_) glDeleteBuffers(1, &vbo_);
 }
 
-bool EntityRenderer::init(const ResourcePack& pack) {
-    pack_ = &pack;
+bool EntityRenderer::init(const ClientAssets& assets) {
+    assets_ = &assets;
     if (!shader_.load("entity.vert", "entity.frag")) return false;
     glCreateVertexArrays(1, &vao_);
     glCreateBuffers(1, &vbo_);
@@ -53,32 +55,12 @@ bool EntityRenderer::init(const ResourcePack& pack) {
     glEnableVertexArrayAttrib(vao_, 3);
     glVertexArrayAttribFormat(vao_, 3, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, light));
     glVertexArrayAttribBinding(vao_, 3, 0);
-    // Missing textures show as a magenta and black checkerboard.
-    const uint32_t checker[4] = {0xFFFF00FFu, 0xFF000000u, 0xFF000000u, 0xFFFF00FFu};
-    missing_.create(2, 2);
-    missing_.upload(0, 0, 0, 2, 2, checker);
-    missing_.setWrap(GL_REPEAT);
     playerRest_ = playerModel(false);
     playerPosed_ = playerRest_;
     return true;
 }
 
-const Texture& EntityRenderer::texture(std::string_view id) {
-    auto it = textures_.find(std::string(id));
-    if (it == textures_.end()) {
-        std::string err;
-        std::unique_ptr<Texture> tex;
-        if (auto img = Image::loadPng(pack_->resource(ResourceLocation::parse(id), "textures", ".png"), &err)) {
-            tex = std::make_unique<Texture>();
-            tex->create(img->width, img->height);
-            tex->upload(0, 0, 0, *img);
-        } else {
-            log::warn("entity texture {}: {}", id, err);
-        }
-        it = textures_.emplace(std::string(id), std::move(tex)).first;
-    }
-    return it->second ? *it->second : missing_;
-}
+const Texture& EntityRenderer::texture(std::string_view id) { return assets_->texture(id); }
 
 void EntityRenderer::begin(const glm::dvec3& cameraPos) {
     cameraPos_ = cameraPos;
@@ -165,6 +147,21 @@ void EntityRenderer::submitShadow(const Level& level, const glm::dvec3& feet, fl
     addBatch(&tex, first, Pass::Shadow);
 }
 
+void EntityRenderer::submitItem(const std::vector<ItemQuad>& quads, const glm::dvec3& origin, const glm::mat4& transform,
+                                glm::vec2 light) {
+    const size_t first = vertices_.size();
+    const glm::vec3 base(origin - cameraPos_);
+    const glm::mat3 nm(transform);
+    for (const ItemQuad& q : quads) {
+        const glm::vec3 rgb = unpackRgb(q.tint);
+        const uint32_t color = packColor(rgb * entityShade(glm::normalize(nm * q.normal)), 1.0f);
+        Vertex v[4];
+        for (size_t k = 0; k < 4; ++k) v[k] = {base + glm::vec3(transform * glm::vec4(q.pos[k], 1.0f)), q.uv[k], color, light};
+        for (int i : {0, 1, 2, 0, 2, 3}) vertices_.push_back(v[i]);
+    }
+    addBatch(&assets_->blockAtlasTexture(), first, Pass::Cutout);
+}
+
 void EntityRenderer::submitPlayer(const Player& player, const Level& level, float partialTick, int skyDarken) {
     const bool spectator = player.mode() == GameMode::Spectator;
     HumanoidPose pose = humanoidPoseOf(player, partialTick);
@@ -180,9 +177,32 @@ void EntityRenderer::submitPlayer(const Player& player, const Level& level, floa
     // Lit at the eyes (vanilla light probe position).
     const uint8_t l = level.lightAt(BlockPos::containing(feet + glm::dvec3(0.0, player.eyeHeight(), 0.0)));
     // Spectators are invisible: their own view shows them at 15% opacity and without a shadow.
+    const glm::vec2 light(float(l & 15), float(l >> 4));
     submitModel(playerPosed_.root, playerRest_.texWidth, playerRest_.texHeight, "minecraft:entity/player/wide/steve",
-                feet, m, glm::vec2(float(l & 15), float(l >> 4)), 0xFFFFFF, spectator ? 38.0f / 255.0f : 1.0f);
-    if (!spectator) submitShadow(level, feet, 0.5f, skyDarken);
+                feet, m, light, 0xFFFFFF, spectator ? 38.0f / 255.0f : 1.0f);
+    if (spectator) return;
+    // ItemInHandLayer: each held item hangs from its arm.
+    for (const bool left : {false, true}) {
+        const ItemStack& stack = left ? player.inventory.offhand : player.inventory.selectedStack();
+        if (stack.empty()) continue;
+        const ModelPart& arm = *playerPosed_.root.find(left ? "left_arm" : "right_arm");
+        glm::mat4 t = m * poseMatrix(arm.pose);
+        t = glm::rotate(t, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+        t = glm::rotate(t, glm::radians(180.0f), glm::vec3(0, 1, 0));
+        t = glm::translate(t, glm::vec3((left ? -1.0f : 1.0f) / 16.0f, 0.125f, -0.625f));
+        ItemModelContext ctx;
+        ctx.display = left ? DisplayContext::ThirdPersonLeft : DisplayContext::ThirdPersonRight;
+        ctx.count = stack.count;
+        ctx.maxStack = stack.maxStack();
+        ctx.holderPos = feet;
+        ctx.holderYaw = player.yaw;
+        layers_.clear();
+        assets_->itemDefinitions().evaluate(stack.item->id, ctx, &assets_->grassColormap(), layers_);
+        itemQuads_.clear();
+        buildItemQuads(layers_, ctx.display, assets_->blockEntityModels(), assets_->blockAtlas(), itemQuads_);
+        submitItem(itemQuads_, feet, t, light);
+    }
+    submitShadow(level, feet, 0.5f, skyDarken);
 }
 
 void EntityRenderer::render(const glm::mat4& viewProj, const ChunkRenderer::Fog& fog) {

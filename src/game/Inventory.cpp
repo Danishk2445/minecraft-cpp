@@ -11,7 +11,9 @@ int Inventory::add(const Item& item, int count) {
         s.count += n;
         count -= n;
     };
+    // Vanilla getSlotWithRemainingSpace: the selected slot, the off hand, then 0-35.
     topUp(selectedStack());
+    topUp(offhand);
     for (ItemStack& s : main) topUp(s);
     for (ItemStack& s : main) {
         if (count <= 0) break;

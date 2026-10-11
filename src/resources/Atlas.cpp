@@ -19,6 +19,7 @@ struct LoadedSprite {
     std::vector<Image> frames; // level-0 frames
     int width = 0, height = 0;
     std::optional<AnimationMeta> animation;
+    std::optional<GuiScaling> gui;
 };
 
 const std::array<float, 256>& pow22Table() {
@@ -73,7 +74,9 @@ std::optional<LoadedSprite> loadSprite(const ResourcePack& pack, const std::stri
     metaPath += ".mcmeta";
     if (std::filesystem::exists(metaPath)) {
         if (auto j = pack.json(metaPath, &err)) {
-            s.animation = parseTextureMeta(*j).animation;
+            TextureMeta meta = parseTextureMeta(*j);
+            s.animation = std::move(meta.animation);
+            s.gui = meta.gui;
         } else if (error) {
             log::warn("{}", err);
         }
@@ -181,6 +184,7 @@ std::optional<Atlas> stitch(std::string name, std::vector<LoadedSprite> loaded, 
         s.y = positions[i].second;
         s.width = src.width;
         s.height = src.height;
+        s.gui = src.gui;
         s.u0 = float(s.x) / float(atlas.width);
         s.v0 = float(s.y) / float(atlas.height);
         s.u1 = float(s.x + s.width) / float(atlas.width);

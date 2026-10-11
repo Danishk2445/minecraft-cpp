@@ -9,11 +9,10 @@
 
 #include "gfx/Shader.h"
 #include "gfx/Texture.h"
+#include "ui/GuiScale.h"
 
 namespace mc {
 
-// Vanilla "auto" GUI scale: the largest s with width >= 320s and height >= 240s.
-int autoGuiScale(glm::ivec2 framebuffer, int maxScale = 0);
 
 class GuiBatch {
 public:
@@ -25,8 +24,15 @@ public:
     void fill(float x0, float y0, float x1, float y1, uint32_t argb);
     void blit(const Texture& texture, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1,
               uint32_t argb = 0xFFFFFFFF);
+    // A quad with free corners (top-left, bottom-left, bottom-right, top-right), e.g. italic glyphs.
+    void blitQuad(const Texture& texture, const glm::vec2 (&corners)[4], float u0, float v0, float u1, float v1,
+                  uint32_t argb = 0xFFFFFFFF);
     void flush();
     void end();
+
+    // Alpha blending, or vanilla's crosshair blend that inverts what is underneath.
+    enum class Blend : uint8_t { Alpha, Invert };
+    void setBlend(Blend blend);
 
     int scale() const { return scale_; }
     glm::vec2 size() const { return size_; } // GUI pixels
@@ -37,7 +43,8 @@ private:
         glm::vec2 uv;
         uint32_t color; // RGBA8 in memory order
     };
-    void quad(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, uint32_t argb);
+    void quad(const glm::vec2 (&p)[4], float u0, float v0, float u1, float v1, uint32_t argb);
+    void use(const Texture& texture);
 
     Shader shader_;
     Texture white_;
@@ -46,6 +53,7 @@ private:
     unsigned vao_ = 0, vbo_ = 0;
     size_t capacity_ = 0;
     int scale_ = 1;
+    Blend blend_ = Blend::Alpha;
     glm::vec2 size_{0.0f};
 };
 
