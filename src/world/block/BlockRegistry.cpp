@@ -628,8 +628,19 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
     }
     choiceStart_[info_.size()] = uint32_t(choices_.size());
 
+    std::string tagErrors;
+    if (!tags_.load(*this, dataDir / "tags" / "blocks", &tagErrors)) {
+        for (size_t start = 0; start < tagErrors.size();) {
+            const size_t end = tagErrors.find('\n', start);
+            problems.push_back(tagErrors.substr(start, end - start));
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+    }
+
     for (const auto& p : problems) log::warn("block registry: {}", p);
-    log::info("Block registry: {} blocks, {} states, {} properties", blocks_.size(), info_.size(), props_.size());
+    log::info("Block registry: {} blocks, {} states, {} properties, {} tags", blocks_.size(), info_.size(),
+              props_.size(), tags_.size());
     if (!problems.empty() && error) *error = problems.front();
     return problems.empty();
 }

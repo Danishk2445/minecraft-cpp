@@ -46,6 +46,9 @@ public:
     void upload(ChunkPos chunk, const SectionMesh& mesh);
     void dropChunk(ChunkPos chunk);
     void clear();
+    // Re-sorts translucent quads of sections within `radius` chunks once the camera
+    // has moved more than a block since the last sort.
+    void resortTranslucent(const glm::dvec3& camera, int radius);
 
     struct FrameStats {
         int sections = 0, drawn = 0, culled = 0, draws = 0;
@@ -73,6 +76,9 @@ private:
     };
     struct SectionGpu {
         std::array<Alloc, kLayerCount> layers;
+        // CPU copy of the translucent layer for re-sorting as the camera moves.
+        std::vector<TerrainVertex> translucent;
+        std::vector<glm::vec3> centers;
     };
     struct ChunkGpu {
         std::array<SectionGpu, kSectionCount> sections;
@@ -111,6 +117,7 @@ private:
     std::vector<DrawCommand> commands_;
     std::vector<glm::vec3> offsets_;
     unsigned commandBuffer_ = 0, offsetBuffer_ = 0; // re-specified every draw (stream)
+    glm::dvec3 lastSortPos_{1e30};
 };
 
 } // namespace mc

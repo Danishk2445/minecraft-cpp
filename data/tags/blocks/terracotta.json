@@ -1,0 +1,9 @@
+{
+  "values": [
+    "terracotta",
+    "*_terracotta"
+  ],
+  "exclude": [
+    "*_glazed_terracotta"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "values": [
+    "*_sign"
+  ],
+  "exclude": [
+    "*_wall_sign",
+    "*_hanging_sign"
+  ]
+}

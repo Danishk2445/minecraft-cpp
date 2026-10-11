@@ -1,0 +1,8 @@
+{
+  "values": [
+    "*_fence"
+  ],
+  "exclude": [
+    "nether_brick_fence"
+  ]
+}

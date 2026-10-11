@@ -83,10 +83,10 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return o.screenshot = v, true; }},
         {"--exit", "", "harness: quit once the run conditions are met",
          [](CliOptions& o, std::string_view) { return o.exitAfter = true, true; }},
-        {"--world-type", "TYPE", "world generator: flat or debug",
+        {"--world-type", "TYPE", "world generator: default, flat or debug",
          [](CliOptions& o, std::string_view v) {
              o.worldType = v;
-             return v == "flat" || v == "debug";
+             return v == "default" || v == "flat" || v == "debug";
          }},
         {"--seed", "N", "world seed",
          [](CliOptions& o, std::string_view v) {
@@ -125,10 +125,14 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return parseBool(v, o.smoothLighting); }},
         {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
          [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
-        {"--pos", "X,Y,Z", "start the camera at this position",
+        {"--pos", "X,Y,Z", "start the camera at this position (Y may be ~: 12 blocks above the generated terrain)",
          [](CliOptions& o, std::string_view v) {
              std::array<double, 3> a{};
-             if (!parseFloats(v, a)) return false;
+             std::string text(v);
+             const size_t c1 = text.find(','), c2 = c1 == std::string::npos ? c1 : text.find(',', c1 + 1);
+             const bool aboveTerrain = c2 != std::string::npos && text.substr(c1 + 1, c2 - c1 - 1) == "~";
+             if (aboveTerrain) text.replace(c1 + 1, 1, "nan");
+             if (!parseFloats(text, a)) return false;
              o.pos = glm::dvec3(a[0], a[1], a[2]);
              return true;
          }},
@@ -141,6 +145,23 @@ const std::vector<Option>& options() {
          }},
         {"--dump-model-sheets", "DIR", "render every block state into tile sheets in DIR, then exit",
          [](CliOptions& o, std::string_view v) { return o.dumpModelSheets = v, true; }},
+        {"--dump-column", "X,Z", "print terrain generator diagnostics for a block column, then exit",
+         [](CliOptions& o, std::string_view v) {
+             std::array<double, 2> a{};
+             if (!parseFloats(v, a)) return false;
+             o.dumpColumn = glm::ivec2(int(a[0]), int(a[1]));
+             return true;
+         }},
+        {"--biome-map", "FILE", "write a top-down biome map PNG of the world around --pos (or 0,0) and print biome statistics",
+         [](CliOptions& o, std::string_view v) { return o.biomeMap = v, true; }},
+        {"--map-size", "N", "biome map size in blocks (default 4096)",
+         [](CliOptions& o, std::string_view v) { return parseInt(v, o.mapSize) && o.mapSize > 0; }},
+        {"--map-step", "N", "biome map blocks per pixel (default 4)",
+         [](CliOptions& o, std::string_view v) { return parseInt(v, o.mapStep) && o.mapStep > 0; }},
+        {"--slice", "FILE", "write a vertical cross-section PNG (x/y plane at --pos z, --map-size blocks wide), then exit",
+         [](CliOptions& o, std::string_view v) { return o.slice = v, true; }},
+        {"--bench-gen", "N", "generate and light about N chunks around --pos (or 0,0), print chunks per second, then exit",
+         [](CliOptions& o, std::string_view v) { return parseInt(v, o.benchGen) && o.benchGen > 0; }},
         {"--golden-tiles", "FILE", "with --dump-model-sheets: also save the tiles of the states listed in FILE",
          [](CliOptions& o, std::string_view v) { return o.goldenTiles = v, true; }},
         {"--log-level", "LEVEL", "debug, info, warn or error",

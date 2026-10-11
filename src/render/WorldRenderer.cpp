@@ -8,9 +8,20 @@
 
 namespace mc {
 
-WorldRenderer::WorldRenderer(const ClientAssets& assets, const BlockRegistry& registry)
-    : assets_(assets), registry_(registry) {
+WorldRenderer::WorldRenderer(const ClientAssets& assets, const BlockRegistry& registry, const BiomeRegistry* biomes)
+    : assets_(assets), registry_(registry), biomes_(biomes) {
     options_.colors = assets.defaultBiomeColors();
+    options_.biomes = biomes;
+    const Atlas& atlas = assets.blockAtlas();
+    auto sprite = [&](const char* id) {
+        const SpriteInfo& s = atlas.sprite(std::string("minecraft:block/") + id);
+        return FluidSprites::Sprite{s.u0, s.v0, s.u1, s.v1};
+    };
+    options_.fluids.waterStill = sprite("water_still");
+    options_.fluids.waterFlow = sprite("water_flow");
+    options_.fluids.waterOverlay = sprite("water_overlay");
+    options_.fluids.lavaStill = sprite("lava_still");
+    options_.fluids.lavaFlow = sprite("lava_flow");
 }
 
 WorldRenderer::~WorldRenderer() = default;
@@ -42,7 +53,8 @@ void WorldRenderer::update(ChunkManager& chunkManager, JobSystem& jobs) {
         std::weak_ptr<int> token = alive_;
         JobSystem* js = &jobs;
         const BlockRegistry* reg = &registry_;
-        const MesherOptions opts = options_;
+        MesherOptions opts = options_;
+        opts.cameraPos = glm::vec3(cameraPos_);
         const int priority = w.pos.chebyshev(chunkManager.center());
         jobs.submit(priority, [this, token, js, reg, opts, seq, w = std::move(w)]() mutable {
             auto meshes = std::make_shared<std::vector<SectionMesh>>();
@@ -62,6 +74,8 @@ void WorldRenderer::update(ChunkManager& chunkManager, JobSystem& jobs) {
 void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level,
                            float partialTick) {
     const float aspect = float(viewport.x) / float(std::max(viewport.y, 1));
+    cameraPos_ = camera.position;
+    chunks_.resortTranslucent(camera.position, 3);
     EnvironmentInputs in;
     in.dayTime = level.dayTime();
     in.partialTick = partialTick;

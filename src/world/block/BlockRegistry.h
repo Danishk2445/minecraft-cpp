@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/Math.h"
+#include "world/block/BlockTags.h"
 #include "world/block/Tints.h"
 
 namespace mc {
@@ -119,6 +120,11 @@ public:
 
     static constexpr StateId kAirState = 0;
 
+    // Block tags from dataDir/tags/blocks (loaded by build()).
+    const BlockTags& tags() const { return tags_; }
+    std::optional<TagId> tag(std::string_view name) const { return tags_.find(name); }
+    bool hasTag(StateId s, TagId t) const { return tags_.containsBlock(t, info_[s].block); }
+
 private:
     uint16_t internProperty(const std::string& name, const std::vector<std::string>& values);
 
@@ -128,6 +134,7 @@ private:
     std::vector<StateInfo> info_;
     std::vector<uint32_t> choiceStart_; // per state, into choices_ (size stateCount + 1)
     std::vector<const BakedChoice*> choices_;
+    BlockTags tags_;
 };
 
 // '*' wildcard match against a block id without namespace ("oak_stairs" ~ "*_stairs").

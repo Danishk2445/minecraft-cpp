@@ -7,7 +7,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M1 Block models: pack, atlases, model baking, blockstates, gallery, model sheets
 - [x] M2 Chunks & meshing: registry, sections/chunks, pipeline, mesher, MDI renderer, commands for `--exec`
 - [x] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
-- [ ] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
+- [x] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
 - [ ] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
 - [ ] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
 - [ ] M7 Entity models: ModelPart, block-entity renderers, player model, F5
@@ -56,3 +56,13 @@ Recorded per milestone.
   - Fog: render-distance fog covers the last `clamp(rd/10, 4, 64)` blocks; environmental fog appears only in rain. Vanilla's exact atmospheric fog constants are not reproduced.
   - Clouds are rebuilt every frame within 16 cells (192 blocks), at a height of 192.33. They fade with distance.
   - The incremental light removal ignores face occlusion: it may over-remove, and re-adding repairs it. A test checks it against from-scratch light after 10,000 random edits.
+- **M4:**
+  - Noise, splines and density follow vanilla's algorithms (ImprovedNoise, PerlinNoise, NormalNoise, BlendedNoise, CubicSpline, the TerrainProvider splines and the overworld noise router). Every noise is seeded from our own Xoroshiro name hashing, so worlds are not seed-compatible with vanilla.
+  - Noise caves have no `pillars` term. Only the sign of the final density is used, so the 0.64 multiplier and `squeeze` are skipped.
+  - Aquifers are a stand-in for vanilla's noise-based aquifer grid. Below sea level, air turns to water down to a flood line 6 blocks under the spline surface; dry air in the 3 blocks under that line becomes stone (a barrier); deeper caves stay dry, and lava fills air below y −54. There are no randomly flooded deep aquifers.
+  - Carvers have vanilla's structure and parameters: `cave` (15%), `cave_extra_underground` (7%, y −56..47) and `canyon` (1%), drawn from our own random streams. Instead of consulting an aquifer, carvers never open a block that touches water.
+  - Surface biomes come from threshold tables equivalent to `OverworldBiomeBuilder`'s parameter list. Cave biomes use vanilla's nearest-point rule against the surface biomes' depth.
+  - Surface rules are a hand-written approximation of vanilla's rule tree: grass/dirt, sand/sandstone, ocean gravel, river beds, snowy peaks and slopes, gravelly hills, badlands terracotta bands, calcite, podzol, coarse dirt, mycelium and swamp clay.
+  - Spawn: the nearest land column on a square spiral of 16-block steps that is not ocean, river, beach or peaks. Vanilla searches climate parameter space instead. The free camera starts 12 blocks above it until the player arrives in M6.
+  - The biome statistics test samples 32768² blocks per seed, not 4096². The continentalness noise varies over about 2,000 blocks, so 4096² samples range from 16% to 53% ocean. Over large areas ocean is 29–31%.
+  - Fluid side faces are hidden only by a neighbor whose face is fully covered. Vanilla also compares the fluid's height with the neighbor's shape.

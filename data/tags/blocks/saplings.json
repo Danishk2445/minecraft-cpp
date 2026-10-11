@@ -1,0 +1,11 @@
+{
+  "values": [
+    "*_sapling",
+    "azalea",
+    "flowering_azalea",
+    "mangrove_propagule"
+  ],
+  "exclude": [
+    "bamboo_sapling"
+  ]
+}

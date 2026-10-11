@@ -2,6 +2,7 @@
 
 #include "app/Cli.h"
 #include "app/Game.h"
+#include "app/WorldTools.h"
 #include "core/Log.h"
 
 int main(int argc, char** argv) {
@@ -18,6 +19,8 @@ int main(int argc, char** argv) {
     if (options->logLevel == "debug") mc::log::setLevel(mc::log::Level::Debug);
     if (options->logLevel == "warn") mc::log::setLevel(mc::log::Level::Warn);
     if (options->logLevel == "error") mc::log::setLevel(mc::log::Level::Error);
+
+    if (auto code = mc::runWorldTools(*options)) return *code;
 
     mc::Game game(std::move(*options));
     return game.run();

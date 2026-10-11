@@ -12,7 +12,9 @@
 
 namespace mc {
 
+class BiomeRegistry;
 class BlockRegistry;
+class OverworldGenerator;
 class ClientAssets;
 class Font;
 class GuiBatch;
@@ -49,6 +51,8 @@ private:
     std::unique_ptr<JobSystem> jobs_;
     std::unique_ptr<ClientAssets> assets_;
     std::unique_ptr<BlockRegistry> registry_;
+    std::unique_ptr<BiomeRegistry> biomes_;
+    std::shared_ptr<const OverworldGenerator> overworld_; // when the world type is "default"
     std::unique_ptr<Gallery> gallery_;
     std::unique_ptr<Level> level_;
     std::unique_ptr<WorldRenderer> worldRenderer_;

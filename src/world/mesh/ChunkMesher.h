@@ -14,6 +14,7 @@
 namespace mc {
 
 class Atlas;
+class BiomeRegistry;
 
 // 16 bytes. Position is section-local in 1/2048 block units offset by 8 blocks,
 // so models may reach from -8 to +24 blocks around the section origin.
@@ -45,14 +46,31 @@ struct SectionMesh {
     }
 };
 
+// Atlas sprites the fluid renderer needs (indices into the block atlas).
+struct FluidSprites {
+    struct Sprite {
+        float u0 = 0, v0 = 0, u1 = 0, v1 = 0;
+        float u(float t) const { return u0 + (u1 - u0) * t; } // t in 0..1
+        float v(float t) const { return v0 + (v1 - v0) * t; }
+    };
+    Sprite waterStill, waterFlow, waterOverlay, lavaStill, lavaFlow;
+};
+
 struct MesherOptions {
     bool smoothLighting = true;
-    BiomeColors colors; // until biomes exist (M4)
+    BiomeColors colors;                  // used when `biomes` is null
+    const BiomeRegistry* biomes = nullptr; // per-position biome colors
+    int biomeBlend = 2;                  // blend radius in blocks (vanilla default 2 = 5x5)
+    FluidSprites fluids;
+    glm::vec3 cameraPos{0.0f};           // world position, for the initial translucent sort
 };
 
 struct MesherStats {
     size_t blocks = 0, quads = 0, culled = 0;
 };
+
+// Reorders a translucent layer back to front as seen from `eye` (section-local).
+void sortTranslucentQuads(std::vector<TerrainVertex>& vertices, std::vector<glm::vec3>& centers, const glm::vec3& eye);
 
 // Meshes the sections of the center chunk of `n` selected by `sectionMask`.
 // Every requested section produces an entry (possibly empty) so stale meshes get cleared.

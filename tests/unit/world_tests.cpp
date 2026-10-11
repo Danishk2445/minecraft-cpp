@@ -6,6 +6,7 @@
 #include "game/Commands.h"
 #include "resources/Atlas.h"
 #include "resources/BlockModels.h"
+#include "world/biome/Biome.h"
 #include "world/block/BlockRegistry.h"
 #include "world/chunk/ChunkManager.h"
 #include "world/mesh/ChunkMesher.h"
@@ -25,8 +26,11 @@ struct WorldFixture : ::testing::Test {
         registry = std::make_unique<BlockRegistry>();
         std::string err;
         registry->build(*models, *atlas, MC_DEFAULT_DATA_DIR, &err);
+        biomes = std::make_unique<BiomeRegistry>();
+        biomes->load(MC_DEFAULT_DATA_DIR, MC_DEFAULT_PACK_DIR, &err);
     }
     static void TearDownTestSuite() {
+        biomes.reset();
         registry.reset();
         models.reset();
         baker.reset();
@@ -61,16 +65,17 @@ struct WorldFixture : ::testing::Test {
 
     // Meshes the section containing y=64 of a single chunk built by `fill`.
     template <class Fill>
-    static SectionMesh meshOne(Fill fill) {
+    static SectionMesh meshOne(Fill fill, const MesherOptions& options = {}) {
         Chunk c({0, 0});
         fill(c);
         Neighborhood n;
         n.center = {0, 0};
         n.cols[4] = ColumnSnapshot::of(c);
         std::vector<SectionMesh> out;
-        meshSections(*registry, MesherOptions{}, n, 1u << sectionIndexOfY(64), out);
+        meshSections(*registry, options, n, 1u << sectionIndexOfY(64), out);
         return out.at(0);
     }
+    static float vertexY(const TerrainVertex& v) { return float(v.y) / 2048.0f - 8.0f; }
 
     static inline std::unique_ptr<ResourcePack> pack;
     static inline std::unique_ptr<Atlas> atlas;
@@ -78,6 +83,7 @@ struct WorldFixture : ::testing::Test {
     static inline std::unique_ptr<ModelBaker> baker;
     static inline std::unique_ptr<BlockModels> models;
     static inline std::unique_ptr<BlockRegistry> registry;
+    static inline std::unique_ptr<BiomeRegistry> biomes;
 };
 
 } // namespace
@@ -183,6 +189,97 @@ TEST_F(WorldFixture, MesherPartialCoverage) {
     EXPECT_EQ(layers.layers[size_t(RenderLayer::Cutout)].size(), 24u);
     EXPECT_EQ(layers.layers[size_t(RenderLayer::Translucent)].size(), 24u);
     EXPECT_EQ(layers.translucentCenters.size(), 6u);
+}
+
+TEST_F(WorldFixture, FluidMeshing) {
+    const StateId water = S("water"), stone = S("stone");
+    const auto& translucent = [](const SectionMesh& m) -> const std::vector<TerrainVertex>& {
+        return m.layers[size_t(RenderLayer::Translucent)];
+    };
+    // A lone source: top (+ its underside, open above), bottom and 4 double-sided sides.
+    const SectionMesh lone = meshOne([&](Chunk& c) { c.set(8, 64, 8, water); });
+    EXPECT_EQ(translucent(lone).size(), 11u * 4u);
+    EXPECT_EQ(lone.translucentCenters.size(), 11u);
+    // Corners average the source (8/9, weight 10) with two empty neighbors (weight 1 each).
+    float top = 0.0f;
+    for (const TerrainVertex& v : translucent(lone)) top = std::max(top, vertexY(v));
+    EXPECT_NEAR(top, (8.0f / 9.0f * 10.0f) / 12.0f - 0.001f, 1e-3f);
+    // Stone to the north hides that side (both of its faces); water above hides the top
+    // and raises every corner to a full block.
+    const SectionMesh walled = meshOne([&](Chunk& c) {
+        c.set(8, 64, 8, water);
+        c.set(8, 64, 7, stone);
+    });
+    EXPECT_EQ(translucent(walled).size(), 9u * 4u);
+    const SectionMesh stacked = meshOne([&](Chunk& c) {
+        c.set(8, 64, 8, water);
+        c.set(8, 65, 8, water);
+    });
+    float lowerTop = 0.0f;
+    for (const TerrainVertex& v : translucent(stacked))
+        if (vertexY(v) < 1.5f) lowerTop = std::max(lowerTop, vertexY(v));
+    EXPECT_NEAR(lowerTop, 1.0f, 1e-3f);
+    // Lava is opaque: it goes to the solid layer and has no sort centers.
+    const SectionMesh lava = meshOne([&](Chunk& c) { c.set(8, 64, 8, S("lava")); });
+    EXPECT_GT(lava.layers[size_t(RenderLayer::Solid)].size(), 0u);
+    EXPECT_TRUE(lava.translucentCenters.empty());
+}
+
+TEST_F(WorldFixture, TranslucentQuadsSortBackToFront) {
+    SectionMesh m = meshOne([&](Chunk& c) {
+        c.set(1, 64, 8, S("white_stained_glass"));
+        c.set(14, 64, 8, S("white_stained_glass"));
+    });
+    auto& verts = m.layers[size_t(RenderLayer::Translucent)];
+    ASSERT_EQ(m.translucentCenters.size() * 4, verts.size());
+    for (const glm::vec3 eye : {glm::vec3(40.0f, 0.5f, 8.5f), glm::vec3(-40.0f, 0.5f, 8.5f)}) {
+        sortTranslucentQuads(verts, m.translucentCenters, eye);
+        for (size_t i = 1; i < m.translucentCenters.size(); ++i)
+            EXPECT_GE(glm::distance(m.translucentCenters[i - 1], eye), glm::distance(m.translucentCenters[i], eye));
+        // Vertices travel with their centers.
+        for (size_t q = 0; q < m.translucentCenters.size(); ++q) {
+            float x = 0;
+            for (int k = 0; k < 4; ++k) x += float(verts[q * 4 + size_t(k)].x) / 2048.0f - 8.0f;
+            EXPECT_NEAR(x / 4.0f, m.translucentCenters[q].x, 1e-3f);
+        }
+    }
+}
+
+TEST_F(WorldFixture, BiomeTintsBlend) {
+    const BiomeId plains = biomes->require("plains"), jungle = biomes->require("jungle");
+    MesherOptions opts;
+    opts.biomes = biomes.get();
+    opts.smoothLighting = false;
+    auto grassTop = [&](int x, int z, auto setBiomes) {
+        const SectionMesh m = meshOne(
+            [&](Chunk& c) {
+                setBiomes(c);
+                c.set(x, 64, z, S("grass_block"));
+            },
+            opts);
+        // The top face is the one whose four vertices sit at y = 1.
+        for (const auto& layer : m.layers)
+            for (size_t i = 0; i + 3 < layer.size(); i += 4)
+                if (vertexY(layer[i]) > 0.99f && vertexY(layer[i + 2]) > 0.99f)
+                    return (uint32_t(layer[i].r) << 16) | (uint32_t(layer[i].g) << 8) | layer[i].b;
+        return 0u;
+    };
+    auto fill = [](BiomeId b) {
+        return [b](Chunk& c) {
+            for (auto& s : c.sections) s.biomes.fill(b);
+        };
+    };
+    EXPECT_EQ(grassTop(8, 8, fill(plains)), biomes->colors(plains, 8, 8).grass);
+    EXPECT_EQ(grassTop(8, 8, fill(jungle)), biomes->colors(jungle, 8, 8).grass);
+    // Jungle in quart columns x >= 8: a block at x = 7 sees 2 jungle columns of 5.
+    const uint32_t mixed = grassTop(7, 8, [&](Chunk& c) {
+        for (auto& s : c.sections)
+            for (int i = 0; i < 64; ++i) s.biomes[size_t(i)] = (i & 3) >= 2 ? jungle : plains;
+    });
+    const uint32_t p = biomes->colors(plains, 0, 0).grass, j = biomes->colors(jungle, 0, 0).grass;
+    auto channel = [](uint32_t c, int shift) { return int((c >> shift) & 255); };
+    for (int shift : {16, 8, 0})
+        EXPECT_NEAR(channel(mixed, shift), (channel(p, shift) * 3 + channel(j, shift) * 2) / 5, 1);
 }
 
 TEST(Commands, Tokenize) {

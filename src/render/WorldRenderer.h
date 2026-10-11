@@ -15,12 +15,13 @@
 
 namespace mc {
 
+class BiomeRegistry;
 class ClientAssets;
 class Level;
 
 class WorldRenderer {
 public:
-    WorldRenderer(const ClientAssets& assets, const BlockRegistry& registry);
+    WorldRenderer(const ClientAssets& assets, const BlockRegistry& registry, const BiomeRegistry* biomes = nullptr);
     ~WorldRenderer();
     bool init();
 
@@ -40,7 +41,9 @@ public:
 private:
     const ClientAssets& assets_;
     const BlockRegistry& registry_;
+    const BiomeRegistry* biomes_ = nullptr;
     ChunkRenderer chunks_;
+    glm::dvec3 cameraPos_{0.0};
     SkyRenderer sky_;
     Lightmap lightmap_;
     LightFlicker flicker_;

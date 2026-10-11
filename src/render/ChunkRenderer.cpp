@@ -126,6 +126,8 @@ void ChunkRenderer::release(Alloc& a) {
 
 void ChunkRenderer::upload(ChunkPos chunk, const SectionMesh& mesh) {
     SectionGpu& sg = chunks_[chunk].sections[size_t(mesh.section)];
+    sg.translucent = mesh.layers[size_t(RenderLayer::Translucent)];
+    sg.centers = mesh.translucentCenters;
     for (int l = 0; l < kLayerCount; ++l) {
         release(sg.layers[size_t(l)]);
         const auto& verts = mesh.layers[size_t(l)];
@@ -135,6 +137,25 @@ void ChunkRenderer::upload(ChunkPos chunk, const SectionMesh& mesh) {
                                            verts.data());
         sg.layers[size_t(l)] = a;
         ensureIndexCapacity(uint32_t(verts.size() / 4));
+    }
+}
+
+void ChunkRenderer::resortTranslucent(const glm::dvec3& camera, int radius) {
+    if (glm::distance(camera, lastSortPos_) < 1.0) return;
+    lastSortPos_ = camera;
+    const ChunkPos cc = ChunkPos::of(BlockPos::containing(camera));
+    for (auto& [pos, cg] : chunks_) {
+        if (pos.chebyshev(cc) > radius) continue;
+        for (int si = 0; si < kSectionCount; ++si) {
+            SectionGpu& sg = cg.sections[size_t(si)];
+            const Alloc& a = sg.layers[size_t(RenderLayer::Translucent)];
+            if (a.count == 0 || sg.translucent.size() != a.count) continue;
+            const glm::vec3 eye(float(camera.x - pos.minBlockX()), float(camera.y - sectionMinY(si)),
+                                float(camera.z - pos.minBlockZ()));
+            sortTranslucentQuads(sg.translucent, sg.centers, eye);
+            pages_[size_t(a.page)]->vbo.update(size_t(a.offset) * sizeof(TerrainVertex),
+                                               sg.translucent.size() * sizeof(TerrainVertex), sg.translucent.data());
+        }
     }
 }
 

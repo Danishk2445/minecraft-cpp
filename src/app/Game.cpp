@@ -17,7 +17,9 @@
 #include "ui/GuiBatch.h"
 #include "world/light/LightEngine.h"
 #include "world/block/BlockRegistry.h"
+#include "world/biome/Biome.h"
 #include "world/gen/ChunkGenerator.h"
+#include "world/gen/OverworldGenerator.h"
 #include "world/level/Level.h"
 
 namespace mc {
@@ -86,18 +88,33 @@ bool Game::initWorld() {
     if (!registry_->build(assets_->blockModels(), assets_->blockAtlas(), opts_.dataDir, &err))
         log::warn("block registry: {}", err); // problems are logged; the world still runs
 
+    biomes_ = std::make_unique<BiomeRegistry>();
+    if (!biomes_->load(opts_.dataDir, opts_.assetsDir, &err)) {
+        log::error("biomes: {}", err);
+        return false;
+    }
     std::shared_ptr<const ChunkGenerator> generator;
-    if (opts_.worldType == "flat") generator = std::make_shared<FlatGenerator>(*registry_);
-    else generator = std::make_shared<DebugGenerator>(*registry_);
+    if (opts_.worldType == "flat") {
+        generator = std::make_shared<FlatGenerator>(*registry_);
+    } else if (opts_.worldType == "debug") {
+        generator = std::make_shared<DebugGenerator>(*registry_);
+    } else {
+        overworld_ = std::make_shared<OverworldGenerator>(*registry_, *biomes_, opts_.seed);
+        generator = overworld_;
+    }
     level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);
     level_->chunks().setLightEngine(std::make_shared<LightEngine>(*registry_));
     if (opts_.time) level_->setDayTime(*opts_.time);
     level_->daylightCycle = !opts_.freezeTime;
-    worldRenderer_ = std::make_unique<WorldRenderer>(*assets_, *registry_);
+    worldRenderer_ = std::make_unique<WorldRenderer>(*assets_, *registry_, opts_.worldType == "default" ? biomes_.get() : nullptr);
     if (!worldRenderer_->init()) return false;
     worldRenderer_->mesherOptions().smoothLighting = opts_.smoothLighting;
 
-    camera_.position = opts_.pos.value_or(generator->spawnPoint() + glm::dvec3(0.0, 1.62, 0.0));
+    camera_.position = opts_.pos.value_or(generator->spawnPoint() + glm::dvec3(0.0, overworld_ ? 12.0 : 1.62, 0.0));
+    if (std::isnan(camera_.position.y)) { // --pos X,~,Z
+        const int x = int(std::floor(camera_.position.x)), z = int(std::floor(camera_.position.z));
+        camera_.position.y = (overworld_ ? overworld_->terrainTop(x, z) + 1 : generator->spawnPoint().y) + 12.0;
+    }
     const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
     camera_.yaw = look.x;
     camera_.pitch = look.y;
@@ -110,10 +127,12 @@ void Game::shutdown() {
     // Order matters: jobs reference the registry and assets until the pool is joined.
     worldRenderer_.reset();
     level_.reset();
+    overworld_.reset();
     font_.reset();
     gui_.reset();
     gallery_.reset();
     jobs_.reset();
+    biomes_.reset();
     registry_.reset();
     assets_.reset();
     window_.destroy();
@@ -271,6 +290,11 @@ void Game::renderDebugOverlay(glm::ivec2 fb) {
         if (const Chunk* c = level_->chunks().chunk(ChunkPos::of(b))) {
             const uint8_t l = c->lightAt(b.x & 15, b.y, b.z & 15);
             lines.push_back(std::format("Client Light: {} ({} sky, {} block)", std::max(l >> 4, l & 15), l >> 4, l & 15));
+            if (overworld_ && b.y >= kWorldMinY && b.y <= kWorldMaxY) {
+                const Section& sec = c->sections[size_t(sectionIndexOfY(b.y))];
+                const BiomeId id = sec.biomes[size_t(((((b.y - kWorldMinY) & 15) >> 2) << 4) | (((b.z & 15) >> 2) << 2) | ((b.x & 15) >> 2))];
+                lines.push_back(std::format("Biome: {}", biomes_->get(id).id));
+            }
         }
         const auto& env = worldRenderer_->environment();
         lines.push_back(std::format("Day {} Time {} (celestial {:.3f}, sky darken {:.2f})",

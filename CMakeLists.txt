@@ -146,6 +146,16 @@ if(XVFB_RUN AND Python3_FOUND)
         --screenshot ${MC_TEST_RUN}/debug_overlay.png --exit)
     mc_py_test(gl_debug_overlay_text gl_debug_overlay check_image.py ${MC_TEST_RUN}/debug_overlay.png
         --region 0,0,640,240 --count-rgb 224,224,224 --tol 12 --min-count 2000)
+
+    # M4: fixed-seed overworld terrain from the spawn point, and the coast with translucent water.
+    mc_gl_test(gl_terrain --seed 12345 --render-distance 8 --size 1280x720 --look -45,15 --time 6000
+        --freeze-time --wait-chunks --screenshot ${MC_TEST_RUN}/terrain.png --exit)
+    mc_py_test(gl_terrain_check gl_terrain check_image.py ${MC_TEST_RUN}/terrain.png
+        --size 1280x720 --no-magenta --min-colors 2000 --region 1180,0,1280,60 --mean-rgb 160,194,255 --tol 12)
+    mc_gl_test(gl_terrain_coast --seed 12345 --render-distance 8 --size 1280x720 --pos 120,72,200 --look -60,35
+        --time 6000 --freeze-time --wait-chunks --screenshot ${MC_TEST_RUN}/terrain_coast.png --exit)
+    mc_py_test(gl_terrain_coast_water gl_terrain_coast check_image.py ${MC_TEST_RUN}/terrain_coast.png
+        --no-magenta --region 200,500,1080,720 --mean-rgb 35,62,114 --tol 12)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

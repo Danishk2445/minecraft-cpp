@@ -1,0 +1,20 @@
+{
+  "values": [
+    "#base_stone_overworld",
+    "#dirt",
+    "#sand",
+    "#terracotta",
+    "#iron_ores",
+    "#copper_ores",
+    "water",
+    "gravel",
+    "suspicious_gravel",
+    "sandstone",
+    "red_sandstone",
+    "calcite",
+    "snow",
+    "packed_ice",
+    "raw_iron_block",
+    "raw_copper_block"
+  ]
+}

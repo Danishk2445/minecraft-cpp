@@ -33,7 +33,7 @@ struct CliOptions {
     bool exitAfter = false;
 
     // World
-    std::string worldType = "debug"; // flat | debug
+    std::string worldType = "default"; // default | flat | debug
     long long seed = 0;
     int renderDistance = 12;
     std::vector<std::string> exec; // commands run once the spawn area is ready
@@ -51,6 +51,12 @@ struct CliOptions {
     // Tools
     std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit
     std::filesystem::path goldenTiles;     // states whose tiles are also saved individually
+    std::optional<glm::ivec2> dumpColumn;  // print worldgen diagnostics for a column, then exit
+    std::filesystem::path biomeMap;        // write a top-down biome map PNG and statistics, then exit
+    int mapSize = 4096;                    // biome map: width/height in blocks
+    int mapStep = 4;                       // biome map: blocks per pixel
+    int benchGen = 0;                      // generate and light about N chunks, report throughput, exit
+    std::filesystem::path slice;           // write a vertical x/y cross-section PNG of the terrain, then exit
 
     std::string logLevel = "info";
     bool help = false;

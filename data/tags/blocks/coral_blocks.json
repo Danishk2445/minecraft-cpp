@@ -1,0 +1,8 @@
+{
+  "values": [
+    "*_coral_block"
+  ],
+  "exclude": [
+    "dead_*"
+  ]
+}

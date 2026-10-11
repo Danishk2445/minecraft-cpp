@@ -291,8 +291,24 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
     - T4: eroded_badlands at H0 and H1
   - Shattered (windswept): gravelly hills ×2, hills, forest ×2 for T0 and T1; hills ×3, forest ×2 for T2.
   - Peaks: jagged_peaks (cold), frozen_peaks, stony_peaks (T4). Slopes: snowy_slopes, grove. Plus beach, snowy_beach, stony_shore, river, frozen_river, swamp, and the oceans by temperature (frozen, cold, normal, lukewarm, warm, with deep variants).
-- **Terrain:** the density sums a spline-shaped `offset·factor` with 3D noise, interpolated over 4×8×4 cells. A deepslate gradient runs from y 0 to 8. Bedrock is a random floor from y −64 to −60.
-- **Caves:** cheese (large noise caverns), spaghetti (2D ridges), noodles, plus carver worms and ravines. Aquifers set a local fluid level per cell; lava is below y −54.
+- **Terrain** (`world/gen/OverworldGenerator`):
+  - depth = `yClampedGradient(y, −64, 320, 1.5, −1.5) + offset`, where offset = spline − 0.50375;
+  - jagged = `jaggedness · halfNegative(jaggedNoise(x·1500, z·1500))`;
+  - base = `4 · quarterNegative((depth + jagged) · factor)`;
+  - sloped = base + BlendedNoise(0.25, 0.125, 80, 160, 8);
+  - sloped < 1.5625 → `min(sloped, 5·entrances)`, otherwise `underground(sloped)`;
+  - slides: lerp toward −0.078125 from y 240 to 256, and toward 0.1171875 from y −40 down to −64;
+  - final = min(interpolated density, noodle), solid where > 0.
+  
+  Density is sampled on 4×8×4 cell corners and interpolated trilinearly. The noodle inputs (selector, thickness, ridge A, ridge B) are interpolated separately, then combined per block. A deepslate gradient runs from y 0 to 8. Bedrock is a random floor from y −64 to −60.
+- **Caves:**
+  - underground = `min(min(4·layer² + clamp(0.27 + cheese, −1, 1) + clamp(1.5 − 0.64·sloped, 0, 0.5), entrances), spaghetti2d + roughness)`;
+  - entrances = `min(caveEntrance(0.75, 0.5) + 0.37 + yGradient(−10, 30, 0.3, 0), roughness + spaghetti3d)`;
+  - spaghetti 3D and 2D use the rarity-scaled samplers (TYPE1 and TYPE2).
+  - Carvers: worm caves (15%, y −56..180), extra underground caves (7%, y −56..47) and canyons (1%, y 10..67), from start chunks within 8. Each carves ellipsoids along a wandering path; caves use the floor cut-off, canyons use per-height width factors.
+  - About 10–13% of the volume between y −56 and 40 is cave air (`--slice` reports it).
+- **Fluids and aquifers:** see the M4 deviations in `docs/STATUS.md`. The flood line is `estimate − 6`, with a 3-block stone barrier below it; lava fills air below y −54.
+- **Cave biomes:** vanilla nearest-point rule. Surface biomes sit at depth 0 and 1, and lush caves (humidity ≥ 0.7) and dripstone caves (continentalness ≥ 0.8) span depth 0.2..0.9. A cave biome wins when its squared parameter distance is below `min(depth², (1 − depth)²)`.
 - **Colormap lookup:** `x = (int)((1-T)·255)`, `y = (int)((1-D·T)·255)` with T and D clamped to [0,1]. Fixed colors: birch #80A755, spruce #619961, lily pad #208030.
 
 ## UI

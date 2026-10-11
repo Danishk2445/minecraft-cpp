@@ -1,0 +1,8 @@
+{
+  "values": [
+    "*_coral_wall_fan"
+  ],
+  "exclude": [
+    "dead_*"
+  ]
+}
