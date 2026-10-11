@@ -60,7 +60,12 @@ enum StateFlag : uint16_t {
     kSkipSame = 1 << 6,     // faces touching the same block are hidden (glass, ice, panes)
     kAoShade = 1 << 7,      // full-cube shape that darkens neighbors' ambient occlusion (not glass)
     kBlocksMotion = 1 << 8, // has collision and counts as solid (vanilla blocksMotion): heightmaps, worldgen
+    kHasCollision = 1 << 9, // entities collide with it (not plants, fluids, signs, ...)
 };
+
+// A block shape: boxes in block-local coordinates (a full cube spans 0..1; fence
+// and wall collision reaches 1.5 high).
+using Shape = std::vector<AABB>;
 
 struct StateInfo {
     uint16_t block = 0;
@@ -70,6 +75,8 @@ struct StateInfo {
     RenderLayer layer = RenderLayer::Solid;
     uint8_t lightBlockingFaces = 0; // bit d: face d fully covered by an opaque shape (slab bottoms)
     uint8_t sturdyFaces = 0;        // bit d: face d fully covered by model faces of any opacity (supports torches, snow)
+    uint16_t outline = 0;           // shape index: selection outline and ray targets
+    uint16_t collision = 0;         // shape index: what entities collide with
     FluidState fluid;
     // 4x4 coverage of each face by opaque geometry (bit = row*4+col), for culling.
     std::array<uint16_t, 6> coverage{};
@@ -85,6 +92,11 @@ struct Block {
     uint32_t stateCount = 1;
     StateId defaultState = 0;
     TintRule tint;
+    float friction = 0.6f;    // ground slipperiness (ice 0.98)
+    float speedFactor = 1.0f; // walking on it (soul sand 0.4)
+    float jumpFactor = 1.0f;  // jumping from it (honey 0.5)
+    float hardness = 1.0f;    // vanilla destroyTime; negative = unbreakable
+    bool requiresTool = false; // vanilla requiresCorrectToolForDrops: slow to break and no drops by hand
 
     StateId stateAt(uint32_t local) const { return StateId(first + local); }
 };
@@ -128,11 +140,18 @@ public:
     const BlockTags& tags() const { return tags_; }
     // Rules that look at neighboring blocks (canSurvive), built after the tags.
     const BlockRules& rules() const { return *rules_; }
+
+    // Shapes (BlockShapes.cpp). Index 0 is empty, 1 the full cube.
+    const Shape& outlineShape(StateId s) const { return shapes_[info_[s].outline]; }
+    const Shape& collisionShape(StateId s) const { return shapes_[info_[s].collision]; }
+    const Shape& shape(uint16_t index) const { return shapes_[index]; }
+    size_t shapeCount() const { return shapes_.size(); }
     std::optional<TagId> tag(std::string_view name) const { return tags_.find(name); }
     bool hasTag(StateId s, TagId t) const { return tags_.containsBlock(t, info_[s].block); }
 
 private:
     uint16_t internProperty(const std::string& name, const std::vector<std::string>& values);
+    void buildShapes();
 
     std::vector<Block> blocks_;
     std::vector<Property> props_;
@@ -142,6 +161,7 @@ private:
     std::vector<const BakedChoice*> choices_;
     BlockTags tags_;
     std::shared_ptr<const BlockRules> rules_;
+    std::vector<Shape> shapes_;
 };
 
 // '*' wildcard match against a block id without namespace ("oak_stairs" ~ "*_stairs").

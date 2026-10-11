@@ -9,19 +9,26 @@
 #include "core/Log.h"
 #include "gfx/GL.h"
 #include "gfx/Screenshot.h"
+#include "game/Item.h"
+#include "game/Placement.h"
 #include "gfx/Shader.h"
 #include "render/ClientAssets.h"
 #include "render/Gallery.h"
+#include "render/BlockOverlay.h"
+#include "resources/Language.h"
 #include "render/WorldRenderer.h"
 #include "ui/Font.h"
 #include "ui/GuiBatch.h"
 #include "world/light/LightEngine.h"
+#include "world/block/BlockBehavior.h"
 #include "world/block/BlockRegistry.h"
 #include "world/biome/Biome.h"
 #include "world/gen/ChunkGenerator.h"
 #include "world/gen/OverworldGenerator.h"
 #include "world/gen/feature/BiomeDecorator.h"
 #include "world/level/Level.h"
+#include "world/storage/ChunkStorage.h"
+#include "world/storage/WorldSave.h"
 
 namespace mc {
 
@@ -89,10 +96,33 @@ bool Game::initWorld() {
     if (!registry_->build(assets_->blockModels(), assets_->blockAtlas(), opts_.dataDir, &err))
         log::warn("block registry: {}", err); // problems are logged; the world still runs
 
+    lang_ = std::make_unique<Language>();
+    if (!lang_->load(assets_->pack())) log::warn("no language file in the resource pack");
+    items_ = std::make_unique<ItemRegistry>();
+    if (!items_->load(assets_->pack(), *registry_, opts_.dataDir, &err)) log::warn("items: {}", err);
+    log::info("Items: {}", items_->size());
+
     biomes_ = std::make_unique<BiomeRegistry>();
     if (!biomes_->load(opts_.dataDir, opts_.assetsDir, &err)) {
         log::error("biomes: {}", err);
         return false;
+    }
+    // A saved world keeps its seed and type; a new one takes them from the options.
+    std::optional<WorldInfo> info;
+    worldType_ = opts_.worldType;
+    worldSeed_ = opts_.seed;
+    if (!opts_.world.empty()) {
+        worldDir_ = opts_.gameDir / "saves" / opts_.world;
+        info = readWorldInfo(worldDir_);
+        if (info) {
+            worldType_ = info->type;
+            worldSeed_ = info->seed;
+            log::info("Loading world '{}' (type {}, seed {})", opts_.world, worldType_, worldSeed_);
+        } else {
+            log::info("Creating world '{}' in {}", opts_.world, worldDir_.string());
+        }
+        opts_.worldType = worldType_;
+        opts_.seed = worldSeed_;
     }
     std::shared_ptr<const ChunkGenerator> generator;
     if (opts_.worldType == "flat") {
@@ -114,6 +144,10 @@ bool Game::initWorld() {
         generator = overworld_;
     }
     level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);
+    if (!worldDir_.empty()) {
+        level_->attachStorage(std::make_shared<ChunkStorage>(worldDir_, *registry_, biomes_.get()));
+        if (info) level_->loadData(info->level);
+    }
     level_->chunks().setLightEngine(std::make_shared<LightEngine>(*registry_));
     if (opts_.time) level_->setDayTime(*opts_.time);
     level_->daylightCycle = !opts_.freezeTime;
@@ -121,22 +155,65 @@ bool Game::initWorld() {
     if (!worldRenderer_->init()) return false;
     worldRenderer_->mesherOptions().smoothLighting = opts_.smoothLighting;
 
-    camera_.position = opts_.pos.value_or(generator->spawnPoint() + glm::dvec3(0.0, overworld_ ? 12.0 : 1.62, 0.0));
-    if (std::isnan(camera_.position.y)) { // --pos X,~,Z
-        const int x = int(std::floor(camera_.position.x)), z = int(std::floor(camera_.position.z));
-        camera_.position.y = (overworld_ ? overworld_->terrainTop(x, z) + 1 : generator->spawnPoint().y) + 12.0;
+    overlay_ = std::make_unique<BlockOverlay>();
+    if (!overlay_->init(*assets_)) return false;
+
+    // The player stands at the spawn point; --pos places the camera (the eye) instead.
+    player_ = std::make_unique<Player>();
+    player_->setMode(gameModeFromName(opts_.gameMode).value_or(GameMode::Survival));
+    if (opts_.pos) {
+        glm::dvec3 eye = *opts_.pos;
+        if (std::isnan(eye.y)) { // --pos X,~,Z: 12 blocks above the terrain
+            const int x = int(std::floor(eye.x)), z = int(std::floor(eye.z));
+            eye.y = (overworld_ ? overworld_->terrainTop(x, z) + 1 : generator->spawnPoint().y) + 12.0;
+        }
+        player_->pos = eye - glm::dvec3(0.0, player_->eyeHeight(), 0.0);
+    } else {
+        player_->pos = generator->spawnPoint();
     }
+    player_->oldPos = player_->pos;
     const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
+    player_->yaw = player_->oldYaw = look.x;
+    player_->pitch = player_->oldPitch = look.y;
+    camera_.position = player_->eyePos();
     camera_.yaw = look.x;
     camera_.pitch = look.y;
+    if (!worldDir_.empty())
+        if (auto saved = readPlayerFile(worldDir_)) {
+            loadPlayer(*player_, *saved, *items_);
+            camera_.position = player_->eyePos();
+        }
+    // Creative starts with a few building blocks until the creative inventory arrives (M8).
+    if (player_->mode() == GameMode::Creative && player_->inventory.main[0].empty()) {
+        const char* starter[9] = {"stone", "grass_block", "dirt", "cobblestone", "oak_planks", "oak_log", "glass",
+                                  "torch", "oak_stairs"};
+        for (int i = 0; i < 9; ++i)
+            if (const Item* item = items_->find(starter[i])) player_->inventory.main[size_t(i)] = {item, item->maxStack};
+    }
     camera_.farPlane = float(opts_.renderDistance * 16 + 64) * 1.5f;
     log::info("World: type {}, seed {}, render distance {}", generator->type(), opts_.seed, opts_.renderDistance);
     return true;
 }
 
+void Game::saveWorld(bool wait) {
+    if (worldDir_.empty() || !level_ || !player_) return;
+    const int chunks = level_->chunks().saveAll();
+    std::string err;
+    if (!writeWorldInfo(worldDir_, {opts_.world, worldSeed_, worldType_, level_->saveData()}, &err)) log::error("{}", err);
+    if (!writePlayerFile(worldDir_, savePlayer(*player_), &err)) log::error("{}", err);
+    if (wait) {
+        while (level_->chunks().savesPending()) jobs_->waitIdle();
+    }
+    log::info("Saved world '{}' ({} chunks)", opts_.world, chunks);
+}
+
 void Game::shutdown() {
+    saveWorld(true);
     // Order matters: jobs reference the registry and assets until the pool is joined.
+    overlay_.reset();
     worldRenderer_.reset();
+    player_.reset();
+    items_.reset();
     level_.reset();
     overworld_.reset();
     font_.reset();
@@ -198,11 +275,33 @@ void Game::handleGlobalKeys() {
         if (window_.cursorCaptured()) window_.setCursorCaptured(false);
         else window_.setShouldClose(true);
     }
-    if (in.mousePressed(GLFW_MOUSE_BUTTON_LEFT) && !window_.cursorCaptured()) window_.setCursorCaptured(true);
+    if (in.mousePressed(GLFW_MOUSE_BUTTON_LEFT) && !window_.cursorCaptured()) {
+        window_.setCursorCaptured(true);
+        return; // the capturing click is not an attack
+    }
+    if (!window_.cursorCaptured()) return;
+    attackClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_LEFT);
+    useClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_RIGHT);
+    pickClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_MIDDLE);
+    if (player_) {
+        int& selected = player_->inventory.selected;
+        for (int i = 0; i < 9; ++i)
+            if (in.keyPressed(GLFW_KEY_1 + i)) selected = i;
+        if (const double scroll = in.scrollY(); scroll != 0.0) selected = ((selected - (scroll > 0 ? 1 : -1)) % 9 + 9) % 9;
+    }
 }
 
 void Game::updateCamera(double dt) {
     const Input& in = window_.input();
+    if (player_) {
+        if (window_.cursorCaptured()) {
+            constexpr float kSensitivity = 0.15f;
+            const glm::dvec2 d = in.mouseDelta();
+            player_->yaw += float(d.x) * kSensitivity;
+            player_->pitch = std::clamp(player_->pitch + float(d.y) * kSensitivity, -90.0f, 90.0f);
+        }
+        return;
+    }
     if (window_.cursorCaptured()) {
         constexpr float kSensitivity = 0.15f;
         const glm::dvec2 d = in.mouseDelta();
@@ -244,15 +343,33 @@ void Game::updateWorld() {
 void Game::runCommand(const std::string& line) {
     CommandSource src;
     src.level = level_.get();
-    src.position = camera_.position;
-    src.rotation = {camera_.yaw, camera_.pitch};
+    src.position = player_ ? player_->pos : camera_.position;
+    src.rotation = player_ ? glm::vec2(player_->yaw, player_->pitch) : glm::vec2(camera_.yaw, camera_.pitch);
     src.feedback = [](const std::string& msg) { log::info("[command] {}", msg); };
     src.teleport = [this](const glm::dvec3& p, std::optional<glm::vec2> rot) {
-        camera_.position = p;
+        if (!player_) return;
+        player_->pos = player_->oldPos = p;
+        player_->velocity = glm::dvec3(0.0);
         if (rot) {
-            camera_.yaw = rot->x;
-            camera_.pitch = rot->y;
+            player_->yaw = player_->oldYaw = rot->x;
+            player_->pitch = player_->oldPitch = rot->y;
         }
+    };
+    src.assertionFailed = [this](const std::string& msg) {
+        log::error("assertion failed: {}", msg);
+        exitCode_ = 1;
+    };
+    src.give = [this](std::string_view id, int count) {
+        const Item* item = items_ ? items_->find(id) : nullptr;
+        if (!item || !player_) return false;
+        player_->inventory.add(*item, count);
+        return true;
+    };
+    src.setGameMode = [this](std::string_view mode) {
+        auto m = gameModeFromName(mode);
+        if (!m || !player_) return false;
+        player_->setMode(*m);
+        return true;
     };
     std::string err;
     if (!commands_.execute(src, line, &err)) log::warn("command '{}' failed: {}", line, err);
@@ -261,14 +378,41 @@ void Game::runCommand(const std::string& line) {
 void Game::tick() {
     ++tickCount_;
     assets_->tick();
+    if (level_ && player_) {
+        // The player waits (vanilla: frozen) until the chunk around it is ready.
+        const ChunkPos here = ChunkPos::of(BlockPos::containing(player_->pos));
+        if (player_->noPhysics || level_->chunks().isReady(here)) {
+            player_->tick(*level_, readPlayerInput());
+            tickInteraction();
+            particles_.tick(*level_);
+        } else {
+            player_->oldPos = player_->pos;
+        }
+    }
+    attackClicks_ = useClicks_ = pickClicks_ = 0;
     if (level_) level_->tick();
+    // Autosave every 5 minutes, like vanilla.
+    if (level_ && tickCount_ % 6000 == 0) saveWorld(false);
     if (worldRenderer_) worldRenderer_->tick();
 }
 
 void Game::render(float partialTick) {
     const glm::ivec2 fb = window_.framebufferSize();
+    if (player_) {
+        camera_.position = glm::mix(player_->oldPos, player_->pos, double(partialTick)) +
+                           glm::dvec3(0.0, player_->eyeHeight(), 0.0);
+        camera_.yaw = player_->yaw;
+        camera_.pitch = player_->pitch;
+        updateTarget();
+    }
     if (worldRenderer_) {
         worldRenderer_->render(camera_, fb, opts_.renderDistance, *level_, partialTick);
+        worldRenderer_->renderParticles(particles_, *level_, camera_, fb, partialTick);
+        if (target_ && player_->mode() != GameMode::Spectator) {
+            const int stage = breaking_.active && breaking_.pos == target_->pos ? int(breaking_.progress * 10.0f) - 1 : -1;
+            overlay_->render(camera_, fb, target_->pos, registry_->outlineShape(level_->getBlock(target_->pos)), stage);
+        }
+        renderHud(fb);
     } else {
         glViewport(0, 0, fb.x, fb.y);
         glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f); // vanilla daytime sky blue
@@ -276,6 +420,184 @@ void Game::render(float partialTick) {
         if (gallery_) gallery_->render(camera_, fb);
     }
     if (showDebug_) renderDebugOverlay(fb);
+}
+
+PlayerInput Game::readPlayerInput() {
+    PlayerInput in;
+    const bool jumpDown = window_.cursorCaptured() && window_.input().keyDown(GLFW_KEY_SPACE);
+    // Vanilla double-tap: a second jump press within 7 ticks toggles creative flight.
+    if (jumpTapTimer_ > 0) --jumpTapTimer_;
+    if (jumpDown && !jumpWasDown_) {
+        if (jumpTapTimer_ == 0) {
+            jumpTapTimer_ = 7;
+        } else {
+            in.doubleTapJump = true;
+            jumpTapTimer_ = 0;
+        }
+    }
+    jumpWasDown_ = jumpDown;
+    if (!window_.cursorCaptured()) return in;
+    const Input& k = window_.input();
+    in.forward = float(k.keyDown(GLFW_KEY_W)) - float(k.keyDown(GLFW_KEY_S));
+    in.strafe = float(k.keyDown(GLFW_KEY_A)) - float(k.keyDown(GLFW_KEY_D));
+    in.jump = jumpDown;
+    in.sneak = k.keyDown(GLFW_KEY_LEFT_SHIFT);
+    in.sprint = k.keyDown(GLFW_KEY_LEFT_CONTROL);
+    return in;
+}
+
+void Game::updateTarget() {
+    target_.reset();
+    if (!level_ || !player_) return;
+    // Vanilla block_interaction_range: 4.5, plus 0.5 in creative.
+    const double reach = player_->mode() == GameMode::Creative ? 5.0 : 4.5;
+    target_ = raycastBlocks(*level_, camera_.position, glm::dvec3(camera_.forward()), reach);
+}
+
+// Debris (or, mining, a chip off `face`) with the block's particle texture.
+void Game::spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face) {
+    const auto choices = registry_->modelChoices(s);
+    if (choices.empty() || choices[0]->models.empty()) return;
+    const Block& b = registry_->blockOf(s);
+    // Vanilla tints the particles like the block's first tint index (but not grass blocks).
+    uint32_t tint = 0xFFFFFF;
+    if (b.tint.source != TintSource::None && b.id != "minecraft:grass_block")
+        tint = resolveTint(b.tint, 0, assets_->defaultBiomeColors());
+    const int sprite = choices[0]->models[0]->particleSprite;
+    if (face) particles_.addBlockHit(*registry_, s, p, *face, sprite, tint);
+    else particles_.addBlockBreak(*registry_, s, p, sprite, tint);
+}
+
+void Game::breakBlock(const BlockPos& p) {
+    const StateId s = level_->getBlock(p);
+    spawnBlockParticles(p, s, std::nullopt);
+    // A waterlogged block leaves its water behind.
+    const bool waterlogged = registry_->boolValue(s, "waterlogged") || registry_->blockOf(s).className == "water_plant";
+    level_->setBlockAndUpdate(p, waterlogged ? registry_->defaultState("water") : BlockRegistry::kAirState);
+}
+
+void Game::placeBlock() {
+    if (!target_) return;
+    ItemStack& held = player_->inventory.selectedStack();
+    if (held.empty() || !held.item->block) return;
+    const Block& block = *held.item->block;
+    const bool consume = player_->mode() != GameMode::Creative;
+    const StateId clicked = level_->getBlock(target_->pos);
+    const double hitY = target_->point.y - double(target_->pos.y);
+    // A slab clicked on its open half becomes a double slab.
+    if (auto merged = mergeIntoClicked(*registry_, clicked, block, target_->face, hitY)) {
+        if (level_->setBlockAndUpdate(target_->pos, *merged) && consume) player_->inventory.consumeSelected();
+        return;
+    }
+    // Clicking a replaceable block (grass, snow layer) places into it; otherwise against the face.
+    const bool replace = (registry_->info(clicked).flags & kReplaceable) && registry_->info(clicked).block != block.index;
+    PlaceContext ctx;
+    ctx.pos = replace ? target_->pos : target_->pos.offset(target_->face);
+    ctx.clickedFace = target_->face;
+    ctx.hitPoint = target_->point;
+    ctx.yaw = player_->yaw;
+    ctx.pitch = player_->pitch;
+    ctx.replacingClicked = replace;
+    ctx.sneaking = player_->crouching;
+    const StateId there = level_->getBlock(ctx.pos);
+    if (!(registry_->info(there).flags & (kReplaceable | kAir))) {
+        // The neighbor may be a slab this one completes.
+        if (auto merged = mergeIntoClicked(*registry_, there, block, opposite(target_->face), hitY))
+            if (level_->setBlockAndUpdate(ctx.pos, *merged) && consume) player_->inventory.consumeSelected();
+        return;
+    }
+    const auto blocks = placementStates(*registry_, *level_, block, ctx);
+    if (blocks.empty()) return;
+    // Never inside the player.
+    const AABB body = player_->box().inflated(-1e-7, -1e-7, -1e-7);
+    for (const auto& [p, s] : blocks)
+        for (const AABB& b : registry_->collisionShape(s))
+            if (b.moved(glm::dvec3(p.vec())).intersects(body)) return;
+    for (const auto& [p, s] : blocks) level_->setBlockAndUpdate(p, s);
+    if (consume) player_->inventory.consumeSelected();
+}
+
+void Game::tickInteraction() {
+    if (!target_ || player_->mode() == GameMode::Spectator) {
+        breaking_.active = false;
+    }
+    if (destroyDelay_ > 0) --destroyDelay_;
+    if (useDelay_ > 0) --useDelay_;
+    const Input& in = window_.input();
+    const bool captured = window_.cursorCaptured();
+    // Pick block (creative): the target's block into the selected slot.
+    if (pickClicks_ > 0 && target_ && player_->mode() == GameMode::Creative)
+        if (const Item* item = items_->forBlock(registry_->blockOf(level_->getBlock(target_->pos))))
+            player_->inventory.pick(*item);
+    // Use: on click, then every 4 ticks while held (vanilla rightClickDelay). Blocks that
+    // react to a hand (doors, levers, ...) take the click unless sneaking with an item.
+    if (target_ && player_->mode() != GameMode::Spectator &&
+        (useClicks_ > 0 || (captured && in.mouseDown(GLFW_MOUSE_BUTTON_RIGHT) && useDelay_ == 0))) {
+        const StateId s = level_->getBlock(target_->pos);
+        const bool bypass = player_->crouching && !player_->inventory.selectedStack().empty();
+        const auto use = bypass ? std::nullopt : useBlock(*registry_, s, horizontalFacing(player_->yaw));
+        if (use) {
+            if (use->state != s) level_->setBlockAndUpdate(target_->pos, use->state);
+            if (use->tickDelay > 0) level_->scheduleTick(target_->pos, registry_->info(use->state).block, use->tickDelay);
+        } else {
+            placeBlock();
+        }
+        useDelay_ = 4;
+    }
+    // Attack: creative breaks at once (5-tick pause between blocks); survival accumulates progress.
+    const bool attacking = attackClicks_ > 0 || (captured && in.mouseDown(GLFW_MOUSE_BUTTON_LEFT));
+    if (!attacking || !target_ || player_->mode() == GameMode::Spectator || player_->mode() == GameMode::Adventure) {
+        breaking_.active = false;
+        return;
+    }
+    const BlockPos p = target_->pos;
+    const StateId s = level_->getBlock(p);
+    const Block& block = registry_->blockOf(s);
+    if (player_->mode() == GameMode::Creative) {
+        if (destroyDelay_ == 0 || attackClicks_ > 0) {
+            breakBlock(p);
+            destroyDelay_ = 5;
+        }
+        return;
+    }
+    if (destroyDelay_ > 0) return;
+    if (!breaking_.active || breaking_.pos != p) {
+        breaking_ = {p, 0.0f, true};
+    }
+    breaking_.progress += destroyProgressPerTick(block, *player_);
+    spawnBlockParticles(p, s, target_->face);
+    if (breaking_.progress >= 1.0f) {
+        breakBlock(p);
+        breaking_.active = false;
+        destroyDelay_ = 5;
+    }
+}
+
+void Game::renderHud(glm::ivec2 fb) {
+    if (!player_) return;
+    gui_->begin(fb, autoGuiScale(fb));
+    const glm::vec2 c = gui_->size() * 0.5f;
+    if (player_->mode() != GameMode::Spectator) {
+        // Crosshair (the inverted-color sprite arrives with the GUI milestone).
+        gui_->fill(c.x - 4.5f, c.y - 0.5f, c.x + 4.5f, c.y + 0.5f, 0xE0FFFFFF);
+        gui_->fill(c.x - 0.5f, c.y - 4.5f, c.x + 0.5f, c.y + 4.5f, 0xE0FFFFFF);
+        // Hotbar: slot numbers and counts with the selected item's name (icons arrive with the GUI milestone).
+        const Inventory& inv = player_->inventory;
+        const float y = gui_->size().y - 14.0f;
+        for (int i = 0; i < 9; ++i) {
+            const float x = c.x - 90.0f + 20.0f * float(i);
+            const bool sel = i == inv.selected;
+            const ItemStack& st = inv.main[size_t(i)];
+            gui_->fill(x, y - 2.0f, x + 18.0f, y + 10.0f, sel ? 0xC0FFFFFF : st.empty() ? 0x60000000 : 0xA0303030);
+            const std::string label = st.empty() ? std::to_string(i + 1) : std::to_string(st.count);
+            font_->draw(*gui_, label, x + 9.0f - float(font_->width(label)) / 2.0f, y, sel ? 0xFF000000 : 0xFFE0E0E0, false);
+        }
+        if (const ItemStack& st = inv.selectedStack(); !st.empty()) {
+            const std::string name = items_->name(*st.item, *lang_);
+            font_->draw(*gui_, name, c.x - float(font_->width(name)) / 2.0f, y - 14.0f, 0xFFFFFFFF, true);
+        }
+    }
+    gui_->end();
 }
 
 void Game::renderDebugOverlay(glm::ivec2 fb) {
@@ -310,6 +632,30 @@ void Game::renderDebugOverlay(glm::ivec2 fb) {
         const auto& env = worldRenderer_->environment();
         lines.push_back(std::format("Day {} Time {} (celestial {:.3f}, sky darken {:.2f})",
                                     level_->dayTime() / 24000, level_->dayTime() % 24000, env.timeOfDay, env.skyDarken));
+        if (player_) {
+            lines.push_back(std::format("Mode: {}{}{}", gameModeName(player_->mode()), player_->flying ? ", flying" : "",
+                                        player_->onGround ? ", on ground" : ""));
+            if (target_) {
+                const BlockPos& t = target_->pos;
+                lines.push_back("");
+                lines.push_back(std::format("Targeted Block: {}, {}, {} ({})", t.x, t.y, t.z, directionName(target_->face)));
+                const std::string desc = registry_->describe(level_->getBlock(t));
+                const size_t bracket = desc.find('[');
+                lines.push_back(desc.substr(0, bracket));
+                if (bracket != std::string::npos) {
+                    // One property per line, like vanilla.
+                    std::string props = desc.substr(bracket + 1, desc.size() - bracket - 2);
+                    for (size_t start = 0; start <= props.size();) {
+                        const size_t comma = props.find(',', start);
+                        std::string kv = props.substr(start, comma - start);
+                        if (const size_t eq = kv.find('='); eq != std::string::npos) kv = kv.substr(0, eq) + ": " + kv.substr(eq + 1);
+                        lines.push_back(kv);
+                        if (comma == std::string::npos) break;
+                        start = comma + 1;
+                    }
+                }
+            }
+        }
     } else {
         lines.push_back(std::format("{:.0f} fps", fps_));
         lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));

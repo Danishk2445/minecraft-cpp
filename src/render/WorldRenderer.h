@@ -9,6 +9,7 @@
 #include "gfx/Camera.h"
 #include "render/ChunkRenderer.h"
 #include "render/Environment.h"
+#include "render/ParticleRenderer.h"
 #include "render/SkyRenderer.h"
 #include "world/chunk/ChunkManager.h"
 #include "world/mesh/ChunkMesher.h"
@@ -18,6 +19,7 @@ namespace mc {
 class BiomeRegistry;
 class ClientAssets;
 class Level;
+class ParticleSystem;
 
 class WorldRenderer {
 public:
@@ -31,6 +33,9 @@ public:
     // Clears to the fog color and draws sky, terrain and clouds.
     void render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level, float partialTick);
     const EnvironmentState& environment() const { return env_; }
+    // Particles over the world just drawn (uses its lightmap and camera).
+    void renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera, glm::ivec2 viewport,
+                         float partialTick);
     float gamma = 0.5f; // the Brightness option (0 = Moody, 1 = Bright)
 
     // No mesh jobs running.
@@ -45,6 +50,7 @@ private:
     ChunkRenderer chunks_;
     glm::dvec3 cameraPos_{0.0};
     SkyRenderer sky_;
+    ParticleRenderer particles_;
     Lightmap lightmap_;
     LightFlicker flicker_;
     EnvironmentState env_;

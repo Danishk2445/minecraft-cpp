@@ -88,6 +88,61 @@ Commands::Commands() {
         return true;
     });
 
+    add("gamemode", "/gamemode <survival|creative|adventure|spectator>", [](CommandSource& src, Args a, std::string& err) {
+        if (a.size() != 1) {
+            err = "expected a game mode";
+            return false;
+        }
+        if (!src.setGameMode || !src.setGameMode(a[0])) {
+            err = "unknown game mode " + a[0];
+            return false;
+        }
+        if (src.feedback) src.feedback("Set own game mode to " + a[0]);
+        return true;
+    });
+    add("assertblock", "/assertblock <x> <y> <z> <block>", [](CommandSource& src, Args a, std::string& err) {
+        if (a.size() != 4 || !src.level) {
+            err = "expected x y z block";
+            return false;
+        }
+        const auto x = parseCoordinate(a[0], src.position.x), y = parseCoordinate(a[1], src.position.y),
+                   z = parseCoordinate(a[2], src.position.z);
+        if (!x || !y || !z) {
+            err = "bad coordinates";
+            return false;
+        }
+        const BlockPos p(int(std::floor(*x)), int(std::floor(*y)), int(std::floor(*z)));
+        const BlockRegistry& reg = src.level->registry();
+        const auto expected = reg.parse(a[3]);
+        const StateId actual = src.level->getBlock(p);
+        // A bare block id matches any of its states.
+        const bool ok = expected && (a[3].find('[') == std::string::npos ? reg.info(actual).block == reg.info(*expected).block
+                                                                       : actual == *expected);
+        if (!ok) {
+            const std::string msg = std::format("block at {} {} {} is {}, expected {}", p.x, p.y, p.z, reg.describe(actual), a[3]);
+            if (src.assertionFailed) src.assertionFailed(msg);
+            err = msg;
+            return false;
+        }
+        return true;
+    });
+    add("give", "/give <item> [count]", [](CommandSource& src, Args a, std::string& err) {
+        if (a.empty() || a.size() > 2) {
+            err = "expected an item and an optional count";
+            return false;
+        }
+        int count = 1;
+        if (a.size() == 2 && (!std::from_chars(a[1].data(), a[1].data() + a[1].size(), count).ptr || count <= 0)) {
+            err = "bad count " + a[1];
+            return false;
+        }
+        if (!src.give || !src.give(a[0], count)) {
+            err = "unknown item " + a[0];
+            return false;
+        }
+        if (src.feedback) src.feedback("Gave " + std::to_string(count) + " " + a[0]);
+        return true;
+    });
     add("setblock", "/setblock <x> <y> <z> <block>", [](CommandSource& src, Args a, std::string& err) {
         if (!src.level || a.size() != 4) {
             err = "expected 4 arguments";

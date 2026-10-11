@@ -34,6 +34,8 @@ struct CliOptions {
 
     // World
     std::string worldType = "default"; // default | flat | debug
+    std::string gameMode = "survival"; // survival | creative | adventure | spectator
+    std::string world;                 // save name under <gameDir>/saves; empty: an unsaved world
     long long seed = 0;
     int renderDistance = 12;
     std::vector<std::string> exec; // commands run once the spawn area is ready

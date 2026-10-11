@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "core/JobSystem.h"
+#include "core/Json.h"
 #include "world/chunk/Chunk.h"
 #include "world/chunk/ChunkSnapshot.h"
 #include "world/gen/ChunkGenerator.h"
@@ -26,6 +27,7 @@ namespace mc {
 enum class ChunkStage : uint8_t { Empty, Terrain, Decorated, Final, Lit };
 
 class LightEngine;
+class ChunkStorage;
 
 class ChunkManager {
 public:
@@ -43,6 +45,20 @@ public:
     ChunkManager& operator=(const ChunkManager&) = delete;
 
     void setLightFunction(LightFn fn) { lightFn_ = std::move(fn); }
+
+    // Persistence: edited chunks are saved on unload and by saveAll(); chunks with a
+    // save file load it in place of their MERGE result. The hooks carry per-chunk
+    // extras (scheduled ticks): `saveExtra(pos, unloading)` collects them, `loadedExtra`
+    // hands them back on load.
+    void setStorage(std::shared_ptr<const ChunkStorage> storage) { storage_ = std::move(storage); }
+    void setPersistenceHooks(std::function<Json(ChunkPos, bool unloading)> saveExtra,
+                             std::function<void(ChunkPos, const Json&)> loadedExtra) {
+        saveExtra_ = std::move(saveExtra);
+        loadedExtra_ = std::move(loadedExtra);
+    }
+    // Saves every edited chunk (in jobs); returns how many were queued.
+    int saveAll();
+    bool savesPending() const { return !savesInFlight_.empty(); }
     // Uses `engine` for the LIGHT stage and for incremental updates after edits.
     void setLightEngine(std::shared_ptr<const LightEngine> engine);
     const LightEngine* lightEngine() const { return lightEngine_.get(); }
@@ -102,7 +118,10 @@ private:
         std::shared_ptr<const Chunk> terrain;
         std::shared_ptr<const DecorationResult> decoration;
         std::unique_ptr<Chunk> chunk;
+        uint32_t savedVersion = 0; // chunk->blockVersion when last loaded or saved
+        bool dirty() const { return chunk && chunk->blockVersion != savedVersion; }
     };
+    void submitSave(Entry& e, bool unloading);
 
     Entry* find(ChunkPos p);
     const Entry* find(ChunkPos p) const;
@@ -133,6 +152,10 @@ private:
     uint64_t nextId_ = 1;
     int inFlight_ = 0;
     std::vector<ChunkPos> dropped_;
+    std::shared_ptr<const ChunkStorage> storage_;
+    std::function<Json(ChunkPos, bool)> saveExtra_;
+    std::function<void(ChunkPos, const Json&)> loadedExtra_;
+    std::unordered_map<ChunkPos, int> savesInFlight_; // count per chunk
 };
 
 } // namespace mc

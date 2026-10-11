@@ -1,4 +1,5 @@
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <map>
 #include <set>
@@ -19,6 +20,7 @@
 #include "world/gen/TerrainSplines.h"
 #include "world/gen/feature/BiomeDecorator.h"
 #include "world/gen/feature/DecorationRegion.h"
+#include "world/storage/ChunkStorage.h"
 
 using namespace mc;
 
@@ -517,4 +519,27 @@ TEST_F(WorldgenFixture, TreesAreNotCutAtChunkBorders) {
     if (leaves == 0) GTEST_SKIP() << "no tree features loaded";
     EXPECT_GT(leaves, 2000);
     EXPECT_LE(orphans, leaves / 100) << orphans << " orphaned leaves of " << leaves;
+}
+
+TEST_F(WorldgenFixture, ChunkStorageRoundTrip) {
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "mc_storage_test";
+    std::filesystem::remove_all(dir);
+    const OverworldGenerator gen(*registry, *biomes, 5);
+    Chunk c({-3, 7});
+    gen.generateTerrain(c);
+    c.set(1, 70, 1, registry->defaultState("oak_stairs"));
+    ChunkStorage storage(dir, *registry, biomes.get());
+    std::string err;
+    const Json extra = {{"ticks", Json::array({{1, 2, 3, "minecraft:oak_button", 10}})}};
+    ASSERT_TRUE(storage.save(c, extra, &err)) << err;
+    EXPECT_TRUE(storage.exists({-3, 7}));
+    EXPECT_FALSE(storage.exists({-3, 8}));
+    EXPECT_EQ(storage.pathFor({-3, 7}).parent_path().filename(), "-1.0");
+    Json loadedExtra;
+    auto loaded = storage.load({-3, 7}, &loadedExtra, &err);
+    ASSERT_NE(loaded, nullptr) << err;
+    EXPECT_EQ(hashChunk(*loaded), hashChunk(c));
+    EXPECT_EQ(loadedExtra, extra);
+    EXPECT_LT(std::filesystem::file_size(storage.pathFor({-3, 7})), 20000u); // compressed
+    std::filesystem::remove_all(dir);
 }

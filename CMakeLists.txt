@@ -125,12 +125,12 @@ if(XVFB_RUN AND Python3_FOUND)
         --size 1280x720 --no-magenta --min-colors 500 --region 0,560,60,720 --mean-rgb 120,167,255 --tol 2)
 
     # M2: the debug world (every block state) through the chunk pipeline, mesher and MDI renderer.
-    mc_gl_test(gl_debug_world --world-type debug --render-distance 6 --size 1280x720 --pos 10,76,10 --look -45,30
+    mc_gl_test(gl_debug_world --gamemode spectator --world-type debug --render-distance 6 --size 1280x720 --pos 10,76,10 --look -45,30
         --wait-chunks --screenshot ${MC_TEST_RUN}/debug_world.png --exit)
     mc_py_test(gl_debug_world_check gl_debug_world check_image.py ${MC_TEST_RUN}/debug_world.png
         --size 1280x720 --no-magenta --min-colors 1000)
     # M2/M3: --exec edits on a flat world (stone wall, glass, slab), lit at noon and midnight.
-    set(MC_FLAT_SCENE --world-type flat --render-distance 8 --size 1280x720 --pos 0,-55,-12 --look 0,20
+    set(MC_FLAT_SCENE --gamemode spectator --world-type flat --render-distance 8 --size 1280x720 --pos 0,-55,-12 --look 0,20
         --exec "/fill -3 -60 0 3 -55 6 stone" --exec "/fill -2 -59 1 2 -56 5 air"
         --exec "/setblock 0 -60 -3 glass" --exec "/setblock 2 -60 -3 oak_slab" --wait-chunks --freeze-time)
     mc_gl_test(gl_flat_noon ${MC_FLAT_SCENE} --time 6000 --screenshot ${MC_TEST_RUN}/flat_noon.png --exit)
@@ -148,14 +148,25 @@ if(XVFB_RUN AND Python3_FOUND)
         --region 0,0,640,240 --count-rgb 224,224,224 --tol 12 --min-count 2000)
 
     # M4: fixed-seed overworld terrain from the spawn point, and the coast with translucent water.
-    mc_gl_test(gl_terrain --seed 12345 --render-distance 8 --size 1280x720 --look -45,15 --time 6000
+    mc_gl_test(gl_terrain --gamemode spectator --seed 12345 --render-distance 8 --size 1280x720 --look -45,15 --time 6000
         --freeze-time --wait-chunks --screenshot ${MC_TEST_RUN}/terrain.png --exit)
     mc_py_test(gl_terrain_check gl_terrain check_image.py ${MC_TEST_RUN}/terrain.png
         --size 1280x720 --no-magenta --min-colors 2000 --region 1180,0,1280,60 --mean-rgb 160,194,255 --tol 12)
-    mc_gl_test(gl_terrain_coast --seed 12345 --render-distance 8 --size 1280x720 --pos 120,72,200 --look -60,35
+    mc_gl_test(gl_terrain_coast --gamemode spectator --seed 12345 --render-distance 8 --size 1280x720 --pos 120,72,200 --look -60,35
         --time 6000 --freeze-time --wait-chunks --screenshot ${MC_TEST_RUN}/terrain_coast.png --exit)
     mc_py_test(gl_terrain_coast_water gl_terrain_coast check_image.py ${MC_TEST_RUN}/terrain_coast.png
         --no-magenta --region 200,500,1080,720 --mean-rgb 35,62,114 --tol 12)
+
+    # M6: edits survive saving and loading the world.
+    add_test(NAME gl_save_clean COMMAND ${CMAKE_COMMAND} -E rm -rf ${MC_TEST_RUN}/saves/savetest)
+    mc_gl_test(gl_save_create --world savetest --world-type flat --gamemode creative --render-distance 4 --size 640x360
+        --exec "/setblock 3 -60 3 gold_block" --exec "/setblock 4 -60 3 oak_stairs[facing=east]" --exit)
+    mc_gl_test(gl_save_reload --world savetest --render-distance 4 --size 640x360
+        --exec "/assertblock 3 -60 3 gold_block"
+        --exec "/assertblock 4 -60 3 oak_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]"
+        --exec "/assertblock 5 -60 3 air" --exit)
+    set_tests_properties(gl_save_create PROPERTIES DEPENDS gl_save_clean)
+    set_tests_properties(gl_save_reload PROPERTIES DEPENDS gl_save_create)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

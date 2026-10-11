@@ -7,6 +7,7 @@
 #include "world/block/BlockRegistry.h"
 #include "world/block/BlockRules.h"
 #include "world/light/LightEngine.h"
+#include "world/storage/ChunkStorage.h"
 
 #include <unordered_set>
 
@@ -115,9 +116,26 @@ void ChunkManager::submitMerge(Entry& e) {
             decos[size_t((dz + 1) * 3 + dx + 1)] = find({e.pos.x + dx, e.pos.z + dz})->decoration;
     const BlockRegistry* reg = &registry_;
     auto gen = generator_;
+    struct Merged {
+        std::unique_ptr<Chunk> chunk;
+        Json extra;
+        bool fromDisk = false;
+    };
     submit(
         e, e.dist * 4 + 2,
-        [reg, gen, terrain = e.terrain, decos, pos = e.pos] {
+        [reg, gen, terrain = e.terrain, decos, pos = e.pos, storage = storage_]() -> Merged {
+            // A saved chunk replaces the generated one (its neighbors still got this
+            // chunk's DECORATE writes, so trees crossing the border stay whole).
+            if (storage && storage->exists(pos)) {
+                Merged m;
+                std::string err;
+                m.chunk = storage->load(pos, &m.extra, &err);
+                if (m.chunk) {
+                    m.fromDisk = true;
+                    return m;
+                }
+                log::warn("chunk {} {}: {}", pos.x, pos.z, err.empty() ? "unreadable save" : err);
+            }
             auto c = std::make_unique<Chunk>(*terrain); // shares section storage until written
             struct Pending {
                 uint8_t step;
@@ -182,12 +200,14 @@ void ChunkManager::submitMerge(Entry& e) {
                 c->set(p.x & 15, p.y, p.z & 15, wet ? water : BlockRegistry::kAirState);
             }
             gen->finalizeChunk(*c);
-            return c;
+            return Merged{std::move(c), Json(), false};
         },
-        [this](Entry& en, std::unique_ptr<Chunk> c) {
-            en.chunk = std::move(c);
+        [this](Entry& en, Merged m) {
+            en.chunk = std::move(m.chunk);
+            en.savedVersion = en.chunk->blockVersion;
             en.stage = ChunkStage::Final;
             readyDirty_ = true;
+            if (m.fromDisk && loadedExtra_ && !m.extra.is_null()) loadedExtra_(en.pos, m.extra);
         });
 }
 
@@ -230,6 +250,7 @@ void ChunkManager::update() {
         for (auto it = entries_.begin(); it != entries_.end();) {
             if (it->first.chebyshev(center_) > keep) {
                 if (it->second->meshReady) dropped_.push_back(it->first);
+                if (storage_ && it->second->dirty()) submitSave(*it->second, true);
                 it = entries_.erase(it);
             } else {
                 ++it;
@@ -270,7 +291,8 @@ void ChunkManager::update() {
             if (e->dist <= r + 3 && neighborsAtLeast(*e, ChunkStage::Terrain)) submitDecorate(*e);
             break;
         case ChunkStage::Decorated:
-            if (e->dist <= r + 2 && neighborsAtLeast(*e, ChunkStage::Decorated)) submitMerge(*e);
+            if (e->dist <= r + 2 && neighborsAtLeast(*e, ChunkStage::Decorated) && !savesInFlight_.contains(e->pos))
+                submitMerge(*e);
             break;
         case ChunkStage::Final:
             if (e->dist <= r + 1 && neighborsAtLeast(*e, ChunkStage::Final)) submitLight(*e);
@@ -432,6 +454,35 @@ ChunkManager::Stats ChunkManager::stats() const {
         if (e->meshReady) ++s.meshReady;
     }
     return s;
+}
+
+void ChunkManager::submitSave(Entry& e, bool unloading) {
+    // Snapshot: sections are shared copy-on-write, so later edits never reach the job.
+    auto snapshot = std::make_shared<const Chunk>(*e.chunk);
+    Json extra = saveExtra_ ? saveExtra_(e.pos, unloading) : Json();
+    e.savedVersion = e.chunk->blockVersion;
+    ++savesInFlight_[e.pos];
+    std::weak_ptr<int> token = alive_;
+    JobSystem* jobs = &jobs_;
+    jobs_.submit(-1, [this, token, jobs, snapshot, extra = std::move(extra), storage = storage_]() {
+        std::string err;
+        if (!storage->save(*snapshot, extra, &err)) log::error("saving chunk {} {}: {}", snapshot->pos.x, snapshot->pos.z, err);
+        jobs->postMain([this, token, pos = snapshot->pos] {
+            if (token.expired()) return;
+            if (--savesInFlight_[pos] <= 0) savesInFlight_.erase(pos);
+        });
+    });
+}
+
+int ChunkManager::saveAll() {
+    if (!storage_) return 0;
+    int n = 0;
+    for (auto& [p, e] : entries_)
+        if (e->dirty()) {
+            submitSave(*e, false);
+            ++n;
+        }
+    return n;
 }
 
 } // namespace mc

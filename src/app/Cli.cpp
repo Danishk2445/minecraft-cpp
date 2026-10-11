@@ -125,6 +125,19 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return parseBool(v, o.smoothLighting); }},
         {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
          [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
+        {"--world", "NAME", "play the saved world <gamedir>/saves/NAME, creating it (with --seed and --world-type) if missing",
+         [](CliOptions& o, std::string_view v) {
+             if (v.empty() || v.find('/') != std::string_view::npos || v.find('\\') != std::string_view::npos || v == "..")
+                 return false;
+             o.world = v;
+             return true;
+         }},
+        {"--gamemode", "MODE", "survival (default), creative, adventure or spectator",
+         [](CliOptions& o, std::string_view v) {
+             if (v != "survival" && v != "creative" && v != "adventure" && v != "spectator") return false;
+             o.gameMode = v;
+             return true;
+         }},
         {"--pos", "X,Y,Z", "start the camera at this position (Y may be ~: 12 blocks above the generated terrain)",
          [](CliOptions& o, std::string_view v) {
              std::array<double, 3> a{};

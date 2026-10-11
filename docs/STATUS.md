@@ -9,7 +9,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M3 Light & sky: light engine, smooth light/AO, lightmap, fog, sky, day/night, F3
 - [x] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
 - [x] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
-- [ ] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
+- [x] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
 - [ ] M7 Entity models: ModelPart, block-entity renderers, player model, F5
 - [ ] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
 - [ ] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
@@ -74,3 +74,10 @@ Recorded per milestone.
   - Noise-driven counts and states (flower patches, coral, kelp, bamboo, meadow flowers) use stand-in noises, and geometry uses `std::sin`/`std::cos` rather than vanilla's lookup tables. Worlds are not seed-compatible anyway.
   - Ice spikes and groves get snow-block surfaces (vanilla mixes in powder snow). Snow and ice ignore block light, which does not exist yet at generation time. Mushrooms survive regardless of light during generation.
   - Every top-level random call is sequenced: C++ leaves the order of operands such as `nextInt() - nextInt()` unspecified, and worlds must not depend on the compiler.
+- **M6:**
+  - Shapes: outlines and collision come from model element boxes (element rotations ignored), with vanilla overrides for fences, panes, walls, gates, snow layers, cactus, soul sand, mud, honey, lily pads, ladders, torches and the code-rendered blocks (chests, beds, signs, banners, heads, shulker boxes, pot, conduit). Flat models (flowers, vines) outline their quads' bounds. Vanilla's hand-written shapes differ in detail (for example flower outlines are smaller).
+  - Step-up uses the pre-1.21 "step up, then across" search; 1.21's candidate step heights give the same result for blocks.
+  - Placement covers the vanilla rules for stairs, slabs (with doubling), doors (approximate hinge choice), beds, double plants, trapdoors, buttons, levers, grindstones, torches, signs, banners, heads, ladders, rails (straight), chests (pairing), hoppers, pistons, observers, dispensers, barrels, anvils, lanterns, rods and pillars; other blocks fall back to their `facing`/`axis`/`rotation` properties. Wall `tall` sides follow only whether the block above has a sturdy bottom face.
+  - Saves keep only edited chunks: every chunk still generates (so neighbors receive its tree and plant writes), and a saved chunk's blocks replace the generated ones before lighting. Light is not saved. `/assertblock` stands in for the planned `--dump-world-state` diff.
+  - Particles: block break and mining debris only (vanilla TerrainParticle); other particle types come with the simulation milestone.
+  - The hotbar shows slot counts and the selected item's name; item icons arrive with the GUI milestone. Creative starts with a few building blocks because the creative inventory comes later.

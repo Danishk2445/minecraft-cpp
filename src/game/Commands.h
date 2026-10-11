@@ -22,6 +22,12 @@ struct CommandSource {
     std::function<void(const std::string&)> feedback;
     // Moves the executing entity (camera/player); rotation optional.
     std::function<void(const glm::dvec3&, std::optional<glm::vec2>)> teleport;
+    // Changes the executing player's game mode; false for an unknown mode.
+    std::function<bool(std::string_view)> setGameMode;
+    // Gives the executing player items; false for an unknown item.
+    std::function<bool(std::string_view item, int count)> give;
+    // Harness: a failed assertion (/assertblock) is reported here.
+    std::function<void(const std::string&)> assertionFailed;
 };
 
 class Commands {

@@ -544,6 +544,11 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         const Json* replaceableJ = firstField(propRules, name, "replaceable");
         const Json* aoShadeJ = firstField(propRules, name, "ao_shade");
         const Json* collisionJ = firstField(propRules, name, "collision");
+        if (const Json* f = firstField(propRules, name, "friction"); f && f->is_number()) b.friction = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "speed_factor"); f && f->is_number()) b.speedFactor = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "jump_factor"); f && f->is_number()) b.jumpFactor = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "hardness"); f && f->is_number()) b.hardness = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "requires_tool"); f && f->is_boolean()) b.requiresTool = f->get<bool>();
         const Json* solidJ = firstField(propRules, name, "solid");
         const bool liquid = b.className == "liquid";
         const bool waterPlant = b.className == "water_plant" || b.className == "tall_water_plant" ||
@@ -616,6 +621,7 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
                 if (collisionJ) collision = collisionJ->is_boolean() ? collisionJ->get<bool>()
                                                                     : Expr(collisionJ->get<std::string>(), get).eval() != 0;
                 const bool solid = !(solidJ && solidJ->is_boolean() && !solidJ->get<bool>());
+                if (collision && !(si.flags & kAir) && !liquid) si.flags |= kHasCollision;
                 if (collision && solid && !(si.flags & kAir) && !liquid) si.flags |= kBlocksMotion;
             }
 
@@ -651,6 +657,7 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         }
     }
 
+    buildShapes();
     rules_ = std::make_shared<const BlockRules>(*this);
 
     for (const auto& p : problems) log::warn("block registry: {}", p);

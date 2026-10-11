@@ -130,7 +130,7 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - flowing lava + water → cobblestone;
   - lava flowing down onto water → stone.
 
-## Player and physics *(mem)*
+## Player and physics
 - **Ground movement:**
   ```
   input *= 0.98                    (sneak ×0.3, using an item ×0.2)
@@ -151,9 +151,10 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - step up 0.6 when on ground and blocked horizontally;
   - sneaking on the ground can't walk off edges.
 - **Dimensions:** the hitbox is 0.6×1.8 (1.5 sneaking), eye height 1.62 (1.27 sneaking), reach 4.5 (5 in creative). Walking is 4.317 m/s and sprinting 5.612 m/s.
+- **Implementation** (`entity/Player`, `entity/Physics`): unit tests pin the jump apex (1.2522), walk, sprint and sneak speeds, slab stepping, ledge guarding, ladder climbing (0.1176 blocks per tick), creative flight (10.92 m/s) and swimming. Collision shapes come from model elements with vanilla overrides (`world/block/BlockShapes.cpp`): fence and wall collision is 1.5 tall, snow layers collide one layer lower, cactus, soul sand, mud and honey are inset.
 - **Fall damage:** `ceil(fallDistance - 3)`.
 
-## Breaking *(mem)*
+## Breaking
 - **Progress per tick:** `speed / hardness / (canHarvest ? 30 : 100)`.
   - hardness < 0 means unbreakable; 0 means instant.
 - **Tool speed:**
@@ -163,6 +164,7 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - sword 15 on cobweb, 1.5 on plants and leaves.
 - **Penalties:** ×0.2 underwater without Aqua Affinity; ÷5 when not on the ground.
 - **Timing:** a 5-tick delay between blocks; crack stage = `floor(progress·10)`.
+- **Data:** `hardness` and `requires_tool` rules in `data/blocks/properties.json`; tools arrive with survival (M10), so M6 breaks with an empty hand.
 - **Reference break times:**
   - hand on stone: 150 ticks;
   - wooden pickaxe on stone: 23;

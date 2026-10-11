@@ -27,7 +27,10 @@ private:
         Always, Plant, DryPlant, Mushroom, SugarCane, Cactus, LilyPad, Seagrass, Kelp, Coral, WallCoral,
         SeaPickle, Bamboo, Cocoa, Vine, Multiface, Snow, CaveVines, HangingFromCeiling, SporeBlossom, SmallDripleaf,
         BigDripleaf, BigDripleafStem, PointedDripstone, DoublePlantTop, Carpet, Azalea, LeafLitter, Farmland,
-        CactusFlower
+        CactusFlower,
+        FloorSupport,  // torches, rails, pressure plates, doors, redstone parts, signs, banners: needs a floor
+        WallAttached,  // wall torches, ladders, wall signs/banners/heads: needs the block behind `facing`
+        FaceAttached   // buttons, levers, grindstones: floor, wall or ceiling by `face`
     };
     const BlockRegistry& reg_;
     std::vector<Kind> kind_; // per block index

@@ -169,3 +169,73 @@ TEST(Glob, Matches) {
     EXPECT_TRUE(globMatch("stone", "stone"));
     EXPECT_FALSE(globMatch("stone", "stones"));
 }
+
+namespace {
+
+// Union bounds of a shape (empty shape: all zero).
+AABB boundsOf(const Shape& s) {
+    if (s.empty()) return {};
+    AABB b = s[0];
+    for (const AABB& a : s) b = AABB(glm::min(b.min, a.min), glm::max(b.max, a.max));
+    return b;
+}
+
+void expectBox(const AABB& a, double x0, double y0, double z0, double x1, double y1, double z1) {
+    EXPECT_NEAR(a.min.x, x0 / 16, 1e-6);
+    EXPECT_NEAR(a.min.y, y0 / 16, 1e-6);
+    EXPECT_NEAR(a.min.z, z0 / 16, 1e-6);
+    EXPECT_NEAR(a.max.x, x1 / 16, 1e-6);
+    EXPECT_NEAR(a.max.y, y1 / 16, 1e-6);
+    EXPECT_NEAR(a.max.z, z1 / 16, 1e-6);
+}
+
+} // namespace
+
+TEST_F(RegistryFixture, Shapes) {
+    const BlockRegistry& r = *registry;
+    auto P = [&](const char* text) { return *r.parse(text); };
+    // Full cubes share the same table entry.
+    EXPECT_EQ(r.info(P("stone")).collision, 1);
+    EXPECT_EQ(r.info(P("oak_leaves")).outline, 1);
+    EXPECT_TRUE(r.collisionShape(P("air")).empty());
+    EXPECT_TRUE(r.outlineShape(P("water")).empty());
+    // Slabs and stairs from their models.
+    ASSERT_EQ(r.collisionShape(P("oak_slab[type=bottom]")).size(), 1u);
+    expectBox(r.collisionShape(P("oak_slab[type=bottom]"))[0], 0, 0, 0, 16, 8, 16);
+    expectBox(boundsOf(r.collisionShape(P("oak_slab[type=top]"))), 0, 8, 0, 16, 16, 16);
+    const Shape& stairs = r.collisionShape(P("oak_stairs[facing=east,half=bottom,shape=straight]"));
+    ASSERT_EQ(stairs.size(), 2u);
+    expectBox(stairs[0], 0, 0, 0, 16, 8, 16);
+    expectBox(stairs[1], 8, 8, 0, 16, 16, 16); // the step rises toward the facing side
+    // A closed door facing north sits on the south edge; a ladder facing north too.
+    expectBox(boundsOf(r.collisionShape(P("oak_door[facing=north,half=lower,hinge=left,open=false,powered=false]"))), 0, 0,
+              13, 16, 16, 16);
+    expectBox(boundsOf(r.outlineShape(P("ladder[facing=north]"))), 0, 0, 13, 16, 16, 16);
+    // Fences and walls: taller collision than outline.
+    const StateId fence = P("oak_fence[north=true,south=false,east=false,west=false,waterlogged=false]");
+    expectBox(boundsOf(r.collisionShape(fence)), 6, 0, 0, 10, 24, 10);
+    expectBox(boundsOf(r.outlineShape(fence)), 6, 0, 0, 10, 16, 10);
+    EXPECT_NEAR(boundsOf(r.collisionShape(P("cobblestone_wall[up=true]"))).max.y, 1.5, 1e-6);
+    // Plants: nothing to collide with, but an outline to aim at.
+    EXPECT_TRUE(r.collisionShape(P("poppy")).empty());
+    const AABB poppy = boundsOf(r.outlineShape(P("poppy")));
+    EXPECT_GT(poppy.size().x, 0.3);
+    EXPECT_GT(poppy.size().y, 0.3);
+    EXPECT_TRUE(r.collisionShape(P("vine[north=true]")).empty());
+    EXPECT_FALSE(r.outlineShape(P("vine[north=true]")).empty());
+    // Snow layers collide one layer lower than they look.
+    EXPECT_TRUE(r.collisionShape(P("snow[layers=1]")).empty());
+    expectBox(boundsOf(r.collisionShape(P("snow[layers=8]"))), 0, 0, 0, 16, 14, 16);
+    expectBox(boundsOf(r.outlineShape(P("snow[layers=8]"))), 0, 0, 0, 16, 16, 16);
+    // Code-rendered blocks.
+    expectBox(boundsOf(r.collisionShape(P("chest[facing=north,type=single]"))), 1, 0, 1, 15, 14, 15);
+    expectBox(boundsOf(r.collisionShape(P("red_bed[facing=north,part=head]"))), 0, 0, 0, 16, 9, 16);
+    EXPECT_TRUE(r.collisionShape(P("oak_sign[rotation=0]")).empty());
+    expectBox(boundsOf(r.collisionShape(P("cactus[age=0]"))), 1, 0, 1, 15, 15, 15);
+    // Every state's shapes stay near its block (fence collision rises to 1.5, piston arms reach 4/16 below).
+    for (size_t s = 0; s < r.stateCount(); ++s)
+        for (const AABB& a : r.collisionShape(StateId(s))) {
+            EXPECT_GE(a.min.y, -0.25 - 1e-6) << r.describe(StateId(s));
+            EXPECT_LE(a.max.y, 1.5 + 1e-6) << r.describe(StateId(s));
+        }
+}

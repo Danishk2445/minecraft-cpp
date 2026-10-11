@@ -51,6 +51,14 @@ BlockRules::BlockRules(const BlockRegistry& reg) : reg_(reg), kind_(reg.blockCou
         {"cave_vines_plant", Kind::CaveVines}, {"small_dripleaf", Kind::SmallDripleaf},
         {"big_dripleaf", Kind::BigDripleaf}, {"big_dripleaf_stem", Kind::BigDripleafStem},
         {"pointed_dripstone", Kind::PointedDripstone}, {"leaf_litter", Kind::LeafLitter},
+        {"torch", Kind::FloorSupport},    {"redstone_torch", Kind::FloorSupport}, {"rail", Kind::FloorSupport},
+        {"powered_rail", Kind::FloorSupport}, {"pressure_plate", Kind::FloorSupport},
+        {"weighted_pressure_plate", Kind::FloorSupport}, {"door", Kind::FloorSupport},
+        {"redstone_wire", Kind::FloorSupport}, {"repeater", Kind::FloorSupport}, {"comparator", Kind::FloorSupport},
+        {"sign", Kind::FloorSupport},     {"banner", Kind::FloorSupport},       {"candle", Kind::FloorSupport},
+        {"wall_torch", Kind::WallAttached}, {"redstone_wall_torch", Kind::WallAttached}, {"ladder", Kind::WallAttached},
+        {"wall_sign", Kind::WallAttached}, {"wall_banner", Kind::WallAttached}, {"wall_hanging_sign", Kind::WallAttached},
+        {"button", Kind::FaceAttached},   {"lever", Kind::FaceAttached},
     };
     static const std::unordered_map<std::string_view, Kind> byId = {
         {"short_grass", Kind::Plant},       {"fern", Kind::Plant},           {"bush", Kind::Plant},
@@ -92,7 +100,9 @@ bool BlockRules::supportedFromColumn(StateId state) const {
     case Kind::WallCoral:
     case Kind::Cocoa:
     case Kind::Vine:
-    case Kind::Multiface: return false;
+    case Kind::Multiface:
+    case Kind::WallAttached:
+    case Kind::FaceAttached: return false;
     default: return true;
     }
 }
@@ -197,6 +207,19 @@ bool BlockRules::canSurvive(const BlockGetter& level, StateId state, const Block
     case Kind::Carpet: return !(bi.flags & kAir);
     case Kind::LeafLitter: return level.sturdy(below, Direction::Up);
     case Kind::CactusFlower: return belowIs(cactus_) || belowIs(farmland_) || level.sturdy(below, Direction::Up);
+    case Kind::FloorSupport: return level.sturdy(below, Direction::Up) || (bi.flags & kBlocksMotion);
+    case Kind::WallAttached: {
+        // `facing` points away from the wall the block hangs on.
+        const Direction f = directionFromName(reg_.value(state, "facing")).value_or(Direction::North);
+        return level.sturdy(pos.offset(opposite(f)), f);
+    }
+    case Kind::FaceAttached: {
+        const std::string_view face = reg_.value(state, "face");
+        if (face == "floor") return level.sturdy(below, Direction::Up);
+        if (face == "ceiling") return level.sturdy(above, Direction::Down);
+        const Direction f = directionFromName(reg_.value(state, "facing")).value_or(Direction::North);
+        return level.sturdy(pos.offset(opposite(f)), f);
+    }
     }
     return true;
 }

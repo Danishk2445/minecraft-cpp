@@ -263,6 +263,18 @@ std::unique_ptr<BakedModel> ModelBaker::bakeUncached(const ModelVariant& v) {
             BakedQuad q;
             if (bakeFace(el, d, *face, atlas_.sprite(sprite), rot, v.uvlock, q, sprite)) out->quads.push_back(q);
         }
+        // Shape box: rotate the corners about the block center (exact for 90-degree steps).
+        const glm::vec3 size = el.to - el.from;
+        if (size.x > 0.0f && size.y > 0.0f && size.z > 0.0f) {
+            const glm::vec3 a = rot * (el.from / 16.0f - 0.5f) + 0.5f, b = rot * (el.to / 16.0f - 0.5f) + 0.5f;
+            out->boxes.emplace_back(glm::dvec3(glm::min(a, b)), glm::dvec3(glm::max(a, b)));
+        }
+    }
+    if (!out->quads.empty()) {
+        glm::vec3 lo(1e9f), hi(-1e9f);
+        for (const BakedQuad& q : out->quads)
+            for (const glm::vec3& p : q.pos) lo = glm::min(lo, p), hi = glm::max(hi, p);
+        out->quadBounds = AABB(glm::dvec3(lo), glm::dvec3(hi));
     }
     return out;
 }

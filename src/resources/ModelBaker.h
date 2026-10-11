@@ -40,6 +40,11 @@ uint16_t faceCellMask(Direction d, const std::array<glm::vec3, 4>& pos, bool ove
 
 struct BakedModel {
     std::vector<BakedQuad> quads; // model order: overlays follow their base quads
+    // Element boxes with volume, in block units after the blockstate rotation
+    // (element rotations ignored): the default outline/collision shape.
+    std::vector<AABB> boxes;
+    // Bounds of all quads (flat models such as flowers, vines and rails).
+    AABB quadBounds;
     bool ambientOcclusion = true;
     bool guiLightFront = false;
     bool builtinGenerated = false;

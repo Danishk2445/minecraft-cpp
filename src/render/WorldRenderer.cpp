@@ -27,6 +27,7 @@ WorldRenderer::WorldRenderer(const ClientAssets& assets, const BlockRegistry& re
 WorldRenderer::~WorldRenderer() = default;
 
 bool WorldRenderer::init() {
+    if (!particles_.init()) return false;
     if (!chunks_.init()) return false;
     if (!sky_.init(assets_.pack())) return false;
     lightmap_.init();
@@ -97,6 +98,20 @@ void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int render
     chunks_.renderOpaque(camera, viewProj, assets_.blockAtlasTexture(), renderDistance, fog);
     chunks_.renderTranslucent(camera, viewProj, assets_.blockAtlasTexture(), fog);
     sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick);
+}
+
+void WorldRenderer::renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera,
+                                    glm::ivec2 viewport, float partialTick) {
+    const float aspect = float(viewport.x) / float(std::max(viewport.y, 1));
+    const glm::mat4 viewProj = camera.projection(aspect) * camera.view();
+    const ChunkManager& chunks = level.chunks();
+    auto lightAt = [&chunks](const BlockPos& p) {
+        const Chunk* c = chunks.chunk(ChunkPos::of(p));
+        const uint8_t l = c ? c->lightAt(p.x & 15, p.y, p.z & 15) : packLight(15, 0);
+        return glm::vec2(float(l & 15), float(l >> 4));
+    };
+    lightmap_.bind(1);
+    particles_.render(particles, lightAt, camera, viewProj, assets_.blockAtlas(), assets_.blockAtlasTexture(), partialTick);
 }
 
 } // namespace mc
