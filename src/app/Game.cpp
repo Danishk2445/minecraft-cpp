@@ -16,6 +16,7 @@
 #include "render/Gallery.h"
 #include "render/BlockOverlay.h"
 #include "resources/Language.h"
+#include "render/EntityRenderer.h"
 #include "render/WorldRenderer.h"
 #include "ui/Font.h"
 #include "ui/GuiBatch.h"
@@ -26,6 +27,7 @@
 #include "world/gen/ChunkGenerator.h"
 #include "world/gen/OverworldGenerator.h"
 #include "world/gen/feature/BiomeDecorator.h"
+#include "world/level/Environment.h"
 #include "world/level/Level.h"
 #include "world/storage/ChunkStorage.h"
 #include "world/storage/WorldSave.h"
@@ -168,21 +170,26 @@ bool Game::initWorld() {
             eye.y = (overworld_ ? overworld_->terrainTop(x, z) + 1 : generator->spawnPoint().y) + 12.0;
         }
         player_->pos = eye - glm::dvec3(0.0, player_->eyeHeight(), 0.0);
+        // The float eye height leaves noise (y -60.0000000047 for an eye at -58.38): snap it off.
+        player_->pos.y = std::round(player_->pos.y * 1e6) / 1e6;
     } else {
         player_->pos = generator->spawnPoint();
     }
     player_->oldPos = player_->pos;
     const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
-    player_->yaw = player_->oldYaw = look.x;
-    player_->pitch = player_->oldPitch = look.y;
+    player_->setRotation(look.x, look.y);
     camera_.position = player_->eyePos();
     camera_.yaw = look.x;
     camera_.pitch = look.y;
+    perspective_ = opts_.perspective == "back"    ? Perspective::ThirdPersonBack
+                   : opts_.perspective == "front" ? Perspective::ThirdPersonFront
+                                                  : Perspective::FirstPerson;
     if (!worldDir_.empty())
         if (auto saved = readPlayerFile(worldDir_)) {
             loadPlayer(*player_, *saved, *items_);
             camera_.position = player_->eyePos();
         }
+    eyeHeight_ = oldEyeHeight_ = player_->eyeHeight();
     // Creative starts with a few building blocks until the creative inventory arrives (M8).
     if (player_->mode() == GameMode::Creative && player_->inventory.main[0].empty()) {
         const char* starter[9] = {"stone", "grass_block", "dirt", "cobblestone", "oak_planks", "oak_log", "glass",
@@ -269,6 +276,7 @@ int Game::run() {
 void Game::handleGlobalKeys() {
     const Input& in = window_.input();
     if (in.keyPressed(GLFW_KEY_F11)) window_.toggleFullscreen();
+    if (in.keyPressed(GLFW_KEY_F5)) perspective_ = Perspective((int(perspective_) + 1) % 3);
     if (in.keyPressed(GLFW_KEY_F2)) screenshotRequested_ = true;
     if (in.keyPressed(GLFW_KEY_F3)) showDebug_ = !showDebug_;
     if (in.keyPressed(GLFW_KEY_ESCAPE)) {
@@ -350,10 +358,7 @@ void Game::runCommand(const std::string& line) {
         if (!player_) return;
         player_->pos = player_->oldPos = p;
         player_->velocity = glm::dvec3(0.0);
-        if (rot) {
-            player_->yaw = player_->oldYaw = rot->x;
-            player_->pitch = player_->oldPitch = rot->y;
-        }
+        if (rot) player_->setRotation(rot->x, rot->y);
     };
     src.assertionFailed = [this](const std::string& msg) {
         log::error("assertion failed: {}", msg);
@@ -382,12 +387,16 @@ void Game::tick() {
         // The player waits (vanilla: frozen) until the chunk around it is ready.
         const ChunkPos here = ChunkPos::of(BlockPos::containing(player_->pos));
         if (player_->noPhysics || level_->chunks().isReady(here)) {
-            player_->tick(*level_, readPlayerInput());
+            // Vanilla handles the mouse buttons before the entities tick.
             tickInteraction();
+            player_->tick(*level_, readPlayerInput());
             particles_.tick(*level_);
         } else {
             player_->oldPos = player_->pos;
         }
+        // Vanilla Camera.tick: the eye height eases toward the player's (crouching).
+        oldEyeHeight_ = eyeHeight_;
+        eyeHeight_ += (player_->eyeHeight() - eyeHeight_) * 0.5f;
     }
     attackClicks_ = useClicks_ = pickClicks_ = 0;
     if (level_) level_->tick();
@@ -396,16 +405,33 @@ void Game::tick() {
     if (worldRenderer_) worldRenderer_->tick();
 }
 
+// Vanilla Camera.setup: at the eyes, or for the F5 views up to 4 blocks behind them
+// (in front of them, looking back) but short of the blocks in between.
+void Game::setupCamera(float partialTick) {
+    const glm::dvec3 feet = glm::mix(player_->oldPos, player_->pos, double(partialTick));
+    camera_.position = feet + glm::dvec3(0.0, oldEyeHeight_ + (eyeHeight_ - oldEyeHeight_) * partialTick, 0.0);
+    camera_.yaw = player_->yaw;
+    camera_.pitch = player_->pitch;
+    if (perspective_ == Perspective::FirstPerson) return;
+    if (perspective_ == Perspective::ThirdPersonFront) {
+        camera_.yaw += 180.0f;
+        camera_.pitch = -camera_.pitch;
+    }
+    const glm::dvec3 forward(camera_.forward());
+    camera_.position -= forward * cameraDistance(*level_, camera_.position, forward, 4.0);
+}
+
 void Game::render(float partialTick) {
     const glm::ivec2 fb = window_.framebufferSize();
     if (player_) {
-        camera_.position = glm::mix(player_->oldPos, player_->pos, double(partialTick)) +
-                           glm::dvec3(0.0, player_->eyeHeight(), 0.0);
-        camera_.yaw = player_->yaw;
-        camera_.pitch = player_->pitch;
-        updateTarget();
+        setupCamera(partialTick);
+        updateTarget(partialTick);
     }
     if (worldRenderer_) {
+        EntityRenderer& entities = worldRenderer_->entities();
+        entities.begin(camera_.position);
+        if (perspective_ != Perspective::FirstPerson)
+            entities.submitPlayer(*player_, *level_, partialTick, skyDarkenLevel(level_->dayTime()));
         worldRenderer_->render(camera_, fb, opts_.renderDistance, *level_, partialTick);
         worldRenderer_->renderParticles(particles_, *level_, camera_, fb, partialTick);
         if (target_ && player_->mode() != GameMode::Spectator) {
@@ -422,9 +448,14 @@ void Game::render(float partialTick) {
     if (showDebug_) renderDebugOverlay(fb);
 }
 
+bool Game::controlDown(int key, std::string_view action) const {
+    if (window_.cursorCaptured() && window_.input().keyDown(key)) return true;
+    return std::find(opts_.hold.begin(), opts_.hold.end(), action) != opts_.hold.end();
+}
+
 PlayerInput Game::readPlayerInput() {
     PlayerInput in;
-    const bool jumpDown = window_.cursorCaptured() && window_.input().keyDown(GLFW_KEY_SPACE);
+    const bool jumpDown = controlDown(GLFW_KEY_SPACE, "jump");
     // Vanilla double-tap: a second jump press within 7 ticks toggles creative flight.
     if (jumpTapTimer_ > 0) --jumpTapTimer_;
     if (jumpDown && !jumpWasDown_) {
@@ -436,22 +467,22 @@ PlayerInput Game::readPlayerInput() {
         }
     }
     jumpWasDown_ = jumpDown;
-    if (!window_.cursorCaptured()) return in;
-    const Input& k = window_.input();
-    in.forward = float(k.keyDown(GLFW_KEY_W)) - float(k.keyDown(GLFW_KEY_S));
-    in.strafe = float(k.keyDown(GLFW_KEY_A)) - float(k.keyDown(GLFW_KEY_D));
+    in.forward = float(controlDown(GLFW_KEY_W, "forward")) - float(controlDown(GLFW_KEY_S, "back"));
+    in.strafe = float(controlDown(GLFW_KEY_A, "left")) - float(controlDown(GLFW_KEY_D, "right"));
     in.jump = jumpDown;
-    in.sneak = k.keyDown(GLFW_KEY_LEFT_SHIFT);
-    in.sprint = k.keyDown(GLFW_KEY_LEFT_CONTROL);
+    in.sneak = controlDown(GLFW_KEY_LEFT_SHIFT, "sneak");
+    in.sprint = controlDown(GLFW_KEY_LEFT_CONTROL, "sprint");
     return in;
 }
 
-void Game::updateTarget() {
+void Game::updateTarget(float partialTick) {
     target_.reset();
     if (!level_ || !player_) return;
-    // Vanilla block_interaction_range: 4.5, plus 0.5 in creative.
+    // Vanilla block_interaction_range: 4.5, plus 0.5 in creative; from the eyes in every view.
     const double reach = player_->mode() == GameMode::Creative ? 5.0 : 4.5;
-    target_ = raycastBlocks(*level_, camera_.position, glm::dvec3(camera_.forward()), reach);
+    const glm::dvec3 eye =
+        glm::mix(player_->oldPos, player_->pos, double(partialTick)) + glm::dvec3(0.0, player_->eyeHeight(), 0.0);
+    target_ = raycastBlocks(*level_, eye, player_->viewVector(), reach);
 }
 
 // Debris (or, mining, a chip off `face`) with the block's particle texture.
@@ -476,18 +507,19 @@ void Game::breakBlock(const BlockPos& p) {
     level_->setBlockAndUpdate(p, waterlogged ? registry_->defaultState("water") : BlockRegistry::kAirState);
 }
 
-void Game::placeBlock() {
-    if (!target_) return;
+bool Game::placeBlock() {
+    if (!target_) return false;
     ItemStack& held = player_->inventory.selectedStack();
-    if (held.empty() || !held.item->block) return;
+    if (held.empty() || !held.item->block) return false;
     const Block& block = *held.item->block;
     const bool consume = player_->mode() != GameMode::Creative;
     const StateId clicked = level_->getBlock(target_->pos);
     const double hitY = target_->point.y - double(target_->pos.y);
     // A slab clicked on its open half becomes a double slab.
     if (auto merged = mergeIntoClicked(*registry_, clicked, block, target_->face, hitY)) {
-        if (level_->setBlockAndUpdate(target_->pos, *merged) && consume) player_->inventory.consumeSelected();
-        return;
+        if (!level_->setBlockAndUpdate(target_->pos, *merged)) return false;
+        if (consume) player_->inventory.consumeSelected();
+        return true;
     }
     // Clicking a replaceable block (grass, snow layer) places into it; otherwise against the face.
     const bool replace = (registry_->info(clicked).flags & kReplaceable) && registry_->info(clicked).block != block.index;
@@ -502,19 +534,21 @@ void Game::placeBlock() {
     const StateId there = level_->getBlock(ctx.pos);
     if (!(registry_->info(there).flags & (kReplaceable | kAir))) {
         // The neighbor may be a slab this one completes.
-        if (auto merged = mergeIntoClicked(*registry_, there, block, opposite(target_->face), hitY))
-            if (level_->setBlockAndUpdate(ctx.pos, *merged) && consume) player_->inventory.consumeSelected();
-        return;
+        auto merged = mergeIntoClicked(*registry_, there, block, opposite(target_->face), hitY);
+        if (!merged || !level_->setBlockAndUpdate(ctx.pos, *merged)) return false;
+        if (consume) player_->inventory.consumeSelected();
+        return true;
     }
     const auto blocks = placementStates(*registry_, *level_, block, ctx);
-    if (blocks.empty()) return;
+    if (blocks.empty()) return false;
     // Never inside the player.
     const AABB body = player_->box().inflated(-1e-7, -1e-7, -1e-7);
     for (const auto& [p, s] : blocks)
         for (const AABB& b : registry_->collisionShape(s))
-            if (b.moved(glm::dvec3(p.vec())).intersects(body)) return;
+            if (b.moved(glm::dvec3(p.vec())).intersects(body)) return false;
     for (const auto& [p, s] : blocks) level_->setBlockAndUpdate(p, s);
     if (consume) player_->inventory.consumeSelected();
+    return true;
 }
 
 void Game::tickInteraction() {
@@ -525,6 +559,8 @@ void Game::tickInteraction() {
     if (useDelay_ > 0) --useDelay_;
     const Input& in = window_.input();
     const bool captured = window_.cursorCaptured();
+    const bool attackHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_LEFT)) || controlDown(-1, "attack");
+    const bool useHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_RIGHT)) || controlDown(-1, "use");
     // Pick block (creative): the target's block into the selected slot.
     if (pickClicks_ > 0 && target_ && player_->mode() == GameMode::Creative)
         if (const Item* item = items_->forBlock(registry_->blockOf(level_->getBlock(target_->pos))))
@@ -532,24 +568,29 @@ void Game::tickInteraction() {
     // Use: on click, then every 4 ticks while held (vanilla rightClickDelay). Blocks that
     // react to a hand (doors, levers, ...) take the click unless sneaking with an item.
     if (target_ && player_->mode() != GameMode::Spectator &&
-        (useClicks_ > 0 || (captured && in.mouseDown(GLFW_MOUSE_BUTTON_RIGHT) && useDelay_ == 0))) {
+        (useClicks_ > 0 || (useHeld && useDelay_ == 0))) {
         const StateId s = level_->getBlock(target_->pos);
         const bool bypass = player_->crouching && !player_->inventory.selectedStack().empty();
         const auto use = bypass ? std::nullopt : useBlock(*registry_, s, horizontalFacing(player_->yaw));
+        // A successful use swings the arm.
         if (use) {
             if (use->state != s) level_->setBlockAndUpdate(target_->pos, use->state);
             if (use->tickDelay > 0) level_->scheduleTick(target_->pos, registry_->info(use->state).block, use->tickDelay);
-        } else {
-            placeBlock();
+            player_->swing();
+        } else if (placeBlock()) {
+            player_->swing();
         }
         useDelay_ = 4;
     }
     // Attack: creative breaks at once (5-tick pause between blocks); survival accumulates progress.
-    const bool attacking = attackClicks_ > 0 || (captured && in.mouseDown(GLFW_MOUSE_BUTTON_LEFT));
+    // A click swings even at nothing; holding on a block swings every tick (vanilla continueAttack).
+    const bool attacking = attackClicks_ > 0 || attackHeld;
+    if (attackClicks_ > 0 && player_->mode() != GameMode::Spectator) player_->swing();
     if (!attacking || !target_ || player_->mode() == GameMode::Spectator || player_->mode() == GameMode::Adventure) {
         breaking_.active = false;
         return;
     }
+    player_->swing();
     const BlockPos p = target_->pos;
     const StateId s = level_->getBlock(p);
     const Block& block = registry_->blockOf(s);
@@ -578,9 +619,11 @@ void Game::renderHud(glm::ivec2 fb) {
     gui_->begin(fb, autoGuiScale(fb));
     const glm::vec2 c = gui_->size() * 0.5f;
     if (player_->mode() != GameMode::Spectator) {
-        // Crosshair (the inverted-color sprite arrives with the GUI milestone).
-        gui_->fill(c.x - 4.5f, c.y - 0.5f, c.x + 4.5f, c.y + 0.5f, 0xE0FFFFFF);
-        gui_->fill(c.x - 0.5f, c.y - 4.5f, c.x + 0.5f, c.y + 4.5f, 0xE0FFFFFF);
+        // Crosshair, first person only (the inverted-color sprite arrives with the GUI milestone).
+        if (perspective_ == Perspective::FirstPerson) {
+            gui_->fill(c.x - 4.5f, c.y - 0.5f, c.x + 4.5f, c.y + 0.5f, 0xE0FFFFFF);
+            gui_->fill(c.x - 0.5f, c.y - 4.5f, c.x + 0.5f, c.y + 4.5f, 0xE0FFFFFF);
+        }
         // Hotbar: slot numbers and counts with the selected item's name (icons arrive with the GUI milestone).
         const Inventory& inv = player_->inventory;
         const float y = gui_->size().y - 14.0f;

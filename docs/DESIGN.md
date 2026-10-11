@@ -154,6 +154,70 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
 - **Implementation** (`entity/Player`, `entity/Physics`): unit tests pin the jump apex (1.2522), walk, sprint and sneak speeds, slab stepping, ledge guarding, ladder climbing (0.1176 blocks per tick), creative flight (10.92 m/s) and swimming. Collision shapes come from model elements with vanilla overrides (`world/block/BlockShapes.cpp`): fence and wall collision is 1.5 tall, snow layers collide one layer lower, cactus, soul sand, mud and honey are inset.
 - **Fall damage:** `ceil(fallDistance - 3)`.
 
+## Entity models (`entity/model`, `render/EntityRenderer`)
+- **ModelPart:** parts hold boxes (`addBox(x, y, z, w, h, d)` in model units of 1/16 block, y pointing down) and a pose. A part's matrix is `T(offset/16)·Rz·Ry·Rx·S(scale)` on top of its parent's. `grow` inflates a box but not its UVs; `mirror` swaps the box's x sides in the texture.
+- **Box UV** for a w×h×d box at texOffs (u0, v0):
+  ```
+  u: l = u0, m = l + d, n = m + w, o = n + w, p = n + d, q = p + w
+  v: r = v0, s = r + d, t = s + h
+  down (m,r)-(n,s)   up (n,s)-(o,r)     west (l,s)-(m,t)
+  north (m,s)-(n,t)  east (n,s)-(p,t)   south (p,s)-(q,t)
+  ```
+- **Entity lighting:** two world-space lights, `(0.2, 1, −0.7)` and `(−0.2, 1, 0.7)` normalized; `shade = min(1, 0.4 + 0.6·Σ max(0, n·l))`. Models are also multiplied by the lightmap at the entity's eye block.
+- **Block entities** (chests, beds, signs, banners, heads, shulker boxes, the bell, the pot, the conduit) are baked per block state into the chunk mesh, in the cutout layer. They take the cell's flat light, and their textures go in the block atlas. Transforms into the block:
+
+  | Kind | Transform (yRot: south 0, west 90, north 180, east 270) |
+  |---|---|
+  | chest | `T(.5)·Ry(−yRot)·T(−.5)` (the chest layers are y-up) |
+  | bed | `T(0, .5625, 0)·Rx(90°)·T(.5)·Rz(180 + yRot)·T(−.5)` |
+  | sign | `T(.5)·Ry(−deg)·[wall: T(0, −.3125, −.4375)]·S(2/3, −2/3, −2/3)`, deg = rotation·22.5 or yRot |
+  | hanging sign | `T(.5, .9375, .5)·Ry(−deg)·T(0, −.3125, 0)·S(1, −1, −1)`, drawn from both sides |
+  | banner | `T(.5, 0, .5)·Ry(−deg)·S(2/3, −2/3, −2/3)`; the flag is tinted by the dye color |
+  | head | floor `T(.5, 0, .5)·S(−1, −1, 1)·Ry(rotation·22.5)`; wall `T(.5 − .25·dx, .25, .5 − .25·dz)·S(−1, −1, 1)·Ry(yRot(opposite facing))` |
+  | shulker box | `T(.5)·S(.9995)·R(facing)·S(1, −1, −1)·T(0, −1, 0)` |
+  | decorated pot | `T(.5, 0, .5)·Ry(180 − yRot)·T(−.5, 0, −.5)` |
+
+  Placement rotations: signs and banners use `segment(yaw + 180)`, heads `segment(yaw)`. Shulker boxes face the clicked face, and pots face the player's horizontal direction.
+- **Living entities** are placed with `T(feet + offset)·Ry(180 − bodyYaw)·S(−s, −s, s)·T(0, −1.501, 0)`. The player has s = 0.9375 and drops 2/16 when crouching. Its model is 1.875 blocks tall, against a 1.8-block hitbox.
+- **Walk animation (per tick):**
+  ```
+  speed += (min(4·dist, 1) − speed)·0.4     dist = horizontal movement this tick
+  position += speed
+  ```
+  When rendering, `speed(pt) = lerp(speedOld, speed, pt)` and `position(pt) = position − speed·(1 − pt)`.
+- **Body yaw (per tick):**
+  - The target is the movement yaw when the entity moved more than 0.05 blocks. When walking backwards (`|yaw − moveYaw|` in 95..265) it is the movement yaw minus 180. While swinging, it is the look yaw.
+  - `body += wrap(target − body)·0.3`, then the body is kept within 50° of the head.
+  - The head yaw follows the look every tick.
+- **Arm swing:** a swing lasts 6 ticks and restarts only once half done. `attackAnim = swingTime/6`; the interpolation runs on to 1 when the swing wraps to 0.
+- **HumanoidModel.setupAnim** (p = walk position, a = walk speed, angles in radians):
+  ```
+  head.xRot = pitch, head.yRot = headYaw − bodyYaw
+  rightArm.xRot = cos(0.6662p + π)·a        leftArm.xRot = cos(0.6662p)·a
+  rightLeg.xRot = cos(0.6662p)·1.4a         leftLeg.xRot = cos(0.6662p + π)·1.4a
+  legs: yRot ±0.005, zRot ±0.005
+  holding an item:  arm.xRot = arm.xRot·0.5 − π/10
+  swing t > 0:      body.yRot = sin(√t·2π)·0.2 (negated for the left arm)
+                    right arm at x = −cos(body.yRot)·5, z = sin(body.yRot)·5 (left arm mirrored)
+                    both arms yRot += body.yRot, left arm xRot += body.yRot
+                    arm.xRot −= sin((1 − (1 − t)⁴)·π)·1.2 + sin(tπ)·(0.7 − head.xRot)·0.75
+                    arm.yRot += 2·body.yRot, arm.zRot −= 0.4·sin(tπ)
+  crouching:        body.xRot = 0.5, arms.xRot += 0.4, legs.z += 4, head.y += 4.2, body.y and arms.y += 3.2
+  idle sway:        right arm zRot += cos(0.09·age)·0.05 + 0.05, xRot += sin(0.067·age)·0.05 (left arm negated)
+  ```
+- **Third person (F5)** cycles first person, behind, and in front:
+  - The camera starts at the eyes. The eye height eases toward its target by `h += (target − h)·0.5` per tick.
+  - The front view adds 180° to the yaw and negates the pitch.
+  - The camera then backs away along −forward by `getMaxZoom(4)`. Eight rays leave from the eye ± 0.1 on each axis, each as long as the zoom found so far. They stop at visual shapes: collision shapes, except that glass and panes have none. A hit shortens the zoom to its distance from the eye.
+  - Targeting always uses the player's eyes and look direction.
+- **Shadows:**
+  - `strength = 1 − d²/256`, with d the distance to the camera.
+  - Shadows cover the blocks within `radius` of the feet (0.5 for the player), for y from `feetY − min(2·strength, radius)` up to `feetY`.
+  - A shadow quad lies on visible, full-collision blocks whose raw light `max(block, sky − skyDarken)` is above 3.
+  - Each quad's alpha is `(strength − (feetY − y)·0.5)·0.5·b/(4 − 3b)`, with b = raw light/15.
+  - `misc/shadow.png` spans 2·radius.
+  - `skyDarken = (int)((1 − (0.5 + 2·clamp(cos 2π·angle, −¼, ¼))·(1 − rain·5/16)·(1 − thunder·5/16))·11)`.
+
 ## Breaking
 - **Progress per tick:** `speed / hardness / (canHarvest ? 30 : 100)`.
   - hardness < 0 means unbreakable; 0 means instant.

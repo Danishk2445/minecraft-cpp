@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <format>
+#include <functional>
 
 #include "core/Log.h"
 
@@ -274,31 +275,17 @@ std::vector<Image> generateMipChain(const Image& base, int mipLevels) {
     return out;
 }
 
-std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::string_view atlasName, int mipLevels,
-                                AtlasStats* stats) {
+namespace {
+
+// Adds the sprites of atlases/<atlasName>.json; false if the definition is missing.
+bool collectSources(const ResourcePack& pack, std::string_view atlasName,
+                    const std::function<void(const std::string&, const ResourceLocation&)>& add, AtlasStats* stats) {
     std::string err;
     const auto def = pack.json(pack.file("minecraft", std::format("atlases/{}.json", atlasName)), &err);
     if (!def) {
         if (stats) stats->errors.push_back(err);
-        return std::nullopt;
+        return false;
     }
-    std::vector<LoadedSprite> loaded;
-    std::unordered_map<std::string, size_t> seen;
-    auto add = [&](const std::string& spriteName, const ResourceLocation& tex) {
-        std::string e;
-        auto s = loadSprite(pack, spriteName, tex, &e);
-        if (!s) {
-            if (stats) stats->errors.push_back(e);
-            return;
-        }
-        if (auto it = seen.find(spriteName); it != seen.end()) {
-            loaded[it->second] = std::move(*s); // later sources override earlier ones
-        } else {
-            seen.emplace(spriteName, loaded.size());
-            loaded.push_back(std::move(*s));
-        }
-    };
-
     for (const auto& src : def->value("sources", Json::array())) {
         const std::string type = canonicalId(jsonGet<std::string>(src, "type", ""));
         if (type == "minecraft:directory") {
@@ -318,7 +305,41 @@ std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::string_view atlas
             log::warn("atlas {}: unsupported source type {}", atlasName, type);
         }
     }
-    return stitch(std::string(atlasName), std::move(loaded), mipLevels, stats);
+    return true;
+}
+
+} // namespace
+
+std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::string_view atlasName, int mipLevels,
+                                AtlasStats* stats) {
+    const std::string_view names[1] = {atlasName};
+    return buildAtlas(pack, names, {}, mipLevels, stats);
+}
+
+std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::span<const std::string_view> atlasNames,
+                                const std::vector<std::string>& extraTextures, int mipLevels, AtlasStats* stats) {
+    std::vector<LoadedSprite> loaded;
+    std::unordered_map<std::string, size_t> seen;
+    auto add = [&](const std::string& spriteName, const ResourceLocation& tex) {
+        std::string e;
+        auto s = loadSprite(pack, spriteName, tex, &e);
+        if (!s) {
+            if (stats) stats->errors.push_back(e);
+            return;
+        }
+        if (auto it = seen.find(spriteName); it != seen.end()) {
+            loaded[it->second] = std::move(*s); // later sources override earlier ones
+        } else {
+            seen.emplace(spriteName, loaded.size());
+            loaded.push_back(std::move(*s));
+        }
+    };
+    for (size_t i = 0; i < atlasNames.size(); ++i)
+        if (!collectSources(pack, atlasNames[i], add, stats) && i == 0) return std::nullopt;
+    for (const std::string& id : extraTextures)
+        if (!seen.contains(canonicalId(id))) add(canonicalId(id), ResourceLocation::parse(id));
+    return stitch(std::string(atlasNames.empty() ? std::string_view("atlas") : atlasNames[0]), std::move(loaded),
+                  mipLevels, stats);
 }
 
 std::optional<Atlas> buildAtlasFromList(const ResourcePack& pack, std::string name,

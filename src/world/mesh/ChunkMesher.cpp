@@ -1,5 +1,7 @@
 #include "world/mesh/ChunkMesher.h"
 
+#include "world/mesh/BlockEntityMeshes.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -445,6 +447,25 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                         fluids.mesh(glm::ivec3(x, y, z), info, tints.at(x, y, z).water, mesh.layers[size_t(fl)],
                                     fl == RenderLayer::Translucent ? &mesh.translucentCenters : nullptr);
                     }
+                    if (options.blockEntities)
+                        if (const auto* quads = options.blockEntities->quads(s)) {
+                            // Block entities: flat light from their own cell, entity shading baked in.
+                            int sky, blk;
+                            lighter.cellLight(glm::ivec3(x, y, z), sky, blk);
+                            auto& verts = mesh.layers[size_t(RenderLayer::Cutout)];
+                            for (const EntityQuad& q : *quads) {
+                                for (int k = 0; k < 4; ++k) {
+                                    const glm::vec3 p = glm::vec3(x, y, z) + q.pos[size_t(k)];
+                                    verts.push_back({packPos(p.x), packPos(p.y), packPos(p.z), uint8_t(blk * 16),
+                                                     uint8_t(sky * 16), packUV(q.uv[size_t(k)].x), packUV(q.uv[size_t(k)].y),
+                                                     uint8_t(std::min(q.color.r + 0.5f, 255.0f)),
+                                                     uint8_t(std::min(q.color.g + 0.5f, 255.0f)),
+                                                     uint8_t(std::min(q.color.b + 0.5f, 255.0f)), 0});
+                                }
+                                if (stats) ++stats->quads;
+                            }
+                            // Fall through: most block-entity models have no quads, the bell's frame does.
+                        }
                     if ((info.flags & kAir) || !(info.flags & kHasGeometry) || info.layer == RenderLayer::Invisible ||
                         (info.flags & kCodeRendered))
                         continue;

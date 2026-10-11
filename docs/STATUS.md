@@ -10,7 +10,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M4 Terrain: climate, density, caves, aquifers, surface, biomes, tags, fluid meshing, translucent sorting, spawn
 - [x] M5 Decoration: DECORATE/MERGE, ores, trees, vegetation, snow/ice, tints/blending
 - [x] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
-- [ ] M7 Entity models: ModelPart, block-entity renderers, player model, F5
+- [x] M7 Entity models: ModelPart, block-entity renderers, player model, F5
 - [ ] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
 - [ ] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
 - [ ] M10 Survival: tools, food, armor, loot, item entities, XP, health, crafting, furnaces, containers, beds, signs
@@ -35,7 +35,6 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 | Biomes: deep dark, pale garden, mangrove swamp | Not generated; neighbors take their place |
 | Powder snow | Generates as snow blocks |
 | Mob variants: cold pig, cow and chicken, warm cow | Temperate model and texture are used instead |
-| Dragon and piglin heads | Plain-cube stand-ins |
 | Sound | None (the pack has no audio) |
 
 ## Deviations from vanilla
@@ -81,3 +80,15 @@ Recorded per milestone.
   - Saves keep only edited chunks: every chunk still generates (so neighbors receive its tree and plant writes), and a saved chunk's blocks replace the generated ones before lighting. Light is not saved. `/assertblock` stands in for the planned `--dump-world-state` diff.
   - Particles: block break and mining debris only (vanilla TerrainParticle); other particle types come with the simulation milestone.
   - The hotbar shows slot counts and the selected item's name; item icons arrive with the GUI milestone. Creative starts with a few building blocks because the creative inventory comes later.
+- **M7:**
+  - Block entities are baked into the chunk meshes as static models.
+    - Chest lids stay shut until container menus arrive (M10). Banners don't wave, and the bell doesn't swing.
+    - They take the flat light of their cell; vanilla lights each block entity at its own position, so the result is the same except for smooth lighting.
+    - Their textures live in the block atlas, so they get mipmaps; vanilla's entity atlases have none.
+  - Banners show their base color only, as planned (no patterns). Decorated pots have no sherds. Sign text is not drawn until signs can be written (M10).
+  - Not drawn: the books of enchanting tables and lecterns, beacon beams, and the contents of spawners, vaults and campfires.
+  - The player is always Steve with wide arms. Vanilla picks one of nine default skins from the player's UUID.
+  - Items in hand are not drawn yet: third-person held items and the first-person hand come with item rendering (M8).
+  - Entity shadows are always on; the option arrives with the options screen (M9).
+  - Spectators see their own head at 15% opacity in third person, with the body hidden, as in vanilla.
+  - The harness's `--hold forward,attack,...` holds controls down for a whole run. It drives the walking, mining and sneaking screenshots.

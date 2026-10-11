@@ -167,6 +167,47 @@ if(XVFB_RUN AND Python3_FOUND)
         --exec "/assertblock 5 -60 3 air" --exit)
     set_tests_properties(gl_save_create PROPERTIES DEPENDS gl_save_clean)
     set_tests_properties(gl_save_reload PROPERTIES DEPENDS gl_save_create)
+
+    # M7: every kind of block entity on a flat world: chests (single, double, trapped,
+    # ender), a bed, signs (standing, wall, hanging), banners, the seven heads, shulker
+    # boxes, the bell, a decorated pot and a conduit.
+    set(MC_BE_COMMANDS
+        "/fill -9 -60 6 9 -57 6 stone" "/fill -8 -60 5 8 -59 5 stone" "/fill -7 -60 4 6 -60 4 stone"
+        "/setblock -8 -60 3 chest[facing=north]" "/setblock -6 -60 3 chest[facing=north,type=left]"
+        "/setblock -5 -60 3 chest[facing=north,type=right]" "/setblock -3 -60 3 trapped_chest[facing=north]"
+        "/setblock -2 -60 3 ender_chest[facing=north]" "/setblock 0 -60 3 red_bed[facing=west,part=foot]"
+        "/setblock -1 -60 3 red_bed[facing=west,part=head]" "/setblock 2 -60 3 oak_sign[rotation=8]"
+        "/setblock 4 -60 3 white_banner[rotation=8]" "/setblock 7 -60 3 shulker_box[facing=up]"
+        "/setblock 8 -60 3 lime_shulker_box[facing=north]" "/setblock -7 -59 4 skeleton_skull[rotation=8]"
+        "/setblock -6 -59 4 wither_skeleton_skull[rotation=8]" "/setblock -5 -59 4 zombie_head[rotation=8]"
+        "/setblock -4 -59 4 creeper_head[rotation=8]" "/setblock -3 -59 4 player_head[rotation=8]"
+        "/setblock -2 -59 4 piglin_head[rotation=8]" "/setblock 0 -59 4 dragon_head[rotation=8]"
+        "/setblock 2 -59 4 stone" "/setblock 2 -58 4 bell[attachment=floor,facing=north]"
+        "/setblock 4 -59 4 decorated_pot[facing=north]" "/setblock 6 -59 4 conduit"
+        "/setblock 3 -58 5 cherry_wall_sign[facing=north]" "/setblock 5 -58 5 blue_wall_banner[facing=north]"
+        "/setblock 7 -56 4 stone" "/setblock 7 -57 4 spruce_hanging_sign[rotation=8,attached=false]")
+    set(MC_BE_ARGS)
+    foreach(cmd IN LISTS MC_BE_COMMANDS)
+        list(APPEND MC_BE_ARGS --exec "${cmd}")
+    endforeach()
+    mc_gl_test(gl_block_entities --gamemode spectator --world-type flat --render-distance 4 --size 1280x720
+        --time 6000 --freeze-time --pos 0.5,-57.2,-5.5 --look 0,22 --wait-chunks ${MC_BE_ARGS}
+        --screenshot ${MC_TEST_RUN}/block_entities.png --exit)
+    mc_py_test(gl_block_entities_check gl_block_entities check_image.py ${MC_TEST_RUN}/block_entities.png
+        --size 1280x720 --no-magenta --min-colors 800)
+    mc_py_test(gl_block_entities_bed gl_block_entities check_image.py ${MC_TEST_RUN}/block_entities.png
+        --region 615,284,690,302 --mean-rgb 146,37,32 --tol 12)
+    mc_py_test(gl_block_entities_chest gl_block_entities check_image.py ${MC_TEST_RUN}/block_entities.png
+        --region 900,290,1000,318 --mean-rgb 97,70,30 --tol 12)
+    mc_py_test(gl_block_entities_shulker gl_block_entities check_image.py ${MC_TEST_RUN}/block_entities.png
+        --region 140,270,190,315 --mean-rgb 77,131,18 --tol 12)
+
+    # M7: the F5 view from behind: the player model (Steve's shirt) with its shadow.
+    mc_gl_test(gl_third_person --world-type flat --gamemode creative --render-distance 4 --size 1280x720 --time 6000
+        --freeze-time --pos 0.5,-58.38,0.5 --look 30,20 --perspective back --wait-chunks --ticks 5
+        --screenshot ${MC_TEST_RUN}/third_person.png --exit)
+    mc_py_test(gl_third_person_check gl_third_person check_image.py ${MC_TEST_RUN}/third_person.png
+        --size 1280x720 --no-magenta --region 590,380,690,460 --mean-rgb 30,109,103 --tol 12)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

@@ -1,5 +1,6 @@
 #include "app/Cli.h"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <format>
@@ -147,6 +148,25 @@ const std::vector<Option>& options() {
              if (aboveTerrain) text.replace(c1 + 1, 1, "nan");
              if (!parseFloats(text, a)) return false;
              o.pos = glm::dvec3(a[0], a[1], a[2]);
+             return true;
+         }},
+        {"--hold", "ACTIONS", "harness: hold these controls down all run (forward, back, left, right, jump, sneak, sprint, attack, use; ','-separated)",
+         [](CliOptions& o, std::string_view v) {
+             static constexpr std::string_view kActions[] = {"forward", "back", "left", "right", "jump",
+                                                             "sneak",   "sprint", "attack", "use"};
+             for (size_t start = 0; start <= v.size();) {
+                 const size_t comma = std::min(v.find(',', start), v.size());
+                 const std::string_view a = v.substr(start, comma - start);
+                 if (std::find(std::begin(kActions), std::end(kActions), a) == std::end(kActions)) return false;
+                 o.hold.emplace_back(a);
+                 start = comma + 1;
+             }
+             return true;
+         }},
+        {"--perspective", "VIEW", "first (default), back or front: first person or the F5 third-person views",
+         [](CliOptions& o, std::string_view v) {
+             if (v != "first" && v != "back" && v != "front") return false;
+             o.perspective = v;
              return true;
          }},
         {"--look", "YAW,PITCH", "start the camera with this rotation (degrees)",

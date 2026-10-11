@@ -39,6 +39,7 @@ struct CliOptions {
     long long seed = 0;
     int renderDistance = 12;
     std::vector<std::string> exec; // commands run once the spawn area is ready
+    std::vector<std::string> hold; // harness: controls held down the whole run (forward, attack, ...)
     bool waitChunks = false;       // harness: also wait until every visible chunk is meshed
     bool gallery = false;          // show the M1 block gallery instead of a world
     std::optional<long long> time; // --time: initial time of day (ticks)
@@ -49,6 +50,7 @@ struct CliOptions {
     // Camera / world placement
     std::optional<glm::dvec3> pos;  // --pos X,Y,Z
     std::optional<glm::vec2> look;  // --look YAW,PITCH (degrees)
+    std::string perspective = "first"; // first | back | front (F5 views)
 
     // Tools
     std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit

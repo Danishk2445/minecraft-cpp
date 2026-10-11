@@ -6,6 +6,11 @@
 
 namespace mc {
 
+glm::dvec3 Entity::viewVector() const {
+    const double y = glm::radians(double(yaw)), p = glm::radians(double(pitch));
+    return {-std::sin(y) * std::cos(p), -std::sin(p), std::cos(y) * std::cos(p)};
+}
+
 AABB Entity::box() const { return boxAt(pos); }
 
 AABB Entity::boxAt(const glm::dvec3& feet) const {

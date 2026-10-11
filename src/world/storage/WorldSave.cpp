@@ -59,8 +59,7 @@ void loadPlayer(Player& p, const Json& j, const ItemRegistry& items) {
     if (auto pos = j.find("pos"); pos != j.end() && pos->is_array() && pos->size() == 3)
         p.pos = p.oldPos = {(*pos)[0].get<double>(), (*pos)[1].get<double>(), (*pos)[2].get<double>()};
     if (auto rot = j.find("rotation"); rot != j.end() && rot->is_array() && rot->size() == 2) {
-        p.yaw = p.oldYaw = (*rot)[0].get<float>();
-        p.pitch = p.oldPitch = (*rot)[1].get<float>();
+        p.setRotation((*rot)[0].get<float>(), (*rot)[1].get<float>());
     }
     if (auto m = gameModeFromName(j.value("mode", std::string("survival")))) p.setMode(*m);
     p.flying = j.value("flying", false) && p.mode() != GameMode::Survival && p.mode() != GameMode::Adventure;

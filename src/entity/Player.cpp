@@ -100,6 +100,7 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
     oldPos = pos;
     oldYaw = yaw;
     oldPitch = pitch;
+    beginLivingTick();
     const bool mayFly = mode_ == GameMode::Creative || mode_ == GameMode::Spectator;
     if (mode_ == GameMode::Spectator) flying = true;
     else if (in.doubleTapJump && mayFly) flying = !flying;
@@ -117,7 +118,9 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
         if (dir != 0) velocity.y += double(dir) * flyingSpeed * 3.0;
     }
 
-    // LivingEntity.aiStep.
+    // LivingEntity.aiStep (serverAiStep first: the swing advances and the head follows the look).
+    updateSwingTime();
+    headYaw = yaw;
     if (jumpDelay_ > 0) --jumpDelay_;
     for (int a = 0; a < 3; ++a)
         if (std::abs(velocity[a]) < 0.003) velocity[a] = 0.0;
@@ -146,8 +149,10 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
         jumpDelay_ = 0;
     }
     travel(level, glm::vec3(strafe * 0.98f, 0.0f, forward * 0.98f), jumping);
+    updateWalkAnimation();
     // Landing ends creative flight (vanilla checks after moving, so taking off works).
     if (flying && onGround && mode_ != GameMode::Spectator) flying = false;
+    turnBody();
 }
 
 void Player::travel(const BlockGetter& level, glm::vec3 input, bool jumping) {

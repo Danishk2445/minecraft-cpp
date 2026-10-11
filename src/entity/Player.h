@@ -3,7 +3,7 @@
 // ladders, swimming, lava, creative flight and spectator noclip.
 #pragma once
 
-#include "entity/Entity.h"
+#include "entity/LivingEntity.h"
 #include "game/Inventory.h"
 
 namespace mc {
@@ -21,7 +21,7 @@ struct PlayerInput {
     bool doubleTapJump = false; // toggles creative flight
 };
 
-class Player : public Entity {
+class Player : public LivingEntity {
 public:
     Player();
 
@@ -34,7 +34,7 @@ public:
     float flyingSpeed = 0.05f;
     Inventory inventory;
 
-    // One game tick: input, movement and collision.
+    // One game tick: input, movement and collision, then the body and limb animation.
     void tick(const BlockGetter& level, const PlayerInput& input);
     float eyeHeight() const { return crouching ? 1.27f : 1.62f; }
     glm::dvec3 eyePos() const { return pos + glm::dvec3(0.0, eyeHeight(), 0.0); }

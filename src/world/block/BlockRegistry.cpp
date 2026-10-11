@@ -58,6 +58,8 @@ const std::unordered_map<std::string_view, std::string_view>& classSchemas() {
         {"bed", "facing:h part:head,foot=foot occupied:bool"},
         {"chest", "facing:h type:single,left,right=single waterlogged:bool"},
         {"ender_chest", "facing:h waterlogged:bool"},
+        {"shulker_box", "facing:6=up"},
+        {"decorated_pot", "facing:h cracked:bool waterlogged:bool"},
         {"furnace", "facing:h lit:bool"},
         {"barrel", "facing:6 open:bool"},
         {"sign", "rotation:0-15 waterlogged:bool"},

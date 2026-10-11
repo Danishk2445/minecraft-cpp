@@ -23,6 +23,12 @@ float celestialAngle(int64_t dayTime, float partialTick) {
     return float((d * 2.0 + e) / 3.0);
 }
 
+int skyDarkenLevel(int64_t dayTime, float rain, float thunder) {
+    const double r = 1.0 - double(rain * 5.0f) / 16.0, t = 1.0 - double(thunder * 5.0f) / 16.0;
+    const double c = 0.5 + 2.0 * std::clamp(double(std::cos(celestialAngle(dayTime, 1.0f) * 2.0f * kPi)), -0.25, 0.25);
+    return int((1.0 - c * r * t) * 11.0);
+}
+
 EnvironmentState computeEnvironment(const EnvironmentInputs& in) {
     EnvironmentState s;
     s.rain = in.rain;

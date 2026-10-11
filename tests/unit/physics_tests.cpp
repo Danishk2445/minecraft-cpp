@@ -11,6 +11,7 @@
 #include "resources/BlockModels.h"
 #include "resources/ResourcePack.h"
 #include "world/block/BlockRegistry.h"
+#include "world/level/Raycast.h"
 
 using namespace mc;
 
@@ -259,4 +260,77 @@ TEST_F(PhysicsFixture, BreakParticles) {
     ps.addBlockHit(*registry, S("stone"), {0, 1, 0}, Direction::Up, 0, 0xFFFFFF);
     ASSERT_EQ(ps.particles().size(), 1u);
     EXPECT_NEAR(ps.particles()[0].pos.y, 2.1, 1e-9);
+}
+
+// Vanilla LivingEntity animation state: limb swing from movement, the body
+// following the movement within 50 degrees of the head, 6-tick arm swings.
+TEST_F(PhysicsFixture, WalkAnimationBodyTurnAndSwing) {
+    TestWorld w(*registry);
+    w.floor(0, S("stone"), 200);
+    PlayerInput walk;
+    walk.forward = 1.0f;
+    Player p = standing(w);
+    EXPECT_FLOAT_EQ(p.walkAnimation.speed, 0.0f);
+    for (int i = 0; i < 40; ++i) p.tick(w, walk);
+    EXPECT_NEAR(p.walkAnimation.speed, std::min(4.317f / 20.0f * 4.0f, 1.0f), 0.01f);
+    EXPECT_NEAR(p.bodyYaw, 0.0f, 0.01f);
+    EXPECT_FLOAT_EQ(p.headYaw, p.yaw);
+
+    // Strafing left (+x while facing +z): the body turns toward -90 but stops 50 short of the head.
+    PlayerInput strafe;
+    strafe.strafe = 1.0f;
+    for (int i = 0; i < 40; ++i) p.tick(w, strafe);
+    EXPECT_NEAR(p.bodyYaw, -50.0f, 0.01f);
+    // Walking backwards keeps the body facing forward.
+    PlayerInput back;
+    back.forward = -1.0f;
+    for (int i = 0; i < 60; ++i) p.tick(w, back);
+    EXPECT_NEAR(wrapDegrees(p.bodyYaw), 0.0f, 0.5f);
+    // Standing still, the limbs come to rest.
+    for (int i = 0; i < 60; ++i) p.tick(w, PlayerInput{});
+    EXPECT_LT(p.walkAnimation.speed, 0.01f);
+
+    // A swing runs 6 ticks; meanwhile the body turns to the look.
+    p.yaw = 120.0f;
+    p.swing();
+    const float expected[] = {0.0f, 1.0f / 6, 2.0f / 6, 3.0f / 6, 4.0f / 6, 5.0f / 6};
+    for (float e : expected) {
+        p.tick(w, PlayerInput{});
+        EXPECT_NEAR(p.attackAnim(1.0f), e, 1e-6f);
+    }
+    EXPECT_GT(wrapDegrees(p.bodyYaw), 100.0f);
+    // When it ends, interpolation runs on to 1 instead of jumping back, then rests.
+    p.tick(w, PlayerInput{});
+    EXPECT_NEAR(p.attackAnim(0.5f), 5.0f / 6 + 0.5f / 6, 1e-6f);
+    p.tick(w, PlayerInput{});
+    EXPECT_NEAR(p.attackAnim(0.5f), 0.0f, 1e-6f);
+}
+
+TEST_F(PhysicsFixture, ViewVectorFollowsYawAndPitch) {
+    Player p;
+    p.setRotation(0.0f, 0.0f);
+    EXPECT_NEAR(p.viewVector().z, 1.0, 1e-9);
+    p.setRotation(90.0f, 0.0f);
+    EXPECT_NEAR(p.viewVector().x, -1.0, 1e-9);
+    p.setRotation(0.0f, 90.0f);
+    EXPECT_NEAR(p.viewVector().y, -1.0, 1e-9);
+}
+
+// Vanilla Camera.getMaxZoom: 4 blocks back unless a block's visual shape is closer.
+TEST_F(PhysicsFixture, ThirdPersonCameraStopsShortOfBlocks) {
+    TestWorld w(*registry);
+    const glm::dvec3 eye(0.5, 10.62, 0.5);
+    const glm::dvec3 forward(0.0, 0.0, 1.0); // looking south: the camera backs away north
+    EXPECT_DOUBLE_EQ(cameraDistance(w, eye, forward, 4.0), 4.0);
+    // A wall whose south face is at z = -2: the corner rays stop there, measured from the eye.
+    for (int y = 8; y <= 13; ++y)
+        for (int x = -2; x <= 2; ++x) w.set({x, y, -3}, S("stone"));
+    EXPECT_NEAR(cameraDistance(w, eye, forward, 4.0), std::sqrt(2.5 * 2.5 + 0.02), 1e-9);
+    // Glass and panes have no visual shape.
+    for (int y = 8; y <= 13; ++y)
+        for (int x = -2; x <= 2; ++x) w.set({x, y, -3}, S("glass"));
+    EXPECT_DOUBLE_EQ(cameraDistance(w, eye, forward, 4.0), 4.0);
+    w.set({0, 10, -1}, S("oak_slab[type=top]"));
+    // The top slab spans y 10.5..11; the upper corner rays (y 10.72) hit its south face at z = 0.
+    EXPECT_NEAR(cameraDistance(w, eye, forward, 4.0), std::sqrt(0.5 * 0.5 + 0.02), 1e-9);
 }

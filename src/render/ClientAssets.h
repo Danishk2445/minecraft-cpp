@@ -6,6 +6,7 @@
 #include <string>
 
 #include "gfx/Texture.h"
+#include "entity/model/BlockEntityModels.h"
 #include "resources/Atlas.h"
 #include "resources/BlockModels.h"
 #include "resources/Model.h"
@@ -31,6 +32,9 @@ public:
     ModelStore& modelStore() { return *models_; }
     ModelBaker& baker() { return *baker_; }
 
+    // Entity models drawn in place of block models (chests, beds, signs, ...).
+    const BlockEntityModels& blockEntityModels() const { return *blockEntityModels_; }
+
     const Colormap& grassColormap() const { return grass_; }
     const Colormap& foliageColormap() const { return foliage_; }
     const Colormap& dryFoliageColormap() const { return dryFoliage_; }
@@ -39,6 +43,7 @@ public:
 
 private:
     std::unique_ptr<ResourcePack> pack_;
+    std::unique_ptr<BlockEntityModels> blockEntityModels_;
     Atlas blockAtlas_;
     Texture blockAtlasTex_;
     std::unique_ptr<AtlasAnimator> animator_;

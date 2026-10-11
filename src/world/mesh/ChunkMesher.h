@@ -15,6 +15,7 @@ namespace mc {
 
 class Atlas;
 class BiomeRegistry;
+class BlockEntityMeshes;
 
 // 16 bytes. Position is section-local in 1/2048 block units offset by 8 blocks,
 // so models may reach from -8 to +24 blocks around the section origin.
@@ -63,6 +64,7 @@ struct MesherOptions {
     int biomeBlend = 2;                  // blend radius in blocks (vanilla default 2 = 5x5)
     FluidSprites fluids;
     glm::vec3 cameraPos{0.0f};           // world position, for the initial translucent sort
+    const BlockEntityMeshes* blockEntities = nullptr; // chests, beds, signs... (null: not drawn)
 };
 
 struct MesherStats {

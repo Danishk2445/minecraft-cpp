@@ -53,6 +53,8 @@
   {"match": "*_bed", "class": "bed"},
   {"match": ["chest", "trapped_chest"], "class": "chest"},
   {"match": "ender_chest", "class": "ender_chest"},
+  {"match": ["shulker_box", "*_shulker_box"], "class": "shulker_box"},
+  {"match": "decorated_pot", "class": "decorated_pot"},
   {"match": ["furnace", "smoker", "blast_furnace"], "class": "furnace"},
   {"match": "barrel", "class": "barrel"},
   {"match": "ladder", "class": "ladder"},

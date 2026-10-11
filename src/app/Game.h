@@ -56,11 +56,14 @@ private:
     void renderDebugOverlay(glm::ivec2 fb);
     void renderHud(glm::ivec2 fb);
     PlayerInput readPlayerInput();
+    // A key or button held down (with the cursor captured), or the harness's --hold action.
+    bool controlDown(int key, std::string_view action) const;
     void tickInteraction();
     void breakBlock(const BlockPos& p);
     void spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face);
-    void placeBlock();
-    void updateTarget();
+    bool placeBlock(); // true when a block was placed
+    void updateTarget(float partialTick);
+    void setupCamera(float partialTick);
     void saveWorld(bool wait);
 
     CliOptions opts_;
@@ -81,6 +84,10 @@ private:
     double fps_ = 0.0;
     Commands commands_;
     Camera camera_;
+    // F5 cycles first person, third person from behind, third person from the front.
+    enum class Perspective : uint8_t { FirstPerson, ThirdPersonBack, ThirdPersonFront };
+    Perspective perspective_ = Perspective::FirstPerson;
+    float eyeHeight_ = 1.62f, oldEyeHeight_ = 1.62f; // the camera's eased eye height
     std::unique_ptr<Player> player_;
     ParticleSystem particles_;
     std::unique_ptr<BlockOverlay> overlay_;

@@ -39,6 +39,9 @@ struct EnvironmentInputs {
 };
 
 float celestialAngle(int64_t dayTime, float partialTick);
+// Vanilla Level.skyDarken (0 by day .. 11 at night): how many levels sky light loses
+// for brightness checks (entity shadows; mob spawning later).
+int skyDarkenLevel(int64_t dayTime, float rain = 0.0f, float thunder = 0.0f);
 EnvironmentState computeEnvironment(const EnvironmentInputs& in);
 
 // Port of shaders/core/lightmap.fsh: RGB 0..1 for [sky][block].

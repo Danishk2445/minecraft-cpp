@@ -44,6 +44,11 @@ void Level::runScheduledTicks() {
     }
 }
 
+uint8_t Level::lightAt(const BlockPos& p) const {
+    const Chunk* c = chunks_.chunk(ChunkPos::of(p));
+    return c ? c->lightAt(p.x & 15, p.y, p.z & 15) : packLight(15, 0);
+}
+
 bool Level::setBlockAndUpdate(const BlockPos& p, StateId state) {
     if (!setBlock(p, state)) return false;
     std::vector<BlockPos> pending{p};

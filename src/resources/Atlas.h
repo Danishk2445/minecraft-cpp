@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -70,6 +71,12 @@ struct AtlasStats {
 // Stitches atlases/<atlasName>.json from the pack. `directory` and `single` sources
 // are supported; `paletted_permutations` (armor trims) is skipped by design.
 std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::string_view atlasName, int mipLevels,
+                                AtlasStats* stats = nullptr);
+
+// Stitches several atlas definitions into one (the first one names it and must
+// exist), plus extra textures by id ("minecraft:entity/bell/bell_body").
+std::optional<Atlas> buildAtlas(const ResourcePack& pack, std::span<const std::string_view> atlasNames,
+                                const std::vector<std::string>& extraTextures, int mipLevels,
                                 AtlasStats* stats = nullptr);
 
 // Stitches an explicit list of textures ("minecraft:block/stone" -> textures/block/stone.png).

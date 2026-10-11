@@ -120,8 +120,10 @@ std::vector<std::pair<BlockPos, StateId>> placementStates(const BlockRegistry& r
         if (!sideClick) return {};
         s = set(reg, s, "facing", directionName(face));
     } else if (cls == "sign" || cls == "banner" || cls == "skull") {
-        // 16 rotations; 0 faces south (toward the player looking north).
-        const int r = int(std::floor((ctx.yaw + 180.0f) * 16.0f / 360.0f + 0.5f)) & 15;
+        // 16 rotations. Signs and banners show their front at rotation 0 to the
+        // south; heads look north at 0, so they take the player's yaw unturned.
+        const float yaw = cls == "skull" ? ctx.yaw : ctx.yaw + 180.0f;
+        const int r = int(std::floor(yaw * 16.0f / 360.0f + 0.5f)) & 15;
         s = set(reg, s, "rotation", std::to_string(r));
     } else if (cls == "rail" || cls == "powered_rail") {
         s = set(reg, s, "shape", axisOf(horizontal) == Axis::X ? "east_west" : "north_south");
@@ -138,6 +140,10 @@ std::vector<std::pair<BlockPos, StateId>> placementStates(const BlockRegistry& r
         s = set(reg, s, "facing", directionName(rotateYClockwise(horizontal)));
     } else if (cls == "lantern") {
         s = set(reg, s, "hanging", face == Direction::Down ? "true" : "false");
+    } else if (cls == "shulker_box") {
+        s = set(reg, s, "facing", directionName(face));
+    } else if (cls == "decorated_pot") {
+        s = set(reg, s, "facing", directionName(horizontal));
     } else if (cls == "end_rod" || cls == "lightning_rod" || cls == "amethyst") {
         s = set(reg, s, "facing", directionName(face));
     } else if (hasProp(reg, *block, "facing")) {

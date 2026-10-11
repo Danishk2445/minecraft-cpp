@@ -29,6 +29,8 @@ public:
     bool inWater = false, inLava = false;
     double waterHeight = 0.0, lavaHeight = 0.0; // how deep the box reaches into each fluid
 
+    // Unit vector of the look direction (vanilla calculateViewVector).
+    glm::dvec3 viewVector() const;
     AABB box() const;
     AABB boxAt(const glm::dvec3& feet) const;
     // Vanilla Entity.move(SELF): collide, step, set collision flags, zero blocked

@@ -8,10 +8,12 @@
 #include "core/JobSystem.h"
 #include "gfx/Camera.h"
 #include "render/ChunkRenderer.h"
+#include "render/EntityRenderer.h"
 #include "render/Environment.h"
 #include "render/ParticleRenderer.h"
 #include "render/SkyRenderer.h"
 #include "world/chunk/ChunkManager.h"
+#include "world/mesh/BlockEntityMeshes.h"
 #include "world/mesh/ChunkMesher.h"
 
 namespace mc {
@@ -30,8 +32,10 @@ public:
     // Main thread, once per frame: drops unloaded chunks and schedules mesh jobs.
     void update(ChunkManager& chunks, JobSystem& jobs);
     void tick(); // 20 Hz: light flicker
-    // Clears to the fog color and draws sky, terrain and clouds.
+    // Clears to the fog color and draws sky, terrain, the entities submitted to
+    // entities() since its begin(), and clouds.
     void render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level, float partialTick);
+    EntityRenderer& entities() { return entities_; }
     const EnvironmentState& environment() const { return env_; }
     // Particles over the world just drawn (uses its lightmap and camera).
     void renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera, glm::ivec2 viewport,
@@ -51,10 +55,12 @@ private:
     glm::dvec3 cameraPos_{0.0};
     SkyRenderer sky_;
     ParticleRenderer particles_;
+    EntityRenderer entities_;
     Lightmap lightmap_;
     LightFlicker flicker_;
     EnvironmentState env_;
     MesherOptions options_;
+    BlockEntityMeshes blockEntities_;
     std::shared_ptr<int> alive_ = std::make_shared<int>(0);
     int inFlight_ = 0;
     uint64_t nextSeq_ = 1;

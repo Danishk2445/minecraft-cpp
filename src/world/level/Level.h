@@ -28,6 +28,8 @@ public:
     int64_t seed() const { return seed_; }
 
     StateId getBlock(const BlockPos& p) const override { return chunks_.getBlock(p); }
+    // Packed light (sky << 4 | block) at p; full sky light where no chunk is loaded.
+    uint8_t lightAt(const BlockPos& p) const;
     // False when the target chunk is not loaded and ready.
     bool setBlock(const BlockPos& p, StateId state) { return chunks_.setBlock(p, state); }
     // setBlock, then the neighbors react (vanilla updateShape: connections, halves,
