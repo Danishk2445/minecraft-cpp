@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#wooden_slabs"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

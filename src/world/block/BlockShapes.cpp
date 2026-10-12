@@ -148,6 +148,16 @@ Override shapeOverride(const BlockRegistry& reg, const Block& b, StateId s) {
     } else if (name == "scaffolding") {
         o.outline = Shape{box(0, 0, 0, 16, 16, 16)};
         o.collision = Shape{box(0, 14, 0, 16, 16, 16)};
+    } else if (name == "pointed_dripstone") {
+        // Vanilla PointedDripstoneBlock: a column narrowing toward the tip.
+        const std::string_view t = reg.value(s, "thickness");
+        const bool up = reg.value(s, "vertical_direction") == "up";
+        const AABB shape = t == "tip_merge" ? box(5, 0, 5, 11, 16, 11)
+                           : t == "tip"     ? (up ? box(5, 0, 5, 11, 11, 11) : box(5, 5, 5, 11, 16, 11))
+                           : t == "frustum" ? box(4, 0, 4, 12, 16, 12)
+                           : t == "middle"  ? box(3, 0, 3, 13, 16, 13)
+                                            : box(2, 0, 2, 14, 16, 14);
+        o.outline = o.collision = Shape{shape};
     } else if (name == "light" || name == "structure_void") {
         o.outline = o.collision = Shape{};
     }

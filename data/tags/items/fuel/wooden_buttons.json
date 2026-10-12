@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#wooden_buttons"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

@@ -447,7 +447,9 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                         fluids.mesh(glm::ivec3(x, y, z), info, tints.at(x, y, z).water, mesh.layers[size_t(fl)],
                                     fl == RenderLayer::Translucent ? &mesh.translucentCenters : nullptr);
                     }
-                    if (options.blockEntities)
+                    if (options.blockEntities &&
+                        !(options.dynamicBlockEntities &&
+                          options.dynamicBlockEntities->contains(BlockPos(wx0 + x, minY + y, wz0 + z))))
                         if (const auto* quads = options.blockEntities->quads(s)) {
                             // Block entities: flat light from their own cell, entity shading baked in.
                             int sky, blk;

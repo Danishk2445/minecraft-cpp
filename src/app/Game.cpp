@@ -15,7 +15,9 @@
 #include "core/Log.h"
 #include "game/CreativeTabs.h"
 #include "game/Item.h"
+#include "game/Loot.h"
 #include "game/Menu.h"
+#include "game/Recipes.h"
 #include "gfx/GL.h"
 #include "gfx/Screenshot.h"
 #include "gfx/Shader.h"
@@ -23,10 +25,13 @@
 #include "render/Gallery.h"
 #include "resources/Language.h"
 #include "ui/Chat.h"
+#include "ui/ContainerScreens.h"
 #include "ui/CreativeScreen.h"
+#include "ui/DeathScreen.h"
 #include "ui/GameMenuScreens.h"
 #include "ui/GuiGraphics.h"
 #include "ui/InventoryScreen.h"
+#include "ui/SignEditScreen.h"
 #include "ui/TitleScreens.h"
 #include "world/biome/Biome.h"
 #include "world/block/BlockRegistry.h"
@@ -303,6 +308,20 @@ bool Game::loadRegistries() {
     log::info("Items: {}", client_.items->size());
     client_.creativeTabs = std::make_unique<CreativeTabs>();
     if (!client_.creativeTabs->load(cli.dataDir, *client_.items, &err)) log::warn("creative tabs: {}", err);
+    client_.recipes = std::make_unique<RecipeBook>();
+    if (!client_.recipes->load(cli.dataDir, *client_.items, &err)) {
+        int shown = 0;
+        for (size_t start = 0; start < err.size() && shown < 20; ++shown) {
+            const size_t end = err.find('\n', start);
+            log::warn("recipes: {}", err.substr(start, end - start));
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+    }
+    log::info("Recipes: {}", client_.recipes->recipes().size());
+    client_.loot = std::make_unique<BlockLoot>();
+    if (!client_.loot->load(cli.dataDir / "loot" / "blocks.json", *client_.registry, *client_.items, &err))
+        log::warn("block loot: {}", err.substr(0, err.find('\n')));
     client_.biomes = std::make_unique<BiomeRegistry>();
     if (!client_.biomes->load(cli.dataDir, cli.assetsDir, &err)) {
         log::error("biomes: {}", err);
@@ -323,6 +342,8 @@ void Game::shutdown() {
     // Jobs reference the registries and assets until the pool is joined.
     client_.jobs.reset();
     client_.creativeTabs.reset();
+    client_.recipes.reset();
+    client_.loot.reset();
     client_.items.reset();
     client_.biomes.reset();
     client_.registry.reset();
@@ -386,6 +407,16 @@ void Game::sendChat(const std::string& line) {
     } else {
         client_.chat->addMessage("<Player> " + line, tickCount_);
     }
+}
+
+void Game::leaveBed() {
+    if (world_) world_->wakeUp();
+}
+
+void Game::respawn() {
+    if (!world_) return;
+    world_->respawnPlayer();
+    setScreen(nullptr);
 }
 
 WorldLoadStatus Game::worldLoadStatus() const { return world_ ? world_->loadStatus() : WorldLoadStatus{}; }
@@ -466,6 +497,33 @@ std::unique_ptr<Screen> Game::makeScreen(const std::string& name) {
     if (name == "worlds") return std::make_unique<SelectWorldScreen>(ctx);
     if (name == "create") return std::make_unique<CreateWorldScreen>(ctx);
     if (name == "pause") return std::make_unique<PauseScreen>(ctx);
+    if (name == "sleep") return std::make_unique<SleepScreen>(ctx, *client_.chat);
+    if (name == "sign" && world_ && world_->editingSign()) {
+        auto sign = world_->editingSign();
+        const StateId state = world_->level().getBlock(sign->pos);
+        const Block& block = client_.registry->blockOf(state);
+        std::string wood(shortId(block.id));
+        for (const char* suffix : {"_wall_hanging_sign", "_hanging_sign", "_wall_sign", "_sign"})
+            if (wood.ends_with(suffix)) {
+                wood.resize(wood.size() - std::string_view(suffix).size());
+                break;
+            }
+        return std::make_unique<SignEditScreen>(ctx, sign, world_->editingFront(), wood, block.className == "sign",
+                                                [this] {
+                                                    if (world_) world_->stopEditingSign();
+                                                });
+    }
+    if (name == "container" && world_) {
+        Menu* menu = world_->openMenu();
+        if (auto* m = dynamic_cast<CraftingMenu*>(menu)) return std::make_unique<CraftingScreen>(ctx, *m, world_->player());
+        if (auto* m = dynamic_cast<ChestMenu*>(menu)) return std::make_unique<ChestScreen>(ctx, *m, world_->player(), m->title);
+        if (auto* m = dynamic_cast<FurnaceMenu*>(menu)) return std::make_unique<FurnaceScreen>(ctx, *m, world_->player());
+    }
+    if (name == "death" && world_) {
+        const Player& p = world_->player();
+        return std::make_unique<DeathScreen>(ctx, ctx.translate(std::string(p.deathMessageKey()), {"Player"}), p.score,
+                                             world_->hardcore());
+    }
     if (name == "options") return std::make_unique<OptionsScreen>(ctx);
     if (name == "video") return std::make_unique<VideoSettingsScreen>(ctx);
     if (name == "chat" || name == "command") return std::make_unique<ChatScreen>(ctx, *client_.chat, name == "command" ? "/" : "");
@@ -528,6 +586,7 @@ int Game::run() {
             }
             if (!harnessStarted_ && client_.cli.worldRequested && world_->viewReady()) {
                 harnessStarted_ = true;
+                harnessStartTick_ = tickCount_;
                 for (const auto& cmd : client_.cli.exec)
                     world_->runCommand(cmd, [](const std::string& msg) { log::info("[command] {}", msg); });
                 openHarnessScreen();
@@ -602,7 +661,16 @@ void Game::tick() {
     client_.assets->tick();
     // Single player pauses under pause screens (vanilla Minecraft.pause).
     const bool paused = screen() && screen()->isPauseScreen();
-    if (world_ && !paused) world_->tick();
+    if (world_ && !paused) {
+        world_->tick();
+        if (const std::string request = world_->takePendingScreen(); request == "close") {
+            if (dynamic_cast<ContainerScreen*>(screen()) || dynamic_cast<SleepScreen*>(screen()) ||
+                dynamic_cast<SignEditScreen*>(screen()))
+                setScreen(nullptr);
+        } else if (!request.empty()) {
+            if (auto s = makeScreen(request)) setScreen(std::move(s));
+        }
+    }
     if (screen()) screen()->tick();
 }
 
@@ -683,7 +751,9 @@ void Game::afterFrame() {
     const bool harness = !cli.screenshot.empty() || cli.exitAfter;
     if (!harness || frameCount_ < std::max(cli.frames, 1) || tickCount_ < cli.ticks) return;
     if (world_ && cli.worldRequested && (!cli.exec.empty() || cli.waitChunks || !cli.screen.empty())) {
-        if (!harnessStarted_) return;
+        // Here --ticks counts from when the world was ready and the --exec commands ran, so
+        // a slow start (sanitizers, llvmpipe) doesn't use them up.
+        if (!harnessStarted_ || tickCount_ - harnessStartTick_ < cli.ticks) return;
         if (cli.waitChunks && !world_->viewMeshed()) return;
     }
     harnessDone_ = true;

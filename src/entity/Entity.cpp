@@ -1,6 +1,7 @@
 #include "entity/Entity.h"
 
 #include <cmath>
+#include <limits>
 
 #include "entity/Physics.h"
 
@@ -16,6 +17,42 @@ AABB Entity::box() const { return boxAt(pos); }
 AABB Entity::boxAt(const glm::dvec3& feet) const {
     const double hw = width / 2.0;
     return AABB(feet.x - hw, feet.y, feet.z - hw, feet.x + hw, feet.y + height, feet.z + hw);
+}
+
+bool Entity::insideBlocks(const BlockGetter& level) const {
+    return !noCollision(level, box().inflated(-1e-7, -1e-7, -1e-7));
+}
+
+void Entity::moveTowardsClosestSpace(const BlockGetter& level, float random01) {
+    const AABB b = box();
+    const glm::dvec3 center((b.min.x + b.max.x) / 2.0, (b.min.y + b.max.y) / 2.0, (b.min.z + b.max.z) / 2.0);
+    const BlockPos cell = BlockPos::containing(center);
+    const glm::dvec3 local = center - glm::dvec3(cell.x, cell.y, cell.z);
+    auto fullBlock = [&](const BlockPos& p) {
+        const Shape& shape = level.registry().collisionShape(level.getBlock(p));
+        return shape.size() == 1 && shape[0].min == glm::dvec3(0.0) && shape[0].max == glm::dvec3(1.0);
+    };
+    // North, south, west, east, up: the nearest open side wins, up on ties (it is checked last
+    // with < but starts as the default).
+    struct Side {
+        glm::ivec3 step;
+        int axis;
+    };
+    static constexpr Side kSides[] = {{{0, 0, -1}, 2}, {{0, 0, 1}, 2}, {{-1, 0, 0}, 0}, {{1, 0, 0}, 0}, {{0, 1, 0}, 1}};
+    Side best = kSides[4];
+    double bestDistance = std::numeric_limits<double>::max();
+    for (const Side& side : kSides) {
+        if (fullBlock(cell.offset(side.step.x, side.step.y, side.step.z))) continue;
+        const int sign = side.step[side.axis];
+        const double d = sign > 0 ? 1.0 - local[side.axis] : local[side.axis];
+        if (d < bestDistance) {
+            bestDistance = d;
+            best = side;
+        }
+    }
+    const double push = double(random01 * 0.2f + 0.1f) * double(best.step[best.axis]);
+    velocity *= 0.75;
+    velocity[best.axis] = push;
 }
 
 BlockPos Entity::blockBelow() const {
@@ -40,9 +77,18 @@ void Entity::move(const BlockGetter& level, glm::dvec3 delta) {
     verticalCollision = delta.y != moved.y;
     verticalCollisionBelow = verticalCollision && delta.y < 0.0;
     onGround = verticalCollisionBelow;
-    // Falling distance accumulates while airborne (fall damage arrives with survival).
-    if (onGround) fallDistance = 0.0f;
-    else if (moved.y < 0.0) fallDistance -= float(moved.y);
+    // Falling distance accumulates (the landing tick's drop included, as in 1.21.5+); landing
+    // records it for fall damage (vanilla checkFallDamage), with the block landed on (0.2
+    // below the feet, or under that when it is air, as on a fence).
+    if (!inWater && moved.y < 0.0) fallDistance -= double(float(moved.y));
+    if (onGround) {
+        if (fallDistance > 0.0) {
+            landedFall = fallDistance;
+            landedOn = BlockPos(int(std::floor(pos.x)), int(std::floor(pos.y - 0.2)), int(std::floor(pos.z)));
+            if (level.registry().info(level.getBlock(landedOn)).flags & kAir) landedOn = landedOn.offset(0, -1, 0);
+        }
+        fallDistance = 0.0;
+    }
     if (xBlocked) velocity.x = 0.0;
     if (zBlocked) velocity.z = 0.0;
     if (verticalCollision) velocity.y = 0.0;
@@ -77,7 +123,7 @@ void Entity::updateFluidState(const BlockGetter& level) {
     lavaHeight = lava;
     inWater = water > 0.0;
     inLava = lava > 0.0;
-    if (inWater) fallDistance = 0.0f;
+    if (inWater) fallDistance = 0.0;
 }
 
 } // namespace mc

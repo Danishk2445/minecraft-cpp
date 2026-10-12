@@ -199,5 +199,374 @@
       "rarity": "uncommon"
     }
   ],
-  "_comment_equipment": "equipment_rules: the slot armor-like items equip to (first match). rarity_rules: name colors (uncommon yellow, rare aqua, epic light purple); first match wins, default common."
+  "_comment_equipment": "equipment_rules: the slot armor-like items equip to (first match). rarity_rules: name colors (uncommon yellow, rare aqua, epic light purple); first match wins, default common.",
+  "_comment_stats": "Tools, armor, durability and food follow vanilla 1.21.8 (Items, ToolMaterial, ArmorMaterials, Foods). Tool items are named <tier>_<kind>; attack damage and speed are vanilla's attribute modifiers, added to the player's base 1 damage and 4 attacks per second.",
+  "tools": {
+    "tiers": {
+      "wooden": {
+        "level": 0,
+        "speed": 2,
+        "durability": 59,
+        "damage": 0
+      },
+      "stone": {
+        "level": 1,
+        "speed": 4,
+        "durability": 131,
+        "damage": 1
+      },
+      "iron": {
+        "level": 2,
+        "speed": 6,
+        "durability": 250,
+        "damage": 2
+      },
+      "golden": {
+        "level": 0,
+        "speed": 12,
+        "durability": 32,
+        "damage": 0
+      },
+      "diamond": {
+        "level": 3,
+        "speed": 8,
+        "durability": 1561,
+        "damage": 3
+      },
+      "netherite": {
+        "level": 4,
+        "speed": 9,
+        "durability": 2031,
+        "damage": 4
+      }
+    },
+    "kinds": {
+      "sword": {
+        "damage": 3,
+        "speed": -2.4
+      },
+      "pickaxe": {
+        "damage": 1,
+        "speed": -2.8
+      },
+      "shovel": {
+        "damage": 1.5,
+        "speed": -3.0
+      },
+      "axe": {
+        "damage": {
+          "wooden": 6,
+          "stone": 7,
+          "iron": 6,
+          "golden": 6,
+          "diamond": 5,
+          "netherite": 5
+        },
+        "speed": {
+          "wooden": -3.2,
+          "stone": -3.2,
+          "iron": -3.1,
+          "golden": -3.0,
+          "diamond": -3.0,
+          "netherite": -3.0
+        }
+      },
+      "hoe": {
+        "damage": {
+          "wooden": 0,
+          "stone": -1,
+          "iron": -2,
+          "golden": 0,
+          "diamond": -3,
+          "netherite": -4
+        },
+        "speed": {
+          "wooden": -3.0,
+          "stone": -2.0,
+          "iron": -1.0,
+          "golden": -3.0,
+          "diamond": 0.0,
+          "netherite": 0.0
+        }
+      }
+    }
+  },
+  "armor": {
+    "_comment": "defense per piece: boots, leggings, chestplate, helmet; durability = base x the piece's multiplier",
+    "multipliers": {
+      "boots": 13,
+      "leggings": 15,
+      "chestplate": 16,
+      "helmet": 11
+    },
+    "materials": {
+      "leather": {
+        "durability": 5,
+        "defense": [
+          1,
+          2,
+          3,
+          1
+        ]
+      },
+      "chainmail": {
+        "durability": 15,
+        "defense": [
+          1,
+          4,
+          5,
+          2
+        ]
+      },
+      "iron": {
+        "durability": 15,
+        "defense": [
+          2,
+          5,
+          6,
+          2
+        ]
+      },
+      "golden": {
+        "durability": 7,
+        "defense": [
+          1,
+          3,
+          5,
+          2
+        ]
+      },
+      "diamond": {
+        "durability": 33,
+        "defense": [
+          3,
+          6,
+          8,
+          3
+        ],
+        "toughness": 2
+      },
+      "netherite": {
+        "durability": 37,
+        "defense": [
+          3,
+          6,
+          8,
+          3
+        ],
+        "toughness": 3,
+        "knockback_resistance": 0.1
+      },
+      "turtle": {
+        "durability": 25,
+        "defense": [
+          2,
+          5,
+          6,
+          2
+        ]
+      }
+    }
+  },
+  "durability": {
+    "bow": 384,
+    "crossbow": 465,
+    "flint_and_steel": 64,
+    "shears": 238,
+    "fishing_rod": 64,
+    "shield": 336,
+    "trident": 250,
+    "elytra": 432,
+    "carrot_on_a_stick": 25,
+    "warped_fungus_on_a_stick": 100,
+    "brush": 64,
+    "mace": 500
+  },
+  "_comment_food": "nutrition, saturation (vanilla nutrition x modifier x 2); always: edible when not hungry; ticks: use time (default 32); remainder: what is left",
+  "food": {
+    "apple": {
+      "nutrition": 4,
+      "saturation": 2.4
+    },
+    "baked_potato": {
+      "nutrition": 5,
+      "saturation": 6.0
+    },
+    "beef": {
+      "nutrition": 3,
+      "saturation": 1.8
+    },
+    "beetroot": {
+      "nutrition": 1,
+      "saturation": 1.2
+    },
+    "beetroot_soup": {
+      "nutrition": 6,
+      "saturation": 7.2,
+      "remainder": "bowl"
+    },
+    "bread": {
+      "nutrition": 5,
+      "saturation": 6.0
+    },
+    "carrot": {
+      "nutrition": 3,
+      "saturation": 3.6
+    },
+    "chicken": {
+      "nutrition": 2,
+      "saturation": 1.2
+    },
+    "chorus_fruit": {
+      "nutrition": 4,
+      "saturation": 2.4,
+      "always": true
+    },
+    "cod": {
+      "nutrition": 2,
+      "saturation": 0.4
+    },
+    "cooked_beef": {
+      "nutrition": 8,
+      "saturation": 12.8
+    },
+    "cooked_chicken": {
+      "nutrition": 6,
+      "saturation": 7.2
+    },
+    "cooked_cod": {
+      "nutrition": 5,
+      "saturation": 6.0
+    },
+    "cooked_mutton": {
+      "nutrition": 6,
+      "saturation": 9.6
+    },
+    "cooked_porkchop": {
+      "nutrition": 8,
+      "saturation": 12.8
+    },
+    "cooked_rabbit": {
+      "nutrition": 5,
+      "saturation": 6.0
+    },
+    "cooked_salmon": {
+      "nutrition": 6,
+      "saturation": 9.6
+    },
+    "cookie": {
+      "nutrition": 2,
+      "saturation": 0.4
+    },
+    "dried_kelp": {
+      "nutrition": 1,
+      "saturation": 0.6,
+      "ticks": 16
+    },
+    "enchanted_golden_apple": {
+      "nutrition": 4,
+      "saturation": 9.6,
+      "always": true
+    },
+    "golden_apple": {
+      "nutrition": 4,
+      "saturation": 9.6,
+      "always": true
+    },
+    "golden_carrot": {
+      "nutrition": 6,
+      "saturation": 14.4
+    },
+    "honey_bottle": {
+      "nutrition": 6,
+      "saturation": 1.2,
+      "always": true,
+      "ticks": 40,
+      "remainder": "glass_bottle"
+    },
+    "melon_slice": {
+      "nutrition": 2,
+      "saturation": 1.2
+    },
+    "mushroom_stew": {
+      "nutrition": 6,
+      "saturation": 7.2,
+      "remainder": "bowl"
+    },
+    "mutton": {
+      "nutrition": 2,
+      "saturation": 1.2
+    },
+    "poisonous_potato": {
+      "nutrition": 2,
+      "saturation": 1.2
+    },
+    "porkchop": {
+      "nutrition": 3,
+      "saturation": 1.8
+    },
+    "potato": {
+      "nutrition": 1,
+      "saturation": 0.6
+    },
+    "pufferfish": {
+      "nutrition": 1,
+      "saturation": 0.2
+    },
+    "pumpkin_pie": {
+      "nutrition": 8,
+      "saturation": 4.8
+    },
+    "rabbit": {
+      "nutrition": 3,
+      "saturation": 1.8
+    },
+    "rabbit_stew": {
+      "nutrition": 10,
+      "saturation": 12.0,
+      "remainder": "bowl"
+    },
+    "rotten_flesh": {
+      "nutrition": 4,
+      "saturation": 0.8
+    },
+    "salmon": {
+      "nutrition": 2,
+      "saturation": 0.4
+    },
+    "spider_eye": {
+      "nutrition": 2,
+      "saturation": 3.2
+    },
+    "suspicious_stew": {
+      "nutrition": 6,
+      "saturation": 7.2,
+      "always": true,
+      "remainder": "bowl"
+    },
+    "sweet_berries": {
+      "nutrition": 2,
+      "saturation": 0.4
+    },
+    "glow_berries": {
+      "nutrition": 2,
+      "saturation": 0.4
+    },
+    "tropical_fish": {
+      "nutrition": 1,
+      "saturation": 0.2
+    },
+    "milk_bucket": {
+      "nutrition": 0,
+      "saturation": 0.0,
+      "always": true,
+      "remainder": "bucket"
+    },
+    "potion": {
+      "nutrition": 0,
+      "saturation": 0.0,
+      "always": true,
+      "remainder": "glass_bottle"
+    }
+  }
 }

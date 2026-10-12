@@ -1,0 +1,23 @@
+{
+  "values": [
+    "#leaves",
+    "hay_block",
+    "dried_kelp_block",
+    "target",
+    "sponge",
+    "wet_sponge",
+    "nether_wart_block",
+    "warped_wart_block",
+    "shroomlight",
+    "sculk",
+    "sculk_vein",
+    "sculk_catalyst",
+    "sculk_sensor",
+    "calibrated_sculk_sensor",
+    "sculk_shrieker",
+    "moss_block",
+    "moss_carpet",
+    "pale_moss_block",
+    "pale_moss_carpet"
+  ]
+}

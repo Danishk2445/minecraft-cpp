@@ -6,6 +6,7 @@
     "mangrove_propagule"
   ],
   "exclude": [
-    "bamboo_sapling"
+    "bamboo_sapling",
+    "potted_*"
   ]
 }

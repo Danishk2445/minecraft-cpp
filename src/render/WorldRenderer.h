@@ -54,6 +54,9 @@ public:
     bool idle() const { return inFlight_ == 0; }
     const ChunkRenderer& chunkRenderer() const { return chunks_; }
     MesherOptions& mesherOptions() { return options_; }
+    // Block entities the entity renderer draws instead of the chunk meshes (opening chests);
+    // their sections remesh when the set changes.
+    void setDynamicBlockEntities(std::unordered_set<BlockPos> positions, ChunkManager& chunks);
 
 private:
     const ClientAssets& assets_;

@@ -250,7 +250,7 @@ void ChunkManager::update() {
         for (auto it = entries_.begin(); it != entries_.end();) {
             if (it->first.chebyshev(center_) > keep) {
                 if (it->second->meshReady) dropped_.push_back(it->first);
-                if (storage_ && it->second->dirty()) submitSave(*it->second, true);
+                if (storage_ && needsSave(*it->second)) submitSave(*it->second, true);
                 it = entries_.erase(it);
             } else {
                 ++it;
@@ -485,7 +485,7 @@ int ChunkManager::saveAll() {
     if (!storage_) return 0;
     int n = 0;
     for (auto& [p, e] : entries_)
-        if (e->dirty()) {
+        if (needsSave(*e)) {
             submitSave(*e, false);
             ++n;
         }

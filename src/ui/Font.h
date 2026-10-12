@@ -26,6 +26,15 @@ public:
     // Draws formatted text with its top-left corner at (x, y); `argb` is the base
     // color (opaque when its alpha is 0, like vanilla). Returns the end x.
     float draw(GuiBatch& batch, std::string_view text, float x, float y, uint32_t argb, bool shadow = true) const;
+    // Glyph quads for drawing text elsewhere (signs in the world): corners in text pixels
+    // (y down), atlas UVs in this font's texture(), no shadow, underlines left out.
+    struct GlyphQuad {
+        glm::vec2 corners[4]; // top-left, bottom-left, bottom-right, top-right
+        glm::vec2 uv0, uv1;
+        uint32_t argb;
+    };
+    void glyphQuads(std::string_view text, float x, float y, uint32_t argb, std::vector<GlyphQuad>& out) const;
+    const Texture& texture() const { return texture_; }
     // Centered like vanilla drawCenteredString: x - width / 2 in whole pixels.
     void drawCentered(GuiBatch& batch, std::string_view text, float centerX, float y, uint32_t argb,
                       bool shadow = true) const {

@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#harnesses"
+  ],
+  "exclude": [
+    "blue_harness"
+  ]
+}

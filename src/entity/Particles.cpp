@@ -35,6 +35,24 @@ void ParticleSystem::add(Particle p) {
     particles_.push_back(p);
 }
 
+void ParticleSystem::addItemParticles(const glm::dvec3& eye, float yaw, float pitch, int sprite, int count) {
+    // Vanilla Vec3.xRot(-pitch) then yRot(-yaw).
+    const double xr = glm::radians(double(-pitch)), yr = glm::radians(double(-yaw));
+    auto rotate = [&](glm::dvec3 v) {
+        v = {v.x, v.y * std::cos(xr) + v.z * std::sin(xr), v.z * std::cos(xr) - v.y * std::sin(xr)};
+        return glm::dvec3(v.x * std::cos(yr) + v.z * std::sin(yr), v.y, v.z * std::cos(yr) - v.x * std::sin(yr));
+    };
+    for (int i = 0; i < count; ++i) {
+        const glm::dvec3 v = rotate({(random_.nextFloat() - 0.5) * 0.1, random_.nextDouble() * 0.1 + 0.1, 0.0});
+        const double down = -random_.nextFloat() * 0.6 - 0.3;
+        const glm::dvec3 at = rotate({(random_.nextFloat() - 0.5) * 0.3, down, 0.6}) + eye;
+        Particle q = terrainParticle(at, glm::dvec3(0.0), sprite, 0xFFFFFF);
+        q.vel = q.vel * 0.1 + glm::dvec3(v.x, v.y + 0.05, v.z);
+        q.color = glm::vec3(1.0f);
+        add(q);
+    }
+}
+
 void ParticleSystem::addBlockBreak(const BlockRegistry& reg, StateId state, const BlockPos& pos, int sprite,
                                    uint32_t tint) {
     const Shape& shape = reg.outlineShape(state);

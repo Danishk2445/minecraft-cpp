@@ -1,0 +1,32 @@
+{
+  "_comment": "Vanilla lists copper trapdoors here but not copper doors, so any pickaxe harvests a copper door.",
+  "values": [
+    "iron_ore",
+    "deepslate_iron_ore",
+    "iron_block",
+    "raw_iron_block",
+    "lapis_ore",
+    "deepslate_lapis_ore",
+    "lapis_block",
+    "copper_ore",
+    "deepslate_copper_ore",
+    "raw_copper_block",
+    "copper_block",
+    "exposed_copper",
+    "weathered_copper",
+    "oxidized_copper",
+    "waxed_copper_block",
+    "waxed_exposed_copper",
+    "waxed_weathered_copper",
+    "waxed_oxidized_copper",
+    "*cut_copper",
+    "*cut_copper_slab",
+    "*cut_copper_stairs",
+    "*chiseled_copper",
+    "*copper_grate",
+    "*copper_bulb",
+    "*copper_trapdoor",
+    "lightning_rod",
+    "crafter"
+  ]
+}

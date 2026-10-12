@@ -1,5 +1,6 @@
 #include "entity/model/HumanoidModel.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -111,11 +112,17 @@ void animateHumanoid(ModelPart& root, const HumanoidPose& s) {
     if (s.bodyHidden) body.visible = rightArm.visible = leftArm.visible = rightLeg.visible = leftLeg.visible = false;
 }
 
-glm::mat4 livingModelTransform(float bodyYaw, float scale, float yOffset) {
+glm::mat4 livingModelTransform(float bodyYaw, float scale, float yOffset, float flipDegrees) {
     glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, yOffset, 0.0f));
     m = glm::rotate(m, (180.0f - bodyYaw) * kDegToRad, glm::vec3(0, 1, 0));
+    if (flipDegrees != 0.0f) m = glm::rotate(m, flipDegrees * kDegToRad, glm::vec3(0, 0, 1));
     m = glm::scale(m, glm::vec3(-scale, -scale, scale));
     return glm::translate(m, glm::vec3(0.0f, -1.501f, 0.0f));
+}
+
+float deathFlipDegrees(float deathTime) {
+    if (deathTime <= 0.0f) return 0.0f;
+    return std::min(std::sqrt(std::max(deathTime - 1.0f, 0.0f) / 20.0f * 1.6f), 1.0f) * 90.0f;
 }
 
 } // namespace mc

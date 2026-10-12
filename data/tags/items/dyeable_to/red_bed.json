@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#beds"
+  ],
+  "exclude": [
+    "red_bed"
+  ]
+}

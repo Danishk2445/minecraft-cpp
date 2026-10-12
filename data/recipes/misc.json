@@ -1,0 +1,340 @@
+{
+  "_comment": "Intermediate items and everything else (vanilla 1.21.8).",
+  "recipes": [
+    {
+      "type": "shaped",
+      "pattern": [
+        "#",
+        "#"
+      ],
+      "key": {
+        "#": "#planks"
+      },
+      "result": {
+        "id": "stick",
+        "count": 4
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "#",
+        "#"
+      ],
+      "key": {
+        "#": "bamboo"
+      },
+      "result": {
+        "id": "stick"
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "# #",
+        " # "
+      ],
+      "key": {
+        "#": "#planks"
+      },
+      "result": {
+        "id": "bowl",
+        "count": 4
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "# #",
+        " # "
+      ],
+      "key": {
+        "#": "glass"
+      },
+      "result": {
+        "id": "glass_bottle",
+        "count": 3
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "###"
+      ],
+      "key": {
+        "#": "sugar_cane"
+      },
+      "result": {
+        "id": "paper",
+        "count": 3
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "paper",
+        "paper",
+        "leather"
+      ],
+      "result": {
+        "id": "book"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "book",
+        "ink_sac",
+        "feather"
+      ],
+      "result": {
+        "id": "writable_book"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "bone"
+      ],
+      "result": {
+        "id": "bone_meal",
+        "count": 3
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "blaze_rod"
+      ],
+      "result": {
+        "id": "blaze_powder",
+        "count": 2
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "breeze_rod"
+      ],
+      "result": {
+        "id": "wind_charge",
+        "count": 4
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "blaze_powder",
+        "slime_ball"
+      ],
+      "result": {
+        "id": "magma_cream"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "ender_pearl",
+        "blaze_powder"
+      ],
+      "result": {
+        "id": "ender_eye"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "gunpowder",
+        "blaze_powder",
+        [
+          "coal",
+          "charcoal"
+        ]
+      ],
+      "result": {
+        "id": "fire_charge",
+        "count": 3
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "spider_eye",
+        "brown_mushroom",
+        "sugar"
+      ],
+      "result": {
+        "id": "fermented_spider_eye"
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "GGG",
+        "GEG",
+        "GTG"
+      ],
+      "key": {
+        "G": "glass",
+        "E": "ender_eye",
+        "T": "ghast_tear"
+      },
+      "result": {
+        "id": "end_crystal"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "netherite_scrap",
+        "netherite_scrap",
+        "netherite_scrap",
+        "netherite_scrap",
+        "gold_ingot",
+        "gold_ingot",
+        "gold_ingot",
+        "gold_ingot"
+      ],
+      "result": {
+        "id": "netherite_ingot"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "waxed_copper_block"
+      ],
+      "result": {
+        "id": "copper_ingot",
+        "count": 9
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5",
+        "disc_fragment_5"
+      ],
+      "result": {
+        "id": "music_disc_5"
+      }
+    },
+    {
+      "type": "shaped",
+      "pattern": [
+        "#S#",
+        "#C#",
+        "###"
+      ],
+      "key": {
+        "#": "diamond",
+        "S": "bolt_armor_trim_smithing_template",
+        "C": [
+          "copper_block",
+          "waxed_copper_block"
+        ]
+      },
+      "result": {
+        "id": "bolt_armor_trim_smithing_template",
+        "count": 2
+      }
+    },
+    {
+      "_comment": "banner pattern items (applied on a loom)",
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "oxeye_daisy"
+      ],
+      "result": {
+        "id": "flower_banner_pattern"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "creeper_head"
+      ],
+      "result": {
+        "id": "creeper_banner_pattern"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "wither_skeleton_skull"
+      ],
+      "result": {
+        "id": "skull_banner_pattern"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "enchanted_golden_apple"
+      ],
+      "result": {
+        "id": "mojang_banner_pattern"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "bricks"
+      ],
+      "result": {
+        "id": "field_masoned_banner_pattern"
+      }
+    },
+    {
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "vine"
+      ],
+      "result": {
+        "id": "bordure_indented_banner_pattern"
+      }
+    },
+    {
+      "_comment": "vanilla firework_rocket_simple (flight duration 1)",
+      "type": "shapeless",
+      "ingredients": [
+        "paper",
+        "gunpowder"
+      ],
+      "result": {
+        "id": "firework_rocket",
+        "count": 3
+      }
+    },
+    {
+      "_comment": "vanilla decorated_pot_simple",
+      "type": "shaped",
+      "pattern": [
+        " # ",
+        "# #",
+        " # "
+      ],
+      "key": {
+        "#": "brick"
+      },
+      "result": {
+        "id": "decorated_pot",
+        "count": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#wooden_pressure_plates"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

@@ -394,26 +394,6 @@ std::optional<RenderLayer> layerFromName(std::string_view n) {
 
 } // namespace
 
-bool globMatch(std::string_view pattern, std::string_view text) {
-    // Iterative matcher with backtracking to the last '*'.
-    size_t p = 0, t = 0, star = std::string_view::npos, mark = 0;
-    while (t < text.size()) {
-        if (p < pattern.size() && pattern[p] == '*') {
-            star = p++;
-            mark = t;
-        } else if (p < pattern.size() && pattern[p] == text[t]) {
-            ++p;
-            ++t;
-        } else if (star != std::string_view::npos) {
-            p = star + 1;
-            t = ++mark;
-        } else {
-            return false;
-        }
-    }
-    while (p < pattern.size() && pattern[p] == '*') ++p;
-    return p == pattern.size();
-}
 
 int Property::index(std::string_view value) const {
     for (size_t i = 0; i < values.size(); ++i)

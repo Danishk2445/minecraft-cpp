@@ -57,6 +57,10 @@ public:
     virtual void setDifficulty(Difficulty d) = 0;
     // Chat input: a message or a /command.
     virtual void sendChat(const std::string& line) = 0;
+    // From the death screen: back at the spawn (spectating, in hardcore).
+    virtual void respawn() = 0;
+    // From the in-bed screen: get up.
+    virtual void leaveBed() = 0;
 };
 
 // Text and names screens look up, and the host they act on.

@@ -4,12 +4,21 @@
 #include <utility>
 
 #include "entity/Player.h"
+#include "game/Recipes.h"
 
 namespace mc {
 
+int Slot::maxStackSize(const ItemStack& s) const {
+    // A bucket in a fuel slot sits alone (vanilla FurnaceFuelSlot).
+    if (kind == Kind::Fuel && !s.empty() && s.item->fuelTicks == 0) return 1;
+    return std::min(maxStackSize(), s.maxStack());
+}
+
 bool Slot::mayPlace(const ItemStack& s) const {
     switch (kind) {
-    case Kind::Result: return false;
+    case Kind::Result:
+    case Kind::Output: return false;
+    case Kind::Fuel: return !s.empty() && (s.item->fuelTicks > 0 || s.item->id == "minecraft:bucket");
     case Kind::Armor: return !s.empty() && s.item->equipment == armor;
     case Kind::Creative: return false; // vanilla ItemPickerMenu.canDragTo: never into the picker
     default: return true;
@@ -30,7 +39,32 @@ ItemStack Slot::safeInsert(ItemStack s, int increment) {
 
 ItemStack Slot::tryRemove(int count, int decrement) {
     if (!mayPickup() || !hasItem()) return {};
+    // A result comes out whole, or not at all (vanilla ResultContainer.removeItem).
+    if (kind == Kind::Result) return decrement < stack->count ? ItemStack{} : std::exchange(*stack, ItemStack{});
     return stack->split(std::min(count, decrement));
+}
+
+ItemStack Menu::take(Slot& slot, int count, int decrement, Player& player) {
+    ItemStack taken = slot.tryRemove(count, decrement);
+    if (!taken.empty() && (slot.kind == Slot::Kind::Result || slot.kind == Slot::Kind::Output))
+        onResultTaken(player, taken);
+    return taken;
+}
+
+ItemStack craftingResult(const RecipeBook* recipes, std::span<const ItemStack> grid, int width, int height) {
+    return recipes ? recipes->craft(grid, width, height).result : ItemStack{};
+}
+
+void consumeCraft(const RecipeBook* recipes, std::span<ItemStack> grid, Player& player) {
+    for (ItemStack& cell : grid) {
+        if (cell.empty()) continue;
+        ItemStack left = recipes ? recipes->remainder(cell) : ItemStack{};
+        cell.shrink(1);
+        if (left.empty()) continue;
+        if (cell.empty()) cell = left;
+        else if (cell.sameItem(left)) cell.grow(left.count);
+        else if (!player.inventory.add(left)) player.drop(left);
+    }
 }
 
 Slot& Menu::addSlot(ItemStack* storage, int containerSlot, int x, int y, bool playerInventory) {
@@ -44,7 +78,21 @@ Slot& Menu::addSlot(ItemStack* storage, int containerSlot, int x, int y, bool pl
     return s;
 }
 
+void Menu::addPlayerSlots(Inventory& inventory, int top) {
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 9; ++j) {
+            const int n = j + (i + 1) * 9;
+            addSlot(&inventory.main[size_t(n)], n, 8 + j * 18, top + i * 18, true);
+        }
+    for (int j = 0; j < 9; ++j) addSlot(&inventory.main[size_t(j)], j, 8 + j * 18, top + 58, true);
+}
+
 void Menu::removed(Player& player) {
+    closed_ = true;
+    returnItems(player);
+}
+
+void Menu::returnItems(Player& player) {
     // Vanilla: whatever the cursor holds goes back to the inventory, or is dropped.
     if (!carried().empty()) {
         if (!player.inventory.add(carried())) player.drop(carried());
@@ -76,6 +124,7 @@ void Menu::resetQuickCraft() {
 void Menu::clicked(int slotId, int button, ClickType type, Player& player) {
     if (slotId != kClickedOutside && (slotId < -1 || slotId >= int(slots.size()))) return;
     doClick(slotId, button, type, player);
+    slotsChanged();
 }
 
 void Menu::doClick(int slotId, int button, ClickType type, Player& player) {
@@ -175,7 +224,7 @@ void Menu::doClick(int slotId, int button, ClickType type, Player& player) {
             } else if (slot.mayPickup()) {
                 if (carried().empty()) {
                     // Take all, or half rounded up.
-                    carried() = slot.tryRemove(primary ? inSlot.count : (inSlot.count + 1) / 2, 0x7FFFFFFF);
+                    carried() = take(slot, primary ? inSlot.count : (inSlot.count + 1) / 2, 0x7FFFFFFF, player);
                 } else if (slot.mayPlace(carried())) {
                     if (inSlot.sameItem(carried())) {
                         carried() = slot.safeInsert(carried(), primary ? carried().count : 1);
@@ -186,7 +235,7 @@ void Menu::doClick(int slotId, int button, ClickType type, Player& player) {
                     }
                 } else if (inSlot.sameItem(carried())) {
                     // A slot that takes nothing (a result) tops up the cursor.
-                    const ItemStack taken = slot.tryRemove(inSlot.count, carried().maxStack() - carried().count);
+                    const ItemStack taken = take(slot, inSlot.count, carried().maxStack() - carried().count, player);
                     carried().grow(taken.count);
                 }
             }
@@ -202,6 +251,7 @@ void Menu::doClick(int slotId, int button, ClickType type, Player& player) {
             if (slot.mayPickup()) {
                 other = inSlot;
                 *slot.stack = {};
+                if (slot.kind == Slot::Kind::Result || slot.kind == Slot::Kind::Output) onResultTaken(player, inSlot);
             }
         } else if (inSlot.empty()) {
             if (slot.mayPlace(other)) {
@@ -228,11 +278,11 @@ void Menu::doClick(int slotId, int button, ClickType type, Player& player) {
         // Q throws one item; Ctrl+Q the stack (and keeps going while the slot refills).
         Slot& slot = slots[size_t(slotId)];
         const int n = button == 0 ? 1 : slot.item().count;
-        ItemStack thrown = slot.tryRemove(n, 0x7FFFFFFF);
+        ItemStack thrown = take(slot, n, 0x7FFFFFFF, player);
         player.drop(thrown);
         if (button == 1)
             while (!thrown.empty() && slot.item().sameItem(thrown)) {
-                thrown = slot.tryRemove(n, 0x7FFFFFFF);
+                thrown = take(slot, n, 0x7FFFFFFF, player);
                 player.drop(thrown);
             }
     } else if (type == ClickType::PickupAll && slotId >= 0) {
@@ -287,7 +337,8 @@ bool Menu::moveItemStackTo(ItemStack& stack, int start, int end, bool reverse) {
     return moved;
 }
 
-InventoryMenu::InventoryMenu(Inventory& inventory) : inventory_(inventory) {
+InventoryMenu::InventoryMenu(Inventory& inventory, const RecipeBook* recipes)
+    : inventory_(inventory), recipes_(recipes) {
     addSlot(&craftResult, 0, 154, 28).kind = Slot::Kind::Result;
     for (int i = 0; i < 2; ++i)
         for (int j = 0; j < 2; ++j) addSlot(&craftGrid[size_t(j + i * 2)], j + i * 2, 98 + j * 18, 18 + i * 18);
@@ -319,7 +370,12 @@ ItemStack InventoryMenu::quickMoveStack(Player& player, int index) {
     // Armor slot for each equipment piece: head 5, chest 6, legs 7, feet 8.
     const int armorSlot = equip == EquipmentSlot::Head ? 5 : equip == EquipmentSlot::Chest ? 6 : equip == EquipmentSlot::Legs ? 7 : 8;
     if (index == kResult) {
+        // Shift-clicking the result crafts once per call (the click repeats it while the
+        // result stays the same): it goes into the inventory from the hotbar's end.
         if (!moveItemStackTo(stack, kMainStart, kHotbarEnd, true)) return {};
+        if (!stack.empty()) player.drop(std::exchange(stack, ItemStack{})); // what didn't fit falls out
+        onResultTaken(player, original);
+        return original;
     } else if (index >= kCraftStart && index < kCraftEnd) {
         if (!moveItemStackTo(stack, kMainStart, kHotbarEnd, false)) return {};
     } else if (index >= kArmorStart && index < kArmorEnd) {
@@ -340,8 +396,15 @@ ItemStack InventoryMenu::quickMoveStack(Player& player, int index) {
     return original;
 }
 
-void InventoryMenu::removed(Player& player) {
-    Menu::removed(player);
+void InventoryMenu::slotsChanged() { craftResult = craftingResult(recipes_, craftGrid, 2, 2); }
+
+void InventoryMenu::onResultTaken(Player& player, const ItemStack&) {
+    consumeCraft(recipes_, craftGrid, player);
+    slotsChanged();
+}
+
+void InventoryMenu::returnItems(Player& player) {
+    Menu::returnItems(player);
     craftResult = {};
     for (ItemStack& s : craftGrid) {
         if (!s.empty() && !inventory_.add(s)) player.drop(s);

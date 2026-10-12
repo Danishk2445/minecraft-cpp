@@ -32,7 +32,6 @@ public:
     float bodyYaw = 0.0f, oldBodyYaw = 0.0f; // yBodyRot
     float headYaw = 0.0f, oldHeadYaw = 0.0f; // yHeadRot
     WalkAnimation walkAnimation;
-    int tickCount = 0;
 
     // Starts an arm swing (vanilla swing); a running one restarts once half done.
     void swing(bool offhand = false);

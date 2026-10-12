@@ -78,7 +78,7 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.threads) && o.threads >= 0; }},
         {"--frames", "N", "harness: render at least N frames before --screenshot/--exit",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.frames) && o.frames >= 0; }},
-        {"--ticks", "N", "harness: run at least N game ticks before --screenshot/--exit",
+        {"--ticks", "N", "harness: run at least N game ticks before --screenshot/--exit (with --exec, --wait-chunks or --screen: after the world is ready)",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.ticks) && o.ticks >= 0; }},
         {"--screenshot", "FILE", "harness: save a PNG screenshot when the run conditions are met",
          [](CliOptions& o, std::string_view v) { return o.screenshot = v, true; }},

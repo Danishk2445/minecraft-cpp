@@ -16,6 +16,7 @@
 #include "resources/ResourcePack.h"
 #include "ui/GameMenuScreens.h"
 #include "ui/GuiScale.h"
+#include "ui/SignEditScreen.h"
 #include "ui/TitleScreens.h"
 #include "world/storage/WorldSave.h"
 
@@ -44,6 +45,8 @@ public:
     Difficulty difficulty() const override { return Difficulty::Normal; }
     void setDifficulty(Difficulty) override {}
     void sendChat(const std::string&) override {}
+    void respawn() override { calls.push_back("respawn"); }
+    void leaveBed() override { calls.push_back("leave bed"); }
 
     bool world = false;
     std::vector<std::string> calls;
@@ -279,6 +282,51 @@ TEST_F(UiLayout, ConfirmAnswersAndEscapeSaysNo) {
     confirm.mouseClicked(centerOf(*findWidget(confirm, "Yes")), 0, 0);
     confirm.keyPressed(GLFW_KEY_ESCAPE, 0, 0);
     EXPECT_EQ(answers, (std::vector<bool>{true, false}));
+}
+
+TEST_F(UiLayout, SignEditorTypesWithinTheSignAndLeavesOnDone) {
+    auto sign = std::make_shared<SignBlockEntity>(BlockPos{0, 0, 0}, false);
+    sign->front.lines[1] = "old";
+    bool closed = false;
+    SignEditScreen screen(ctx(), sign, true, "oak", true, [&] { closed = true; });
+    screen.init({427, 240});
+    checkLayout(screen, {427, 240}, "sign editor");
+    const Widget* done = findWidget(screen, "Done");
+    ASSERT_NE(done, nullptr);
+    EXPECT_EQ(done->x, 427 / 2 - 100); // vanilla: (width / 2 - 100, height / 4 + 144)
+    EXPECT_EQ(done->y, 240 / 4 + 144);
+    // Typing fills the first line; Enter (and Down) go to the next, wrapping after four.
+    for (char32_t c : U"Hello there") screen.charTyped(c);
+    EXPECT_EQ(sign->front.lines[0], "Hello there");
+    screen.keyPressed(GLFW_KEY_ENTER, 0, 0);
+    EXPECT_EQ(screen.line(), 1);
+    screen.charTyped(U'!'); // the cursor starts at the line's end
+    EXPECT_EQ(sign->front.lines[1], "old!");
+    screen.keyPressed(GLFW_KEY_UP, 0, 0);
+    EXPECT_EQ(screen.line(), 0);
+    // Ctrl+Backspace takes a word, Backspace a character; § can't be typed.
+    screen.keyPressed(GLFW_KEY_BACKSPACE, 0, Screen::kControl);
+    EXPECT_EQ(sign->front.lines[0], "Hello ");
+    screen.keyPressed(GLFW_KEY_BACKSPACE, 0, 0);
+    EXPECT_EQ(sign->front.lines[0], "Hello");
+    EXPECT_FALSE(screen.charTyped(U'§'));
+    // Nothing goes in past the sign's 90 pixels.
+    for (int i = 0; i < 40; ++i) screen.charTyped(U'W');
+    const float width = font_->width(sign->front.lines[0]);
+    EXPECT_LE(width, 90.0f);
+    EXPECT_GT(width, 80.0f);
+    EXPECT_TRUE(sign->back.empty());
+    screen.mouseClicked(centerOf(*done), 0, 0);
+    EXPECT_EQ(host_->calls.back(), "pop");
+    screen.removed();
+    EXPECT_TRUE(closed);
+    // Hanging signs hold 60 pixels.
+    auto hanging = std::make_shared<SignBlockEntity>(BlockPos{0, 0, 0}, true);
+    SignEditScreen narrow(ctx(), hanging, false, "oak", false);
+    narrow.init({427, 240});
+    for (int i = 0; i < 40; ++i) narrow.charTyped(U'W');
+    EXPECT_LE(font_->width(hanging->back.lines[0]), 60.0f);
+    EXPECT_TRUE(hanging->front.empty());
 }
 
 } // namespace

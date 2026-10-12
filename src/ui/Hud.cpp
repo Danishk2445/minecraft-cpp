@@ -11,7 +11,22 @@ namespace mc {
 
 void Hud::tick(const Player& player, const ItemNamer& name) {
     ++ticks_;
+    if (overlayTime_ > 0) --overlayTime_;
     random_ = random_ * 1664525u + 1013904223u;
+    // Vanilla renderPlayerHealth's blink (its second of real time as 20 ticks here).
+    const int health = int(std::ceil(player.health));
+    if (health < lastHealth_ && player.invulnerableTime > 0) {
+        lastHealthTime_ = ticks_;
+        healthBlinkTime_ = ticks_ + 20;
+    } else if (health > lastHealth_ && player.invulnerableTime > 0) {
+        lastHealthTime_ = ticks_;
+        healthBlinkTime_ = ticks_ + 10;
+    }
+    if (ticks_ - lastHealthTime_ > 20) {
+        displayHealth_ = health;
+        lastHealthTime_ = ticks_;
+    }
+    lastHealth_ = health;
     const ItemStack& held = player.inventory.selectedStack();
     if (held.empty()) {
         highlightTimer_ = 0;
@@ -34,8 +49,18 @@ void Hud::render(GuiGraphics& g, const Player& player, bool firstPerson, bool ey
     if (firstPerson && !spectator) {
         g.batch().setBlend(GuiBatch::Blend::Invert);
         g.sprite("hud/crosshair", std::floor((size.x - 15) / 2), std::floor((size.y - 15) / 2), 15, 15);
+        // Vanilla renderCrosshair: the attack strength as a bar under it while it recovers.
+        // (The full sprite, for a ready attack on a living target, arrives with mobs.)
+        const float strength = player.attackStrengthScale(0.0f);
+        if (attackIndicator == AttackIndicator::Crosshair && strength < 1.0f) {
+            const float x = std::floor(size.x / 2) - 8, y = std::floor(size.y / 2) - 7 + 16;
+            g.sprite("hud/crosshair_attack_indicator_background", x, y, 16, 4);
+            g.spriteRegion("hud/crosshair_attack_indicator_progress", 16, 4, 0, 0, x, y, float(int(strength * 17.0f)), 4);
+        }
         g.batch().setBlend(GuiBatch::Blend::Alpha);
     }
+    renderSleepOverlay(g, player);
+    renderOverlayMessage(g);
     if (spectator) return; // the spectator hotbar (teleport menu) is not in scope
     renderHotbar(g, player, drawItem);
     const bool survival = player.mode() == GameMode::Survival || player.mode() == GameMode::Adventure;
@@ -56,6 +81,14 @@ void Hud::renderHotbar(GuiGraphics& g, const Player& player, const ItemDrawer& d
     for (int i = 0; i < Inventory::kHotbarSize; ++i)
         if (!inv.main[size_t(i)].empty()) drawItem(inv.main[size_t(i)], cx - 90 + float(i) * 20 + 2, h - 16 - 3);
     if (!inv.offhand.empty()) drawItem(inv.offhand, cx - 91 - 26, h - 16 - 3);
+    // The hotbar attack indicator, opposite the off hand, fills from the bottom.
+    const float strength = player.attackStrengthScale(0.0f);
+    if (attackIndicator == AttackIndicator::Hotbar && strength < 1.0f) {
+        const float x = cx + 91 + 6, y = h - 20;
+        const int p = int(strength * 19.0f);
+        g.sprite("hud/hotbar_attack_indicator_background", x, y, 18, 18);
+        g.spriteRegion("hud/hotbar_attack_indicator_progress", 18, 18, 0, 18 - p, x, y + float(18 - p), 18, float(p));
+    }
 }
 
 void Hud::renderStatus(GuiGraphics& g, const Player& player) {
@@ -81,23 +114,38 @@ void Hud::renderStatus(GuiGraphics& g, const Player& player) {
             g.sprite(id, left + float(i) * 8, y, 9, 9);
         }
     }
-    // Hearts: containers, then full or half hearts; they shake at 4 health or less.
+    // Hearts (vanilla renderHearts): containers, then full or half hearts; they shake at 4
+    // health or less. While blinking, the containers light up and the health just lost shows
+    // in pale blinking hearts under what is left.
+    const bool blink = healthBlinkTime_ > ticks_ && (healthBlinkTime_ - ticks_) / 3 % 2 == 1;
+    auto heart = [&](std::string_view kind, bool half, bool blinking) {
+        std::string id = "hud/heart/";
+        if (kind == "container") {
+            id += hardcore ? "container_hardcore" : "container";
+        } else {
+            if (hardcore) id += "hardcore_";
+            id += half ? "half" : "full";
+        }
+        if (blinking) id += "_blinking";
+        return id;
+    };
     const int containers = int(std::ceil(maxHealth / 2.0f));
     for (int i = containers - 1; i >= 0; --i) {
         const float x = left + float(i % 10) * 8;
         float y = top - float(i / 10) * float(rowHeight);
         if (health <= 4) y += float(nextBit(2));
-        g.sprite("hud/heart/container", x, y, 9, 9);
-        if (i * 2 < health) g.sprite(i * 2 + 1 == health ? "hud/heart/half" : "hud/heart/full", x, y, 9, 9);
+        g.sprite(heart("container", false, blink), x, y, 9, 9);
+        if (blink && i * 2 < displayHealth_) g.sprite(heart("normal", i * 2 + 1 == displayHealth_, true), x, y, 9, 9);
+        if (i * 2 < health) g.sprite(heart("normal", i * 2 + 1 == health, false), x, y, 9, 9);
     }
     // Food from the right; it jitters when saturation is gone.
     for (int i = 0; i < 10; ++i) {
         float y = top;
-        if (player.saturation <= 0.0f && ticks_ % (player.foodLevel * 3 + 1) == 0) y += float(nextBit(3) - 1);
+        if (player.food.saturation <= 0.0f && ticks_ % (player.food.foodLevel * 3 + 1) == 0) y += float(nextBit(3) - 1);
         const float x = right - float(i) * 8 - 9;
         g.sprite("hud/food_empty", x, y, 9, 9);
-        if (i * 2 + 1 < player.foodLevel) g.sprite("hud/food_full", x, y, 9, 9);
-        if (i * 2 + 1 == player.foodLevel) g.sprite("hud/food_half", x, y, 9, 9);
+        if (i * 2 + 1 < player.food.foodLevel) g.sprite("hud/food_full", x, y, 9, 9);
+        if (i * 2 + 1 == player.food.foodLevel) g.sprite("hud/food_half", x, y, 9, 9);
     }
     // Air bubbles above the food while the eyes are underwater or the air is refilling
     // (vanilla renderAirBubbles).
@@ -144,6 +192,23 @@ void Hud::renderSelectedName(GuiGraphics& g, const Player& player) {
     float y = g.size().y - 59;
     if (player.mode() == GameMode::Creative) y += 14; // no health bar to clear
     g.text(highlightName_, std::floor((g.size().x - w) / 2), y, (uint32_t(alpha) << 24) | 0xFFFFFF);
+}
+
+void Hud::renderOverlayMessage(GuiGraphics& g) {
+    if (overlayTime_ <= 0 || overlayMessage_.empty()) return;
+    const int alpha = std::min(255, int(float(overlayTime_) * 255.0f / 20.0f));
+    if (alpha <= 8) return;
+    const float w = float(g.textWidth(overlayMessage_));
+    g.text(overlayMessage_, std::floor(g.size().x / 2) - std::floor(w / 2), g.size().y - 68 - 4,
+           (uint32_t(alpha) << 24) | 0xFFFFFF);
+}
+
+void Hud::renderSleepOverlay(GuiGraphics& g, const Player& player) {
+    if (player.sleepTimer <= 0) return;
+    const float t = float(player.sleepTimer);
+    float f = t / 100.0f;
+    if (f > 1.0f) f = 1.0f - (t - 100.0f) / 10.0f;
+    g.fill(0, 0, g.size().x, g.size().y, (uint32_t(int(220.0f * f)) << 24) | 0x101020);
 }
 
 } // namespace mc

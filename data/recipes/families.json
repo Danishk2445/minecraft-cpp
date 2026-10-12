@@ -1,0 +1,382 @@
+{
+  "_comment": "Repetitive vanilla 1.21.8 recipes as material tables x templates. Each template is emitted once per row with {var} replaced by the row's value; a template that uses a variable the row does not define is skipped for that row. Experience and counts are numbers, so templates that differ in them are split into separate families.",
+  "families": [
+    {
+      "name": "wood",
+      "_comment": "The 12 wood sets. logs: planks source (4 planks), logs2: bamboo blocks (2 planks); log -> wood and slog -> swood are the 2x2 bark blocks (3); slog is also the hanging-sign log; boat/chest_boat only where they exist.",
+      "rows": [
+        {"w": "oak", "logs": "#oak_logs", "log": "oak_log", "wood": "oak_wood", "slog": "stripped_oak_log", "swood": "stripped_oak_wood", "boat": "oak_boat", "chest_boat": "oak_chest_boat"},
+        {"w": "spruce", "logs": "#spruce_logs", "log": "spruce_log", "wood": "spruce_wood", "slog": "stripped_spruce_log", "swood": "stripped_spruce_wood", "boat": "spruce_boat", "chest_boat": "spruce_chest_boat"},
+        {"w": "birch", "logs": "#birch_logs", "log": "birch_log", "wood": "birch_wood", "slog": "stripped_birch_log", "swood": "stripped_birch_wood", "boat": "birch_boat", "chest_boat": "birch_chest_boat"},
+        {"w": "jungle", "logs": "#jungle_logs", "log": "jungle_log", "wood": "jungle_wood", "slog": "stripped_jungle_log", "swood": "stripped_jungle_wood", "boat": "jungle_boat", "chest_boat": "jungle_chest_boat"},
+        {"w": "acacia", "logs": "#acacia_logs", "log": "acacia_log", "wood": "acacia_wood", "slog": "stripped_acacia_log", "swood": "stripped_acacia_wood", "boat": "acacia_boat", "chest_boat": "acacia_chest_boat"},
+        {"w": "dark_oak", "logs": "#dark_oak_logs", "log": "dark_oak_log", "wood": "dark_oak_wood", "slog": "stripped_dark_oak_log", "swood": "stripped_dark_oak_wood", "boat": "dark_oak_boat", "chest_boat": "dark_oak_chest_boat"},
+        {"w": "pale_oak", "logs": "#pale_oak_logs", "log": "pale_oak_log", "wood": "pale_oak_wood", "slog": "stripped_pale_oak_log", "swood": "stripped_pale_oak_wood", "boat": "pale_oak_boat", "chest_boat": "pale_oak_chest_boat"},
+        {"w": "mangrove", "logs": "#mangrove_logs", "log": "mangrove_log", "wood": "mangrove_wood", "slog": "stripped_mangrove_log", "swood": "stripped_mangrove_wood", "boat": "mangrove_boat", "chest_boat": "mangrove_chest_boat"},
+        {"w": "cherry", "logs": "#cherry_logs", "log": "cherry_log", "wood": "cherry_wood", "slog": "stripped_cherry_log", "swood": "stripped_cherry_wood", "boat": "cherry_boat", "chest_boat": "cherry_chest_boat"},
+        {"w": "bamboo", "logs2": "#bamboo_blocks", "slog": "stripped_bamboo_block", "boat": "bamboo_raft", "chest_boat": "bamboo_chest_raft"},
+        {"w": "crimson", "logs": "#crimson_stems", "log": "crimson_stem", "wood": "crimson_hyphae", "slog": "stripped_crimson_stem", "swood": "stripped_crimson_hyphae"},
+        {"w": "warped", "logs": "#warped_stems", "log": "warped_stem", "wood": "warped_hyphae", "slog": "stripped_warped_stem", "swood": "stripped_warped_hyphae"}
+      ],
+      "recipes": [
+        {"type": "shapeless", "ingredients": ["{logs}"], "result": {"id": "{w}_planks", "count": 4}},
+        {"type": "shapeless", "ingredients": ["{logs2}"], "result": {"id": "{w}_planks", "count": 2}},
+        {"type": "shaped", "pattern": ["##", "##"], "key": {"#": "{log}"}, "result": {"id": "{wood}", "count": 3}},
+        {"type": "shaped", "pattern": ["##", "##"], "key": {"#": "{slog}"}, "result": {"id": "{swood}", "count": 3}},
+        {"type": "shaped", "pattern": ["###"], "key": {"#": "{w}_planks"}, "result": {"id": "{w}_slab", "count": 6}},
+        {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": "{w}_planks"}, "result": {"id": "{w}_stairs", "count": 4}},
+        {"type": "shaped", "pattern": ["W#W", "W#W"], "key": {"W": "{w}_planks", "#": "stick"}, "result": {"id": "{w}_fence", "count": 3}},
+        {"type": "shaped", "pattern": ["#W#", "#W#"], "key": {"#": "stick", "W": "{w}_planks"}, "result": {"id": "{w}_fence_gate"}},
+        {"type": "shaped", "pattern": ["##", "##", "##"], "key": {"#": "{w}_planks"}, "result": {"id": "{w}_door", "count": 3}},
+        {"type": "shaped", "pattern": ["###", "###"], "key": {"#": "{w}_planks"}, "result": {"id": "{w}_trapdoor", "count": 2}},
+        {"type": "shaped", "pattern": ["##"], "key": {"#": "{w}_planks"}, "result": {"id": "{w}_pressure_plate"}},
+        {"type": "shapeless", "ingredients": ["{w}_planks"], "result": {"id": "{w}_button"}},
+        {"type": "shaped", "pattern": ["###", "###", " X "], "key": {"#": "{w}_planks", "X": "stick"}, "result": {"id": "{w}_sign", "count": 3}},
+        {"type": "shaped", "pattern": ["X X", "###", "###"], "key": {"X": "chain", "#": "{slog}"}, "result": {"id": "{w}_hanging_sign", "count": 6}},
+        {"type": "shaped", "pattern": ["# #", "###"], "key": {"#": "{w}_planks"}, "result": {"id": "{boat}"}},
+        {"type": "shapeless", "ingredients": ["chest", "{boat}"], "result": {"id": "{chest_boat}"}}
+      ]
+    },
+    {
+      "name": "masonry",
+      "_comment": "Block b -> st stairs (4), sl slab (6), wa wall (6), p4 '2x2 -> 4' (polished, bricks, tiles, cut), and smelting b -> sm (0.1 xp: smooth, cracked, stone, deepslate). Two chsl slabs stacked -> ch (chiseled blocks, pillars, mosaic). Sandstone, red sandstone, quartz and purpur stairs/slabs take several block kinds and are in building.json.",
+      "rows": [
+        {"b": "stone", "st": "stone_stairs", "sl": "stone_slab", "p4": "stone_bricks", "sm": "smooth_stone"},
+        {"b": "cobblestone", "st": "cobblestone_stairs", "sl": "cobblestone_slab", "wa": "cobblestone_wall", "sm": "stone"},
+        {"b": "mossy_cobblestone", "st": "mossy_cobblestone_stairs", "sl": "mossy_cobblestone_slab", "wa": "mossy_cobblestone_wall"},
+        {"b": "smooth_stone", "sl": "smooth_stone_slab"},
+        {"b": "stone_bricks", "st": "stone_brick_stairs", "sl": "stone_brick_slab", "wa": "stone_brick_wall", "chsl": "stone_brick_slab", "ch": "chiseled_stone_bricks", "sm": "cracked_stone_bricks"},
+        {"b": "mossy_stone_bricks", "st": "mossy_stone_brick_stairs", "sl": "mossy_stone_brick_slab", "wa": "mossy_stone_brick_wall"},
+        {"b": "granite", "st": "granite_stairs", "sl": "granite_slab", "wa": "granite_wall", "p4": "polished_granite"},
+        {"b": "polished_granite", "st": "polished_granite_stairs", "sl": "polished_granite_slab"},
+        {"b": "diorite", "st": "diorite_stairs", "sl": "diorite_slab", "wa": "diorite_wall", "p4": "polished_diorite"},
+        {"b": "polished_diorite", "st": "polished_diorite_stairs", "sl": "polished_diorite_slab"},
+        {"b": "andesite", "st": "andesite_stairs", "sl": "andesite_slab", "wa": "andesite_wall", "p4": "polished_andesite"},
+        {"b": "polished_andesite", "st": "polished_andesite_stairs", "sl": "polished_andesite_slab"},
+        {"b": "cobbled_deepslate", "st": "cobbled_deepslate_stairs", "sl": "cobbled_deepslate_slab", "wa": "cobbled_deepslate_wall", "p4": "polished_deepslate", "chsl": "cobbled_deepslate_slab", "ch": "chiseled_deepslate", "sm": "deepslate"},
+        {"b": "polished_deepslate", "st": "polished_deepslate_stairs", "sl": "polished_deepslate_slab", "wa": "polished_deepslate_wall", "p4": "deepslate_bricks"},
+        {"b": "deepslate_bricks", "st": "deepslate_brick_stairs", "sl": "deepslate_brick_slab", "wa": "deepslate_brick_wall", "p4": "deepslate_tiles", "sm": "cracked_deepslate_bricks"},
+        {"b": "deepslate_tiles", "st": "deepslate_tile_stairs", "sl": "deepslate_tile_slab", "wa": "deepslate_tile_wall", "sm": "cracked_deepslate_tiles"},
+        {"b": "bricks", "st": "brick_stairs", "sl": "brick_slab", "wa": "brick_wall"},
+        {"b": "packed_mud", "p4": "mud_bricks"},
+        {"b": "mud_bricks", "st": "mud_brick_stairs", "sl": "mud_brick_slab", "wa": "mud_brick_wall"},
+        {"b": "sandstone", "wa": "sandstone_wall", "p4": "cut_sandstone", "chsl": "sandstone_slab", "ch": "chiseled_sandstone", "sm": "smooth_sandstone"},
+        {"b": "cut_sandstone", "sl": "cut_sandstone_slab"},
+        {"b": "smooth_sandstone", "st": "smooth_sandstone_stairs", "sl": "smooth_sandstone_slab"},
+        {"b": "red_sandstone", "wa": "red_sandstone_wall", "p4": "cut_red_sandstone", "chsl": "red_sandstone_slab", "ch": "chiseled_red_sandstone", "sm": "smooth_red_sandstone"},
+        {"b": "cut_red_sandstone", "sl": "cut_red_sandstone_slab"},
+        {"b": "smooth_red_sandstone", "st": "smooth_red_sandstone_stairs", "sl": "smooth_red_sandstone_slab"},
+        {"b": "prismarine", "st": "prismarine_stairs", "sl": "prismarine_slab", "wa": "prismarine_wall"},
+        {"b": "prismarine_bricks", "st": "prismarine_brick_stairs", "sl": "prismarine_brick_slab"},
+        {"b": "dark_prismarine", "st": "dark_prismarine_stairs", "sl": "dark_prismarine_slab"},
+        {"b": "nether_bricks", "st": "nether_brick_stairs", "sl": "nether_brick_slab", "wa": "nether_brick_wall", "chsl": "nether_brick_slab", "ch": "chiseled_nether_bricks", "sm": "cracked_nether_bricks"},
+        {"b": "red_nether_bricks", "st": "red_nether_brick_stairs", "sl": "red_nether_brick_slab", "wa": "red_nether_brick_wall"},
+        {"b": "quartz_block", "p4": "quartz_bricks", "chsl": "quartz_slab", "ch": "chiseled_quartz_block", "sm": "smooth_quartz"},
+        {"b": "smooth_quartz", "st": "smooth_quartz_stairs", "sl": "smooth_quartz_slab"},
+        {"chsl": "purpur_slab", "ch": "purpur_pillar"},
+        {"b": "end_stone", "p4": "end_stone_bricks"},
+        {"b": "end_stone_bricks", "st": "end_stone_brick_stairs", "sl": "end_stone_brick_slab", "wa": "end_stone_brick_wall"},
+        {"b": "blackstone", "st": "blackstone_stairs", "sl": "blackstone_slab", "wa": "blackstone_wall", "p4": "polished_blackstone"},
+        {"b": "polished_blackstone", "st": "polished_blackstone_stairs", "sl": "polished_blackstone_slab", "wa": "polished_blackstone_wall", "p4": "polished_blackstone_bricks", "chsl": "polished_blackstone_slab", "ch": "chiseled_polished_blackstone"},
+        {"b": "polished_blackstone_bricks", "st": "polished_blackstone_brick_stairs", "sl": "polished_blackstone_brick_slab", "wa": "polished_blackstone_brick_wall", "sm": "cracked_polished_blackstone_bricks"},
+        {"b": "basalt", "p4": "polished_basalt", "sm": "smooth_basalt"},
+        {"b": "tuff", "st": "tuff_stairs", "sl": "tuff_slab", "wa": "tuff_wall", "p4": "polished_tuff", "chsl": "tuff_slab", "ch": "chiseled_tuff"},
+        {"b": "polished_tuff", "st": "polished_tuff_stairs", "sl": "polished_tuff_slab", "wa": "polished_tuff_wall", "p4": "tuff_bricks"},
+        {"b": "tuff_bricks", "st": "tuff_brick_stairs", "sl": "tuff_brick_slab", "wa": "tuff_brick_wall", "chsl": "tuff_brick_slab", "ch": "chiseled_tuff_bricks"},
+        {"b": "resin_bricks", "st": "resin_brick_stairs", "sl": "resin_brick_slab", "wa": "resin_brick_wall", "chsl": "resin_brick_slab", "ch": "chiseled_resin_bricks"},
+        {"b": "bamboo_mosaic", "st": "bamboo_mosaic_stairs", "sl": "bamboo_mosaic_slab", "chsl": "bamboo_slab", "ch": "bamboo_mosaic"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": "{b}"}, "result": {"id": "{st}", "count": 4}},
+        {"type": "shaped", "pattern": ["###"], "key": {"#": "{b}"}, "result": {"id": "{sl}", "count": 6}},
+        {"type": "shaped", "pattern": ["###", "###"], "key": {"#": "{b}"}, "result": {"id": "{wa}", "count": 6}},
+        {"type": "shaped", "pattern": ["##", "##"], "key": {"#": "{b}"}, "result": {"id": "{p4}", "count": 4}},
+        {"type": "shaped", "pattern": ["#", "#"], "key": {"#": "{chsl}"}, "result": {"id": "{ch}"}},
+        {"type": "smelting", "ingredient": "{b}", "result": {"id": "{sm}"}, "experience": 0.1, "cookingtime": 200}
+      ]
+    },
+    {
+      "name": "compress_2x2",
+      "_comment": "Four of an item in a square -> one block (one way).",
+      "rows": [
+        {"in": "sand", "out": "sandstone"},
+        {"in": "red_sand", "out": "red_sandstone"},
+        {"in": "brick", "out": "bricks"},
+        {"in": "nether_brick", "out": "nether_bricks"},
+        {"in": "resin_brick", "out": "resin_bricks"},
+        {"in": "quartz", "out": "quartz_block"},
+        {"in": "prismarine_shard", "out": "prismarine"},
+        {"in": "clay_ball", "out": "clay"},
+        {"in": "snowball", "out": "snow_block"},
+        {"in": "glowstone_dust", "out": "glowstone"},
+        {"in": "honeycomb", "out": "honeycomb_block"},
+        {"in": "honey_bottle", "out": "honey_block"},
+        {"in": "magma_cream", "out": "magma_block"},
+        {"in": "amethyst_shard", "out": "amethyst_block"},
+        {"in": "pointed_dripstone", "out": "dripstone_block"},
+        {"in": "string", "out": "white_wool"},
+        {"in": "rabbit_hide", "out": "leather"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["##", "##"], "key": {"#": "{in}"}, "result": {"id": "{out}"}}
+      ]
+    },
+    {
+      "name": "storage_blocks",
+      "_comment": "Nine items -> block, and block -> nine items.",
+      "rows": [
+        {"block": "coal_block", "item": "coal"},
+        {"block": "iron_block", "item": "iron_ingot"},
+        {"block": "gold_block", "item": "gold_ingot"},
+        {"block": "diamond_block", "item": "diamond"},
+        {"block": "emerald_block", "item": "emerald"},
+        {"block": "lapis_block", "item": "lapis_lazuli"},
+        {"block": "redstone_block", "item": "redstone"},
+        {"block": "copper_block", "item": "copper_ingot"},
+        {"block": "netherite_block", "item": "netherite_ingot"},
+        {"block": "raw_iron_block", "item": "raw_iron"},
+        {"block": "raw_copper_block", "item": "raw_copper"},
+        {"block": "raw_gold_block", "item": "raw_gold"},
+        {"block": "iron_ingot", "item": "iron_nugget"},
+        {"block": "gold_ingot", "item": "gold_nugget"},
+        {"block": "hay_block", "item": "wheat"},
+        {"block": "dried_kelp_block", "item": "dried_kelp"},
+        {"block": "slime_block", "item": "slime_ball"},
+        {"block": "bone_block", "item": "bone_meal"},
+        {"block": "resin_block", "item": "resin_clump"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["###", "###", "###"], "key": {"#": "{item}"}, "result": {"id": "{block}"}},
+        {"type": "shapeless", "ingredients": ["{block}"], "result": {"id": "{item}", "count": 9}}
+      ]
+    },
+    {
+      "name": "compress_3x3",
+      "_comment": "Nine of an item -> one block (one way).",
+      "rows": [
+        {"in": "melon_slice", "out": "melon"},
+        {"in": "nether_wart", "out": "nether_wart_block"},
+        {"in": "ice", "out": "packed_ice"},
+        {"in": "packed_ice", "out": "blue_ice"},
+        {"in": "prismarine_shard", "out": "prismarine_bricks"},
+        {"in": "bamboo", "out": "bamboo_block"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["###", "###", "###"], "key": {"#": "{in}"}, "result": {"id": "{out}"}}
+      ]
+    },
+    {
+      "name": "colors",
+      "_comment": "The 16 dye colors. Wool, carpets, beds and harnesses of any other color can be dyed (vanilla's dye_<color>_* recipes); #dyeable_to/<item> is the kind's tag minus <item>. Shulker boxes and bundles are recolored by component-keeping (transmute) recipes and are not here.",
+      "rows": [
+        {"c": "white"}, {"c": "orange"}, {"c": "magenta"}, {"c": "light_blue"},
+        {"c": "yellow"}, {"c": "lime"}, {"c": "pink"}, {"c": "gray"},
+        {"c": "light_gray"}, {"c": "cyan"}, {"c": "purple"}, {"c": "blue"},
+        {"c": "brown"}, {"c": "green"}, {"c": "red"}, {"c": "black"}
+      ],
+      "recipes": [
+        {"type": "shapeless", "ingredients": ["{c}_dye", "#dyeable_to/{c}_wool"], "result": {"id": "{c}_wool"}},
+        {"type": "shaped", "pattern": ["##"], "key": {"#": "{c}_wool"}, "result": {"id": "{c}_carpet", "count": 3}},
+        {"type": "shapeless", "ingredients": ["{c}_dye", "#dyeable_to/{c}_carpet"], "result": {"id": "{c}_carpet"}},
+        {"type": "shaped", "pattern": ["###", "XXX"], "key": {"#": "{c}_wool", "X": "#planks"}, "result": {"id": "{c}_bed"}},
+        {"type": "shapeless", "ingredients": ["{c}_dye", "#dyeable_to/{c}_bed"], "result": {"id": "{c}_bed"}},
+        {"type": "shaped", "pattern": ["###", "###", " | "], "key": {"#": "{c}_wool", "|": "stick"}, "result": {"id": "{c}_banner"}},
+        {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "glass", "X": "{c}_dye"}, "result": {"id": "{c}_stained_glass", "count": 8}},
+        {"type": "shaped", "pattern": ["###", "###"], "key": {"#": "{c}_stained_glass"}, "result": {"id": "{c}_stained_glass_pane", "count": 16}},
+        {"type": "shaped", "pattern": ["###", "#$#", "###"], "key": {"#": "glass_pane", "$": "{c}_dye"}, "result": {"id": "{c}_stained_glass_pane", "count": 8}},
+        {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "terracotta", "X": "{c}_dye"}, "result": {"id": "{c}_terracotta", "count": 8}},
+        {"type": "smelting", "ingredient": "{c}_terracotta", "result": {"id": "{c}_glazed_terracotta"}, "experience": 0.1, "cookingtime": 200},
+        {"type": "shapeless", "ingredients": ["{c}_dye", "sand", "sand", "sand", "sand", "gravel", "gravel", "gravel", "gravel"], "result": {"id": "{c}_concrete_powder", "count": 8}},
+        {"type": "shapeless", "ingredients": ["candle", "{c}_dye"], "result": {"id": "{c}_candle"}},
+        {"type": "shaped", "pattern": ["LLL", "G#G"], "key": {"L": "leather", "G": "glass", "#": "{c}_wool"}, "result": {"id": "{c}_harness"}},
+        {"type": "shapeless", "ingredients": ["{c}_dye", "#dyeable_to/{c}_harness"], "result": {"id": "{c}_harness"}}
+      ]
+    },
+    {
+      "name": "copper_shapes",
+      "_comment": "Each oxidation stage, unwaxed and waxed: cut copper (4), its stairs (4) and slab (6), chiseled copper (2 slabs), grates (4) and bulbs (4). Doors and trapdoors come from ingots (redstone.json) and oxidize; waxing is the next family.",
+      "rows": [
+        {"blk": "copper_block", "cut": "cut_copper", "stairs": "cut_copper_stairs", "slab": "cut_copper_slab", "chiseled": "chiseled_copper", "grate": "copper_grate", "bulb": "copper_bulb"},
+        {"blk": "exposed_copper", "cut": "exposed_cut_copper", "stairs": "exposed_cut_copper_stairs", "slab": "exposed_cut_copper_slab", "chiseled": "exposed_chiseled_copper", "grate": "exposed_copper_grate", "bulb": "exposed_copper_bulb"},
+        {"blk": "weathered_copper", "cut": "weathered_cut_copper", "stairs": "weathered_cut_copper_stairs", "slab": "weathered_cut_copper_slab", "chiseled": "weathered_chiseled_copper", "grate": "weathered_copper_grate", "bulb": "weathered_copper_bulb"},
+        {"blk": "oxidized_copper", "cut": "oxidized_cut_copper", "stairs": "oxidized_cut_copper_stairs", "slab": "oxidized_cut_copper_slab", "chiseled": "oxidized_chiseled_copper", "grate": "oxidized_copper_grate", "bulb": "oxidized_copper_bulb"},
+        {"blk": "waxed_copper_block", "cut": "waxed_cut_copper", "stairs": "waxed_cut_copper_stairs", "slab": "waxed_cut_copper_slab", "chiseled": "waxed_chiseled_copper", "grate": "waxed_copper_grate", "bulb": "waxed_copper_bulb"},
+        {"blk": "waxed_exposed_copper", "cut": "waxed_exposed_cut_copper", "stairs": "waxed_exposed_cut_copper_stairs", "slab": "waxed_exposed_cut_copper_slab", "chiseled": "waxed_exposed_chiseled_copper", "grate": "waxed_exposed_copper_grate", "bulb": "waxed_exposed_copper_bulb"},
+        {"blk": "waxed_weathered_copper", "cut": "waxed_weathered_cut_copper", "stairs": "waxed_weathered_cut_copper_stairs", "slab": "waxed_weathered_cut_copper_slab", "chiseled": "waxed_weathered_chiseled_copper", "grate": "waxed_weathered_copper_grate", "bulb": "waxed_weathered_copper_bulb"},
+        {"blk": "waxed_oxidized_copper", "cut": "waxed_oxidized_cut_copper", "stairs": "waxed_oxidized_cut_copper_stairs", "slab": "waxed_oxidized_cut_copper_slab", "chiseled": "waxed_oxidized_chiseled_copper", "grate": "waxed_oxidized_copper_grate", "bulb": "waxed_oxidized_copper_bulb"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["##", "##"], "key": {"#": "{blk}"}, "result": {"id": "{cut}", "count": 4}},
+        {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": "{cut}"}, "result": {"id": "{stairs}", "count": 4}},
+        {"type": "shaped", "pattern": ["###"], "key": {"#": "{cut}"}, "result": {"id": "{slab}", "count": 6}},
+        {"type": "shaped", "pattern": ["#", "#"], "key": {"#": "{slab}"}, "result": {"id": "{chiseled}"}},
+        {"type": "shaped", "pattern": [" M ", "M M", " M "], "key": {"M": "{blk}"}, "result": {"id": "{grate}", "count": 4}},
+        {"type": "shaped", "pattern": [" C ", "CBC", " R "], "key": {"C": "{blk}", "B": "blaze_rod", "R": "redstone"}, "result": {"id": "{bulb}", "count": 4}}
+      ]
+    },
+    {
+      "name": "copper_waxing",
+      "_comment": "Honeycomb + any unwaxed copper block -> its waxed_ twin.",
+      "rows": [
+        {"item": "copper_block"}, {"item": "exposed_copper"}, {"item": "weathered_copper"}, {"item": "oxidized_copper"},
+        {"item": "cut_copper"}, {"item": "exposed_cut_copper"}, {"item": "weathered_cut_copper"}, {"item": "oxidized_cut_copper"},
+        {"item": "cut_copper_stairs"}, {"item": "exposed_cut_copper_stairs"}, {"item": "weathered_cut_copper_stairs"}, {"item": "oxidized_cut_copper_stairs"},
+        {"item": "cut_copper_slab"}, {"item": "exposed_cut_copper_slab"}, {"item": "weathered_cut_copper_slab"}, {"item": "oxidized_cut_copper_slab"},
+        {"item": "chiseled_copper"}, {"item": "exposed_chiseled_copper"}, {"item": "weathered_chiseled_copper"}, {"item": "oxidized_chiseled_copper"},
+        {"item": "copper_grate"}, {"item": "exposed_copper_grate"}, {"item": "weathered_copper_grate"}, {"item": "oxidized_copper_grate"},
+        {"item": "copper_bulb"}, {"item": "exposed_copper_bulb"}, {"item": "weathered_copper_bulb"}, {"item": "oxidized_copper_bulb"},
+        {"item": "copper_door"}, {"item": "exposed_copper_door"}, {"item": "weathered_copper_door"}, {"item": "oxidized_copper_door"},
+        {"item": "copper_trapdoor"}, {"item": "exposed_copper_trapdoor"}, {"item": "weathered_copper_trapdoor"}, {"item": "oxidized_copper_trapdoor"}
+      ],
+      "recipes": [
+        {"type": "shapeless", "ingredients": ["{item}", "honeycomb"], "result": {"id": "waxed_{item}"}}
+      ]
+    },
+    {
+      "name": "tools",
+      "rows": [
+        {"m": "wooden", "x": "#wooden_tool_materials"},
+        {"m": "stone", "x": "#stone_tool_materials"},
+        {"m": "iron", "x": "#iron_tool_materials"},
+        {"m": "golden", "x": "#gold_tool_materials"},
+        {"m": "diamond", "x": "#diamond_tool_materials"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["XXX", " # ", " # "], "key": {"X": "{x}", "#": "stick"}, "result": {"id": "{m}_pickaxe"}},
+        {"type": "shaped", "pattern": ["XX", "X#", " #"], "key": {"X": "{x}", "#": "stick"}, "result": {"id": "{m}_axe"}},
+        {"type": "shaped", "pattern": ["X", "#", "#"], "key": {"X": "{x}", "#": "stick"}, "result": {"id": "{m}_shovel"}},
+        {"type": "shaped", "pattern": ["XX", " #", " #"], "key": {"X": "{x}", "#": "stick"}, "result": {"id": "{m}_hoe"}},
+        {"type": "shaped", "pattern": ["X", "X", "#"], "key": {"X": "{x}", "#": "stick"}, "result": {"id": "{m}_sword"}}
+      ]
+    },
+    {
+      "name": "armor",
+      "_comment": "Chainmail and netherite armor are not crafted (netherite is a smithing upgrade).",
+      "rows": [
+        {"m": "leather", "x": "leather"},
+        {"m": "iron", "x": "iron_ingot"},
+        {"m": "golden", "x": "gold_ingot"},
+        {"m": "diamond", "x": "diamond"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["XXX", "X X"], "key": {"X": "{x}"}, "result": {"id": "{m}_helmet"}},
+        {"type": "shaped", "pattern": ["X X", "XXX", "XXX"], "key": {"X": "{x}"}, "result": {"id": "{m}_chestplate"}},
+        {"type": "shaped", "pattern": ["XXX", "X X", "X X"], "key": {"X": "{x}"}, "result": {"id": "{m}_leggings"}},
+        {"type": "shaped", "pattern": ["X X", "X X"], "key": {"X": "{x}"}, "result": {"id": "{m}_boots"}}
+      ]
+    },
+    {
+      "name": "smithing_template_copies",
+      "_comment": "Copying a smithing template on the crafting table: template + 7 diamonds + its block -> 2 templates. The bolt template takes copper or waxed copper and is in misc.json.",
+      "rows": [
+        {"t": "netherite_upgrade", "m": "netherrack"},
+        {"t": "sentry_armor_trim", "m": "cobblestone"},
+        {"t": "vex_armor_trim", "m": "cobblestone"},
+        {"t": "wild_armor_trim", "m": "mossy_cobblestone"},
+        {"t": "coast_armor_trim", "m": "cobblestone"},
+        {"t": "dune_armor_trim", "m": "sandstone"},
+        {"t": "wayfinder_armor_trim", "m": "terracotta"},
+        {"t": "raiser_armor_trim", "m": "terracotta"},
+        {"t": "shaper_armor_trim", "m": "terracotta"},
+        {"t": "host_armor_trim", "m": "terracotta"},
+        {"t": "ward_armor_trim", "m": "cobbled_deepslate"},
+        {"t": "silence_armor_trim", "m": "cobbled_deepslate"},
+        {"t": "tide_armor_trim", "m": "prismarine"},
+        {"t": "snout_armor_trim", "m": "blackstone"},
+        {"t": "rib_armor_trim", "m": "netherrack"},
+        {"t": "eye_armor_trim", "m": "end_stone"},
+        {"t": "spire_armor_trim", "m": "purpur_block"},
+        {"t": "flow_armor_trim", "m": "breeze_rod"}
+      ],
+      "recipes": [
+        {"type": "shaped", "pattern": ["#S#", "#C#", "###"], "key": {"#": "diamond", "S": "{t}_smithing_template", "C": "{m}"}, "result": {"id": "{t}_smithing_template", "count": 2}}
+      ]
+    },
+    {
+      "name": "cook_food",
+      "_comment": "Raw food -> cooked in a furnace, smoker and on a campfire (0.35 xp; campfires give none).",
+      "rows": [
+        {"raw": "beef", "cooked": "cooked_beef"},
+        {"raw": "porkchop", "cooked": "cooked_porkchop"},
+        {"raw": "chicken", "cooked": "cooked_chicken"},
+        {"raw": "mutton", "cooked": "cooked_mutton"},
+        {"raw": "rabbit", "cooked": "cooked_rabbit"},
+        {"raw": "cod", "cooked": "cooked_cod"},
+        {"raw": "salmon", "cooked": "cooked_salmon"},
+        {"raw": "potato", "cooked": "baked_potato"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{raw}", "result": {"id": "{cooked}"}, "experience": 0.35, "cookingtime": 200},
+        {"type": "smoking", "ingredient": "{raw}", "result": {"id": "{cooked}"}, "experience": 0.35, "cookingtime": 100},
+        {"type": "campfire_cooking", "ingredient": "{raw}", "result": {"id": "{cooked}"}, "experience": 0, "cookingtime": 600}
+      ]
+    },
+    {
+      "name": "ores_xp_0.1",
+      "rows": [
+        {"in": "coal_ore", "out": "coal"},
+        {"in": "deepslate_coal_ore", "out": "coal"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.1, "cookingtime": 200},
+        {"type": "blasting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.1, "cookingtime": 100}
+      ]
+    },
+    {
+      "name": "ores_xp_0.2",
+      "rows": [
+        {"in": "lapis_ore", "out": "lapis_lazuli"},
+        {"in": "deepslate_lapis_ore", "out": "lapis_lazuli"},
+        {"in": "nether_quartz_ore", "out": "quartz"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.2, "cookingtime": 200},
+        {"type": "blasting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.2, "cookingtime": 100}
+      ]
+    },
+    {
+      "name": "ores_xp_0.7",
+      "rows": [
+        {"in": "iron_ore", "out": "iron_ingot"},
+        {"in": "deepslate_iron_ore", "out": "iron_ingot"},
+        {"in": "raw_iron", "out": "iron_ingot"},
+        {"in": "copper_ore", "out": "copper_ingot"},
+        {"in": "deepslate_copper_ore", "out": "copper_ingot"},
+        {"in": "raw_copper", "out": "copper_ingot"},
+        {"in": "redstone_ore", "out": "redstone"},
+        {"in": "deepslate_redstone_ore", "out": "redstone"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.7, "cookingtime": 200},
+        {"type": "blasting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 0.7, "cookingtime": 100}
+      ]
+    },
+    {
+      "name": "ores_xp_1.0",
+      "rows": [
+        {"in": "gold_ore", "out": "gold_ingot"},
+        {"in": "deepslate_gold_ore", "out": "gold_ingot"},
+        {"in": "nether_gold_ore", "out": "gold_ingot"},
+        {"in": "raw_gold", "out": "gold_ingot"},
+        {"in": "diamond_ore", "out": "diamond"},
+        {"in": "deepslate_diamond_ore", "out": "diamond"},
+        {"in": "emerald_ore", "out": "emerald"},
+        {"in": "deepslate_emerald_ore", "out": "emerald"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 1.0, "cookingtime": 200},
+        {"type": "blasting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 1.0, "cookingtime": 100}
+      ]
+    },
+    {
+      "name": "ores_xp_2.0",
+      "rows": [
+        {"in": "ancient_debris", "out": "netherite_scrap"}
+      ],
+      "recipes": [
+        {"type": "smelting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 2.0, "cookingtime": 200},
+        {"type": "blasting", "ingredient": "{in}", "result": {"id": "{out}"}, "experience": 2.0, "cookingtime": 100}
+      ]
+    }
+  ]
+}

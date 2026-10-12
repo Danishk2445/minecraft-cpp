@@ -1,0 +1,20 @@
+{
+  "_comment": "Rails, minecarts and riding gear (vanilla 1.21.8). Boats and rafts are in families.json (wood), harnesses in families.json (colors).",
+  "recipes": [
+    {"type": "shaped", "pattern": ["X X", "X#X", "X X"], "key": {"X": "iron_ingot", "#": "stick"}, "result": {"id": "rail", "count": 16}},
+    {"type": "shaped", "pattern": ["X X", "X#X", "XRX"], "key": {"X": "gold_ingot", "#": "stick", "R": "redstone"}, "result": {"id": "powered_rail", "count": 6}},
+    {"type": "shaped", "pattern": ["X X", "X#X", "XRX"], "key": {"X": "iron_ingot", "#": "stone_pressure_plate", "R": "redstone"}, "result": {"id": "detector_rail", "count": 6}},
+    {"type": "shaped", "pattern": ["XSX", "X#X", "XSX"], "key": {"X": "iron_ingot", "#": "redstone_torch", "S": "stick"}, "result": {"id": "activator_rail", "count": 6}},
+    {"type": "shaped", "pattern": ["# #", "###"], "key": {"#": "iron_ingot"}, "result": {"id": "minecart"}},
+    {"type": "shapeless", "ingredients": ["chest", "minecart"], "result": {"id": "chest_minecart"}},
+    {"type": "shapeless", "ingredients": ["furnace", "minecart"], "result": {"id": "furnace_minecart"}},
+    {"type": "shapeless", "ingredients": ["hopper", "minecart"], "result": {"id": "hopper_minecart"}},
+    {"type": "shapeless", "ingredients": ["tnt", "minecart"], "result": {"id": "tnt_minecart"}},
+    {"type": "shaped", "pattern": ["# ", " X"], "key": {"#": "fishing_rod", "X": "carrot"}, "result": {"id": "carrot_on_a_stick"}},
+    {"type": "shaped", "pattern": ["# ", " X"], "key": {"#": "fishing_rod", "X": "warped_fungus"}, "result": {"id": "warped_fungus_on_a_stick"}},
+    {"_comment": "craftable since 1.21.5",
+     "type": "shaped", "pattern": [" X ", "X#X"], "key": {"X": "leather", "#": "iron_ingot"}, "result": {"id": "saddle"}},
+    {"_comment": "1.21.6 replaced the slime ball with a fifth string",
+     "type": "shaped", "pattern": ["~~ ", "~~ ", "  ~"], "key": {"~": "string"}, "result": {"id": "lead", "count": 2}}
+  ]
+}

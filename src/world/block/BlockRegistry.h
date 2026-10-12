@@ -164,7 +164,5 @@ private:
     std::vector<Shape> shapes_;
 };
 
-// '*' wildcard match against a block id without namespace ("oak_stairs" ~ "*_stairs").
-bool globMatch(std::string_view pattern, std::string_view text);
 
 } // namespace mc

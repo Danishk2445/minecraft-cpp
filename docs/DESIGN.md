@@ -228,7 +228,7 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - sword 15 on cobweb, 1.5 on plants and leaves.
 - **Penalties:** ×0.2 underwater without Aqua Affinity; ÷5 when not on the ground.
 - **Timing:** a 5-tick delay between blocks; crack stage = `floor(progress·10)`.
-- **Data:** `hardness` and `requires_tool` rules in `data/blocks/properties.json`; tools arrive with survival (M10), so M6 breaks with an empty hand.
+- **Data:** `hardness` and `requires_tool` rules in `data/blocks/properties.json`; tool tiers and kinds in `data/items/items.json`.
 - **Reference break times:**
   - hand on stone: 150 ticks;
   - wooden pickaxe on stone: 23;
@@ -243,41 +243,52 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
 - **Drops:** blocks drop with chance 1/P.
 - **Power:** TNT 4 with an 80-tick fuse; creeper 3, with a 30-tick fuse.
 
-## Survival *(mem)*
-- **Hunger:**
+## Survival (`entity/Player`, `game/FoodData`, `game/Damage`, `game/Tools`)
+- **Hunger** (FoodData):
   - Every 4.0 exhaustion: saturation −1 if it is above 0, otherwise food −1 (except in Peaceful).
   - Regeneration (`tickTimer` = ticks since the last heal):
     - food 20, saturation > 0, hurt: every 10 ticks heal `min(sat,6)/6` and add that much exhaustion;
     - food ≥ 18 and hurt: every 80 ticks heal 1 and add 6 exhaustion;
     - food 0: every 80 ticks deal 1 damage, down to 10 HP on Easy, 1 on Normal, or death on Hard.
+  - Peaceful with naturalRegeneration: heal 1 every 20 ticks and add 1 food every 10.
   - Exhaustion costs:
-    - sprinting 0.1 per meter, swimming 0.01 per meter;
+    - sprinting 0.1 per meter, swimming 0.01 per meter (meters rounded to centimeters);
     - jumping 0.05, sprint-jumping 0.2;
-    - attacking and taking damage 0.1 each;
+    - taking damage 0.1 (most sources), attacking 0.1 (M12);
     - breaking a block 0.005.
-- **Armor:** damage × `(1 - min(20, max(a/5, a - 4d/(t+8)))/25)`, where a is armor, t is toughness and d is damage.
-  - points (helmet/chest/legs/boots): leather 1/3/2/1, chain 2/5/4/1, iron 2/6/5/2, gold 2/5/3/1, diamond 3/8/6/3 with toughness 2;
+  - Eating (FoodData.add): `food = min(food + n, 20)`, `saturation = min(saturation + s, food)`, where s is the food's saturation (nutrition × modifier × 2 in the older terms: a cake slice is 2 and 0.4). Sprinting needs food > 6.
+- **Damage** (hurt, actuallyHurt):
+  - A hit starts 20 ticks of invulnerability. While more than 10 remain, only a harder hit counts, and only by what it adds over the last.
+  - Armor wears by `max(1, ⌊d/4⌋)` per piece, then damage × `(1 − clamp(a − d/(2 + t/4), a/5, 20)/25)`, where a is armor, t toughness and d damage.
+  - Falling (1.21.5): `⌊(fall + 1e−6 − 3)·m⌋`, with the landing tick's movement counted. Blocks' fallOn: hay and honey m = 0.2; slime 0 unless sneaking; beds halve the fall; a stalagmite tip adds 2.5 and m = 2.
+  - Drowning: air 300, −1 per tick with the eyes in water; at −20 it resets to 0 and deals 2. It refills 4 per tick.
+  - Lava: 4 and 15 s of fire. Fire blocks: 1 (soul fire 2) and 8 s of fire. Burning: 1 every 20 ticks. Cactus, campfires, magma (not sneaking), sweet berry bushes (while moving) and suffocation: 1 each. The void (64 below the bottom): 4.
+- **Death:** experience dropped is `min(7·level, 100)`; the inventory spills (unless keepInventory); the camera rolls `40 − 8000/(min(deathTime, 20) + 200)` degrees, and the model falls over `min(√((deathTime − 1)/20·1.6), 1)·90` degrees about z.
+- **Hurt overlay:** while hurt or dead the model mixes 30% red (OverlayTexture: red at alpha 178, `mix(color, red, 1 − 178/255)`) before the light.
+- **Armor:**
+  - points (helmet/chest/legs/boots): leather 1/3/2/1, chain 2/5/4/1, iron 2/6/5/2, gold 2/5/3/1, diamond 3/8/6/3 and netherite 3/8/6/3, toughness 2 for diamond and 3 for netherite;
   - durability = base × factor, with base: helmet 11, chest 16, legs 15, boots 13;
-  - factor: leather 5, chain 15, iron 15, gold 7, diamond 33.
-- **Tools:**
-  - durability: wood 59, stone 131, iron 250, diamond 1561, gold 32.
+  - factor: leather 5, chain 15, iron 15, gold 7, diamond 33, netherite 37.
+  - Right-clicking a piece swaps it with what is worn (Equippable.swapWithEquipmentSlot).
+- **Tools** (Tool component):
+  - durability: wood 59, stone 131, iron 250, diamond 1561, gold 32, netherite 2031.
   - damage (wood/stone/iron/diamond/gold): sword 4/5/6/7/4; axe 7/9/9/9/7; pickaxe 2/3/4/5/2; shovel 2.5/3.5/4.5/5.5/2.5.
-  - attack speed: sword 1.6, pickaxe 1.2, shovel 1.0, axe 0.8–1.0, hand 4.
-- **Combat:**
-  - cooldown = 20/attackSpeed ticks; multiplier `0.2 + s²·0.8`;
+  - attack speed: sword 1.6, pickaxe 1.2, shovel 1.0, axe 0.8–1.0, hoe 1–4, hand 4.
+  - Wear: 1 per block with hardness > 0 (swords 2). Correct-tool rules: `minecraft:incorrect_for_<tier>_tool` denies drops first, then `mineable/<kind>` gives the tier's speed and drops.
+- **Attack strength:** `attackStrengthTicker` counts up each tick; it resets when swinging at nothing, attacking, or changing the kind of held item. Scale `clamp((ticker + adjust)/(20/attackSpeed), 0, 1)`; attack damage × `0.2 + s²·0.8` (M12). A miss outside creative pauses attacking for 10 ticks (missTime).
+- **Combat** *(mem, M12)*:
   - a crit (falling, scale > 0.9) does ×1.5;
-  - knockback is 0.4, plus 1 level when sprinting;
-  - 10 ticks of invulnerability after a hit.
-- **Difficulty:** mob→player damage on Easy is `min(d/2+1, d)`, on Normal `d`, on Hard `1.5d`.
-- **XP to the next level:** `2L+7` (L ≤ 15), `5L−38` (L ≤ 30), `9L−158`.
-- **Items and smelting:**
-  - item entities have a 10-tick pickup delay (40 when thrown), despawn after 6000 ticks, and merge within 0.5 blocks;
-  - smelting takes 200 ticks (100 in a smoker or blast furnace);
-  - fuel: coal 1600, log or planks 300, stick 100, lava bucket 20000, coal block 16000.
+  - knockback is 0.4, plus 1 level when sprinting.
+- **Difficulty** *(mem, M12)*: mob→player damage on Easy is `min(d/2+1, d)`, on Normal `d`, on Hard `1.5d`.
+- **Experience:** to the next level `2L+7` (L ≤ 15), `5L−38` (L ≤ 30), `9L−158`. Orbs split into the largest of 2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3, 1; they drift to a player within 8 blocks (`(1 − d/8)²·0.1` per tick) and are taken one per 2 ticks.
+- **Item entities:** a 10-tick pickup delay (40 when thrown); gravity 0.04 with 0.98 drag (×0.6 friction on the ground); they rise slowly in water; merge with equal stacks within 0.5 blocks; despawn after 6000 ticks; burn in fire and lava unless fire resistant.
+- **Furnaces** (AbstractFurnaceBlockEntity.serverTick): fuel lights when there is something to cook; cooking takes the recipe's time (200; 100 in a smoker or blast furnace); without fire the progress unwinds 2 per tick. Experience gathers per item and is paid when the output is taken, its fraction rounded up by chance. Fuel: coal 1600, logs and planks 300, sticks 100, a lava bucket 20000 (leaving the bucket), a coal block 16000.
+- **Crafting:** the grid trims to its filled cells; shaped recipes match as written or mirrored; shapeless ones pair ingredients off with the items (bipartite matching). The result slot gives its whole stack or nothing. Two damaged tools of one kind repair to the sum of their durability plus 5% of the maximum.
 - **Sleeping:**
-  - allowed from time 12541 to 23458, or during a thunderstorm;
-  - no monsters within 8 blocks horizontally or 5 vertically;
-  - skips to the next morning.
+  - at night (sky darkening ≥ 4) or in a thunderstorm (M11); no monsters within 8 blocks horizontally or 5 vertically (M12);
+  - the player lies at the head `(x + 0.5, y + 0.6875, z + 0.5)`; after 100 ticks asleep the time skips to the next multiple of 24000;
+  - first person looks along the bed from the pillow; third person draws the model laid along the bed, `T(−facing·1.52)·Ry(south 90, west 0, north 270, east 180)·Rz(90)·Ry(270)`.
+- **Signs** (SignRenderer): `T(0.5, 0.5, 0.5)·Ry(−rotation)` (wall signs then `T(0, −0.3125, −0.4375)`); hanging signs `T(0.5, 0.9375, 0.5)·Ry(−rotation)·T(0, −0.3125, 0)`. The back side turns 180°. Text: `T(0, 0.3333, 0.0467)·S(1/96, −1/96, 1/96)` (hanging: `T(0, −0.32, 0.073)` and 0.9/64), lines 10 (9) apart from −20 (−18), centered by `−width/2`, at most 90 (60) pixels. Plain text is the dye color × 0.4 in the block's light; glowing text is full-bright, outlined in that dark color (cream F0EBCC for black) within 16 blocks. The editor (SignEditScreen) draws the board 96×48 at `(w/2 − 48, 66)` and text at y 90, scale 0.9765628 (hanging: a 16-px picture at 4.5× and text at y 125); the cursor blinks every 6 ticks.
 
 ## Mobs *(mem)*
 | Mob | HP | Speed | Size | Notes |
@@ -409,7 +420,8 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - hearts from `(w/2 − 91, h − 39)` with an 8-pixel step, shaking at 4 health or less; food from the right edge `w/2 + 91 − 8i − 9`; armor 10 above the hearts; air above the food;
   - the XP bar is `(w/2 − 91, h − 29)` 182×5, with `filled = (int)(progress·183)`;
   - the selected item's name shows for 40 ticks (alpha `timer·256/10`, capped) at `h − 59` (`h − 45` in creative);
-  - the crosshair blends `ONE_MINUS_DST_COLOR, ONE_MINUS_SRC_COLOR`.
+  - the crosshair blends `ONE_MINUS_DST_COLOR, ONE_MINUS_SRC_COLOR`; under it, while the attack strength recovers, a 16×4 bar at `(w/2 − 8, h/2 + 9)` filled `(int)(s·17)`; or (option Hotbar) an 18×18 sword at `(w/2 + 97, h − 20)` filled from the bottom `(int)(s·19)`;
+  - hearts blink (`(blinkTime − ticks)/3` odd) for 20 ticks after health drops while invulnerable, 10 after it rises; the containers turn white and the health just lost shows as `*_blinking` hearts under the rest.
 - **Item models** (`resources/ItemDefinitions`, `ItemModelGenerator`, `entity/model/ItemGeometry`):
   - Definitions are trees of `model` (with tints), `condition`, `select`, `range_dispatch` (the last threshold ≤ value·scale), `special`, `composite`, `empty` and `bundle/selected_item`.
   - A select or range with no match falls back to its fallback, else the missing model.
@@ -433,7 +445,7 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
     Ry(±(45 − 20·sin(s²π)))·Rz(∓20·sin(√s·π))·Rx(−80·sin(√s·π))·Ry(∓45)
     ```
   - The bare arm uses vanilla renderPlayerArm's constants (`0.64, −0.6, −0.72`, then `T(∓1, 3.6, 3.5)·Rz(±120)·Rx(200)·Ry(∓135)·T(±5.6, 0, 0)`), with the arm at zRot 0.1.
-  - The equip height eases toward 1 (0 while a different item is shown) by at most 0.4 per tick. The shown item swaps once the height is below 0.1.
+  - The equip height eases toward 1 (the main hand: the attack strength cubed; 0 while a different item is shown) by at most 0.4 per tick. The shown item swaps once the height is below 0.1.
   - Third person (ItemInHandLayer): `arm pose·Rx(−90)·Ry(180)·T(±1/16, 0.125, −0.625)`, then the third-person display transform.
 - **Menus** (`game/Menu`, vanilla AbstractContainerMenu):
   - pickup and split clicks: right click takes half rounded up, or places one;

@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#signs"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

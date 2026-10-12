@@ -37,8 +37,5 @@ std::vector<std::pair<BlockPos, StateId>> placementStates(const BlockRegistry& r
 std::optional<StateId> mergeIntoClicked(const BlockRegistry& reg, StateId clicked, const Block& block,
                                         Direction clickedFace, double hitYInBlock);
 
-// Vanilla destroy progress per tick with an empty hand: 1/hardness/30, or /100 when
-// the block needs a tool; slowed 5x underwater and 5x in the air.
-float destroyProgressPerTick(const Block& block, const Player& player);
 
 } // namespace mc

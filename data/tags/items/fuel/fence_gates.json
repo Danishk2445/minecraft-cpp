@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#fence_gates"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

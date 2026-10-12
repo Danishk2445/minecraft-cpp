@@ -1,0 +1,16 @@
+{
+  "values": [
+    "gold_ore",
+    "deepslate_gold_ore",
+    "gold_block",
+    "raw_gold_block",
+    "redstone_ore",
+    "deepslate_redstone_ore",
+    "emerald_ore",
+    "deepslate_emerald_ore",
+    "emerald_block",
+    "diamond_ore",
+    "deepslate_diamond_ore",
+    "diamond_block"
+  ]
+}

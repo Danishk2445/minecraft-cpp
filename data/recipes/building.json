@@ -1,0 +1,38 @@
+{
+  "_comment": "One-off building-block recipes (vanilla 1.21.8). Stairs, slabs, walls, polished/bricks/chiseled variants and storage blocks are in families.json.",
+  "recipes": [
+    {"_comment": "sandstone, red sandstone, quartz and purpur stairs/slabs accept several kinds of the block",
+     "type": "shaped", "pattern": ["###"], "key": {"#": ["sandstone", "chiseled_sandstone"]}, "result": {"id": "sandstone_slab", "count": 6}},
+    {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": ["sandstone", "chiseled_sandstone", "cut_sandstone"]}, "result": {"id": "sandstone_stairs", "count": 4}},
+    {"type": "shaped", "pattern": ["###"], "key": {"#": ["red_sandstone", "chiseled_red_sandstone"]}, "result": {"id": "red_sandstone_slab", "count": 6}},
+    {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": ["red_sandstone", "chiseled_red_sandstone", "cut_red_sandstone"]}, "result": {"id": "red_sandstone_stairs", "count": 4}},
+    {"type": "shaped", "pattern": ["###"], "key": {"#": ["chiseled_quartz_block", "quartz_block", "quartz_pillar"]}, "result": {"id": "quartz_slab", "count": 6}},
+    {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": ["chiseled_quartz_block", "quartz_block", "quartz_pillar"]}, "result": {"id": "quartz_stairs", "count": 4}},
+    {"type": "shaped", "pattern": ["###"], "key": {"#": ["purpur_block", "purpur_pillar"]}, "result": {"id": "purpur_slab", "count": 6}},
+    {"type": "shaped", "pattern": ["#  ", "## ", "###"], "key": {"#": ["purpur_block", "purpur_pillar"]}, "result": {"id": "purpur_stairs", "count": 4}},
+
+    {"type": "shaped", "pattern": ["#", "#"], "key": {"#": "quartz_block"}, "result": {"id": "quartz_pillar", "count": 2}},
+    {"type": "shaped", "pattern": ["FF", "FF"], "key": {"F": "popped_chorus_fruit"}, "result": {"id": "purpur_block", "count": 4}},
+    {"type": "shapeless", "ingredients": ["cobblestone", "vine"], "result": {"id": "mossy_cobblestone"}},
+    {"type": "shapeless", "ingredients": ["cobblestone", "moss_block"], "result": {"id": "mossy_cobblestone"}},
+    {"type": "shapeless", "ingredients": ["stone_bricks", "vine"], "result": {"id": "mossy_stone_bricks"}},
+    {"type": "shapeless", "ingredients": ["stone_bricks", "moss_block"], "result": {"id": "mossy_stone_bricks"}},
+    {"type": "shapeless", "ingredients": ["diorite", "quartz"], "result": {"id": "granite"}},
+    {"type": "shaped", "pattern": ["CQ", "QC"], "key": {"C": "cobblestone", "Q": "quartz"}, "result": {"id": "diorite", "count": 2}},
+    {"type": "shapeless", "ingredients": ["diorite", "cobblestone"], "result": {"id": "andesite", "count": 2}},
+    {"type": "shaped", "pattern": ["DG", "GD"], "key": {"D": "dirt", "G": "gravel"}, "result": {"id": "coarse_dirt", "count": 4}},
+    {"type": "shapeless", "ingredients": ["mud", "wheat"], "result": {"id": "packed_mud"}},
+    {"type": "shapeless", "ingredients": ["mud", "mangrove_roots"], "result": {"id": "muddy_mangrove_roots"}},
+    {"type": "shaped", "pattern": ["SSS", "SIS", "SSS"], "key": {"S": "prismarine_shard", "I": "black_dye"}, "result": {"id": "dark_prismarine"}},
+    {"type": "shaped", "pattern": ["SCS", "CCC", "SCS"], "key": {"S": "prismarine_shard", "C": "prismarine_crystals"}, "result": {"id": "sea_lantern"}},
+    {"type": "shaped", "pattern": ["NW", "WN"], "key": {"N": "nether_brick", "W": "nether_wart"}, "result": {"id": "red_nether_bricks"}},
+    {"type": "shaped", "pattern": ["W#W", "W#W"], "key": {"W": "nether_bricks", "#": "nether_brick"}, "result": {"id": "nether_brick_fence", "count": 6}},
+    {"type": "shaped", "pattern": ["###", "###"], "key": {"#": "glass"}, "result": {"id": "glass_pane", "count": 16}},
+    {"type": "shaped", "pattern": [" S ", "SGS", " S "], "key": {"S": "amethyst_shard", "G": "glass"}, "result": {"id": "tinted_glass", "count": 2}},
+    {"type": "shaped", "pattern": ["###"], "key": {"#": "snow_block"}, "result": {"id": "snow", "count": 6}},
+    {"type": "shaped", "pattern": ["##"], "key": {"#": "moss_block"}, "result": {"id": "moss_carpet", "count": 3}},
+    {"type": "shaped", "pattern": ["##"], "key": {"#": "pale_moss_block"}, "result": {"id": "pale_moss_carpet", "count": 3}},
+    {"type": "shaped", "pattern": ["###", "###"], "key": {"#": "iron_ingot"}, "result": {"id": "iron_bars", "count": 16}},
+    {"type": "shaped", "pattern": ["N", "I", "N"], "key": {"N": "iron_nugget", "I": "iron_ingot"}, "result": {"id": "chain"}}
+  ]
+}

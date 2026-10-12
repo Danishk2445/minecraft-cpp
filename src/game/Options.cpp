@@ -32,6 +32,7 @@ std::string Options::toJson() const {
         {"clouds", int(clouds)},
         {"particles", int(particles)},
         {"menuBlur", menuBlur},
+        {"attackIndicator", int(attackIndicator)},
         {"mouseSensitivity", mouseSensitivity},
         {"invertMouse", invertMouse},
         {"chatVisibility", int(chatVisibility)},
@@ -63,6 +64,7 @@ Options Options::fromJson(std::string_view text, std::string* error) {
         o.clouds = enumFrom(j, "clouds", o.clouds, 3);
         o.particles = enumFrom(j, "particles", o.particles, 3);
         o.menuBlur = std::clamp(j.value("menuBlur", o.menuBlur), 0, 10);
+        o.attackIndicator = enumFrom(j, "attackIndicator", o.attackIndicator, 3);
         o.mouseSensitivity = std::clamp(j.value("mouseSensitivity", o.mouseSensitivity), 0.0f, 1.0f);
         o.invertMouse = j.value("invertMouse", o.invertMouse);
         o.chatVisibility = enumFrom(j, "chatVisibility", o.chatVisibility, 3);

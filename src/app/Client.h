@@ -19,6 +19,8 @@ class BlockRegistry;
 class Chat;
 class ClientAssets;
 class CreativeTabs;
+class BlockLoot;
+class RecipeBook;
 class GuiGraphics;
 class ItemRegistry;
 class Language;
@@ -34,6 +36,8 @@ struct Client {
     std::unique_ptr<ItemRegistry> items;
     std::unique_ptr<Language> lang;
     std::unique_ptr<CreativeTabs> creativeTabs;
+    std::unique_ptr<RecipeBook> recipes;
+    std::unique_ptr<BlockLoot> loot;
     std::unique_ptr<GuiGraphics> gui;
     std::unique_ptr<Chat> chat;
     Commands commands;

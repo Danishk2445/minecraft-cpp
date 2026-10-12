@@ -2,6 +2,9 @@
 // GL-free: runs on worker threads and in unit tests.
 #pragma once
 
+#include <memory>
+#include <unordered_set>
+
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -65,6 +68,8 @@ struct MesherOptions {
     FluidSprites fluids;
     glm::vec3 cameraPos{0.0f};           // world position, for the initial translucent sort
     const BlockEntityMeshes* blockEntities = nullptr; // chests, beds, signs... (null: not drawn)
+    // Block entities drawn by the entity renderer for now (chests opening): left out.
+    std::shared_ptr<const std::unordered_set<BlockPos>> dynamicBlockEntities;
 };
 
 struct MesherStats {

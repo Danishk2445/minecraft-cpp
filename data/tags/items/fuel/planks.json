@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#planks"
+  ],
+  "exclude": [
+    "#non_flammable_wood"
+  ]
+}

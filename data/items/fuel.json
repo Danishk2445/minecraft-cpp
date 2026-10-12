@@ -1,0 +1,31 @@
+{
+  "_comment": "Furnace, smoker and blast furnace fuel: burn time in ticks (vanilla 1.21.8 FuelValues, base unit 200 = one item smelted). The first rule that matches an item wins; items no rule matches are not fuel. Crimson and warped wood never burns: the fuel/* tags are the vanilla wood tags minus #non_flammable_wood.",
+  "rules": [
+    {"match": ["lava_bucket"], "ticks": 20000},
+    {"match": ["coal_block"], "ticks": 16000},
+    {"match": ["dried_kelp_block"], "ticks": 4001},
+    {"match": ["blaze_rod"], "ticks": 2400},
+    {"match": ["coal", "charcoal"], "ticks": 1600},
+    {"match": ["#boats"], "ticks": 1200},
+    {"match": ["#fuel/hanging_signs"], "ticks": 800},
+    {"match": [
+      "#logs_that_burn", "#bamboo_blocks", "#fuel/planks", "bamboo_mosaic",
+      "#fuel/wooden_stairs", "bamboo_mosaic_stairs", "#fuel/wooden_trapdoors", "#fuel/wooden_pressure_plates",
+      "#fuel/wooden_fences", "#fuel/fence_gates", "#banners",
+      "note_block", "bookshelf", "chiseled_bookshelf", "lectern", "jukebox", "chest", "trapped_chest",
+      "crafting_table", "daylight_detector", "loom", "barrel", "cartography_table", "fletching_table",
+      "smithing_table", "composter", "ladder", "bow", "crossbow", "fishing_rod", "mangrove_roots"
+    ], "ticks": 300},
+    {"match": [
+      "#fuel/signs", "#fuel/wooden_doors",
+      "wooden_pickaxe", "wooden_axe", "wooden_shovel", "wooden_hoe", "wooden_sword"
+    ], "ticks": 200},
+    {"match": ["#fuel/wooden_slabs", "bamboo_mosaic_slab"], "ticks": 150},
+    {"match": [
+      "#wool", "#fuel/wooden_buttons", "stick", "bowl", "#saplings",
+      "dead_bush", "short_dry_grass", "tall_dry_grass", "leaf_litter"
+    ], "ticks": 100},
+    {"match": ["#wool_carpets"], "ticks": 67},
+    {"match": ["bamboo", "scaffolding"], "ticks": 50}
+  ]
+}

@@ -155,6 +155,12 @@ void VideoSettingsScreen::addOptions() {
         host->options().guiScale = i;
         host->optionsChanged();
     });
+    option<CycleButton>(t("options.attackIndicator"),
+                        std::vector<std::string>{t("options.off"), t("options.attack.crosshair"), t("options.attack.hotbar")},
+                        int(o.attackIndicator), [host](int i) {
+                            host->options().attackIndicator = AttackIndicator(i);
+                            host->optionsChanged();
+                        });
     option<Slider>(o.gamma,
                    [label, ctx](double v) {
                        const int p = int(std::lround(v * 100.0));
@@ -286,6 +292,21 @@ bool ChatScreen::keyPressed(int key, int scancode, int mods) {
 bool ChatScreen::mouseScrolled(glm::vec2, double amount) {
     chat_.scroll(amount > 0 ? 1 : -1);
     return true;
+}
+
+void SleepScreen::init(glm::vec2 size) {
+    ChatScreen::init(size);
+    const ScreenContext ctx = ctx_;
+    add<Button>(std::floor(size.x / 2) - 100, size.y - 40, 200, 20, t("multiplayer.stopSleeping"),
+                [ctx](Button&) { ctx.host->leaveBed(); });
+}
+
+bool SleepScreen::keyPressed(int key, int scancode, int mods) {
+    if (key == GLFW_KEY_ESCAPE) {
+        ctx_.host->leaveBed();
+        return true;
+    }
+    return ChatScreen::keyPressed(key, scancode, mods);
 }
 
 } // namespace mc

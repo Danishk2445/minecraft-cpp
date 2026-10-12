@@ -48,4 +48,20 @@ void Inventory::consumeSelected(int count) {
     if (s.count <= 0) s = {};
 }
 
+Json stackToJson(const ItemStack& stack) {
+    if (stack.empty()) return nullptr;
+    Json j = {{"id", stack.item->id}, {"count", stack.count}};
+    if (stack.damage > 0) j["damage"] = stack.damage;
+    return j;
+}
+
+ItemStack stackFromJson(const Json& j, const ItemRegistry& items) {
+    if (!j.is_object()) return {};
+    const Item* item = items.find(j.value("id", std::string()));
+    if (!item) return {};
+    ItemStack stack{item, std::clamp(j.value("count", 1), 1, item->maxStack)};
+    if (item->maxDamage > 0) stack.damage = std::clamp(j.value("damage", 0), 0, item->maxDamage - 1);
+    return stack;
+}
+
 } // namespace mc

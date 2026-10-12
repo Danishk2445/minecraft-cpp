@@ -11,12 +11,15 @@ in vec4 vColor;
 in vec2 vLightUV;
 in float vSpherical;
 in float vCylindrical;
+in float vOverlay;
 
 out vec4 fragColor;
 
 void main() {
     vec4 color = texture(uTexture, vUV) * vColor;
     if (color.a < uAlphaCutoff) discard;
+    // Vanilla entity.fsh: the overlay (the hurt red) before the light.
+    color.rgb = mix(color.rgb, vec3(1.0, 0.0, 0.0), vOverlay);
     color.rgb *= texture(uLightmap, vLightUV).rgb;
     fragColor = applyFog(color, vSpherical, vCylindrical, uFog, uFogColor);
 }

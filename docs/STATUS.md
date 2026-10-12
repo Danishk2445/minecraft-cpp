@@ -13,7 +13,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M7 Entity models: ModelPart, block-entity renderers, player model, F5
 - [x] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
 - [x] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
-- [ ] M10 Survival: tools, food, armor, loot, item entities, XP, health, crafting, furnaces, containers, beds, signs
+- [x] M10 Survival: tools, food, armor, loot, item entities, XP, health, crafting, furnaces, containers, beds, signs
 - [ ] M11 Simulation: random ticks, fluids, falling blocks, TNT, fire, farming, weather, particles
 - [ ] M12 Mobs: models, AI, A*, spawning, combat, breeding
 - [ ] M13 Polish: cave culling, overlays, options, rebinding, benchmark, end-to-end script
@@ -31,7 +31,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 | Armor trims | The item-definition trim cases are never selected or baked |
 | Entity-spawning items (boats, minecarts, item frames, paintings, armor stands, snowballs, eggs, ender pearls) | Do nothing. Only the 8 in-scope spawn eggs work |
 | Shields and tridents | Render only |
-| Job-site and other blocks (stonecutter, smithing table, loom, grindstone, cartography table, anvil, enchanting table, brewing stand, lectern, composter, cauldrons, note block, jukebox, beacon, conduit) | No menu or interaction |
+| Job-site and other blocks (stonecutter, smithing table, loom, grindstone, cartography table, anvil, enchanting table, brewing stand, lectern, composter, cauldrons, note block, jukebox, beacon, conduit) and shulker boxes | No menu or interaction |
 | Biomes: deep dark, pale garden, mangrove swamp | Not generated; neighbors take their place |
 | Powder snow | Generates as snow blocks |
 | Mob variants: cold pig, cow and chicken, warm cow | Temperate model and texture are used instead |
@@ -48,6 +48,7 @@ Recorded per milestone.
   - Block states come from behavior-class schemas (`data/blocks/classes.json`, with schemas in `BlockRegistry.cpp`), or are inferred from blockstate files for blocks without behavior. That gives 25,986 states; vanilla has about 27k, because inferred blocks lack non-visual properties such as note block instruments.
   - Face culling uses a 4×4 coverage grid per face, built from fully opaque flush quads, instead of vanilla's VoxelShape occlusion test.
   - Outline and collision shapes are deferred to M6, where they are first used.
+  - Models are drawn without vanilla's random per-position offsets (the XZ, sometimes Y, nudge of flowers, grass, ferns, bamboo, roots and pointed dripstone); planned for M13.
 - **M3:**
   - Quads are split along the diagonal joining their brighter corners (anisotropy fix, as in Sodium). Vanilla always splits 0-2.
   - Partial quads interpolate the four AO corner values bilinearly. This is equivalent to vanilla's `SizeInfo` weight tables.
@@ -82,10 +83,10 @@ Recorded per milestone.
   - The hotbar shows slot counts and the selected item's name; item icons arrive with the GUI milestone.
 - **M7:**
   - Block entities are baked into the chunk meshes as static models.
-    - Chest lids stay shut until container menus arrive (M10). Banners don't wave, and the bell doesn't swing.
+    - A chest or ender chest whose lid is moving (M10) leaves the mesh and draws as an entity until it shuts. Banners don't wave, and the bell doesn't swing.
     - They take the flat light of their cell; vanilla lights each block entity at its own position, so the result is the same except for smooth lighting.
     - Their textures live in the block atlas, so they get mipmaps; vanilla's entity atlases have none.
-  - Banners show their base color only, as planned (no patterns). Decorated pots have no sherds. Sign text is not drawn until signs can be written (M10).
+  - Banners show their base color only, as planned (no patterns). Decorated pots have no sherds. Sign boards are part of the mesh at any distance; their text draws as an entity within 64 blocks (M10), where vanilla draws the whole sign.
   - Not drawn: the books of enchanting tables and lecterns, beacon beams, and the contents of spawners, vaults and campfires.
   - The player is always Steve with wide arms. Vanilla picks one of nine default skins from the player's UUID.
   - Items in hand are not drawn yet: third-person held items and the first-person hand come with item rendering (M8).
@@ -96,17 +97,29 @@ Recorded per milestone.
   - GUI item icons are drawn one by one with their own depth slices. Vanilla 1.21.6+ renders them into an item atlas first; they look the same.
   - Item definitions are fully parsed, but items carry no data components yet. Properties that read them take their defaults: damage, dyes, potions, trims, bundles, block state and charge type. Clocks follow the time of day, compasses point at the world spawn (and spin without a holder), and chests switch to the Christmas texture from 24 to 26 December.
   - Equipment slots (which armor slot an item fits) and rarities (name colors) come from rules in `data/items/items.json`.
-  - Thrown items (Q in a menu, or clicking outside a window with a stack on the cursor) leave the inventory and wait on the player until item entities exist (M10); until then they are lost. Q in the world is not bound yet.
   - Creative inventory: tab contents are vanilla's order as written from memory (`data/creative_tabs.json`). There is no Saved Hotbars tab, and the Operator Utilities tab stays hidden. Search matches names and ids, not tags or tooltips.
-  - The 2x2 crafting grid accepts items but crafts nothing until recipes (M10). There is no recipe book (out of scope).
-  - First-person hands have no view bobbing (M13). The attack-cooldown dip of the held item arrives with combat (M10).
-  - Items on the ground (item entities) arrive with M10.
+  - There is no recipe book (out of scope).
+  - First-person hands have no view bobbing (M13).
 - **M9:**
   - The pack's panorama is six 1×1 placeholders, so the game bakes its own into `<gamedir>/panorama` on first start (a few seconds): our seed 42 from (−60, 79, −250) at time 2500. `--bake-panorama` re-bakes it; with `--seed`, `--pos`, `--look` and `--time` it bakes another view. The pack's `panorama_overlay` is transparent, so nothing tints it.
   - Title screen: no fade-in. The version line names this game, and the corner where vanilla shows its copyright line reads "Not an official Minecraft product." Multiplayer, Realms, Language (en_us only) and Accessibility are disabled.
   - World list: Edit World and Re-Create are disabled. There are no lock, version or backup warnings, and every world shows version 1.21.8. Deleting the last world leaves an empty list; vanilla moves on to Create World.
-  - Create World: Generate Structures and Bonus Chest are fixed off, since this game has neither. Customize (superflat presets), Game Rules, Experiments and Data Packs are disabled. World types are Default, Superflat and Debug Mode, all in the cycle; vanilla shows Debug Mode only with Shift and also has Large Biomes, Amplified and Single Biome. Hardcore worlds are saved as hardcore, and their one-life death screen comes with death (M10).
+  - Create World: Generate Structures and Bonus Chest are fixed off, since this game has neither. Customize (superflat presets), Game Rules, Experiments and Data Packs are disabled. World types are Default, Superflat and Debug Mode, all in the cycle; vanilla shows Debug Mode only with Shift and also has Large Biomes, Amplified and Single Biome. Hardcore worlds are saved as hardcore; their death screen offers only Spectate World (M10).
   - Loading screen: the map shows our pipeline stages in vanilla's ChunkStatus colors, over the render-distance square instead of vanilla's spawn chunk radius.
   - "Saving world" is shown for a single frame, because saving blocks the main thread.
-  - Commands use vanilla's syntax, but without target selectors (they act on the player), tab completion or translated feedback. `/gamerule` knows only doDaylightCycle; the other rules arrive with their systems. `/clear` takes no target. The 16 commands: help, list, me, seed, say, difficulty, gamemode, give, clear, tp/teleport, time, gamerule, setblock, fill and the harness's assertblock.
+  - Commands use vanilla's syntax, but without target selectors (they act on the player), tab completion or translated feedback. `/gamerule` knows doDaylightCycle, and since M10 keepInventory and naturalRegeneration; the other rules arrive with their systems. `/clear` takes no target. The 16 commands: help, list, me, seed, say, difficulty, gamemode, give, clear, tp/teleport, time, gamerule, setblock, fill and the harness's assertblock.
   - Options are saved as `options.json`, not vanilla's `options.txt`. Particles has no effect yet: the only particles are block breaking and mining, which vanilla shows at every setting. View Bobbing arrives with M13. Menu Background Blur sits in Video Settings (vanilla also has it under Accessibility).
+- **M10:**
+  - Data: tool tiers, armor materials, foods, fuel times, item tags (`data/items/items.json`, `data/tags/items`), block loot (`data/loot/blocks.json`) and recipes (`data/recipes`) are written from vanilla 1.21.8 by hand. Loot uses a compact rule format (an item's own drop by default; counts uniform, binomial or from a property; `else` for a failed chance; `player_only`) instead of loot-table JSON.
+  - No enchantments, so no Silk Touch, Fortune, Mending or Unbreaking: ores always drop their raw items, glass and ice drop nothing, and so on.
+  - Recipes: 1,063 load, with mirrored shaped matching, shapeless matching and the tool repair recipe. Missing are the special recipes that need data components: armor dyeing, banner copying and patterns, book and map cloning, firework stars, suspicious stew and tipped arrows. Firework rockets have one fixed recipe, and a decorated pot is made from four bricks. Stonecutting and smithing have no menus. Recipes are never locked.
+  - Damage: falling (the 1.21.5 order, including the landing tick's movement), drowning, suffocation, lava, fire and burning, cactus, sweet berry bushes, magma (unless sneaking), the void, starvation and `/kill`. Mobs, arrows, explosions and lightning come with M11 and M12, along with difficulty damage scaling, which applies only to mobs. There is no freezing (no powder snow) and there are no status effects.
+  - Death drops the inventory (unless keepInventory) and min(7·level, 100) experience. Death messages cover the sources above. Respawning goes to the bed if it is still there, else to the world spawn with vanilla's "missing or obstructed" message. Respawn anchors are out of scope.
+  - Beds: sleep at night (sky darkening ≥ 4), skip to the next morning after 100 ticks, and set the spawn. Thunderstorms (M11) and the "monsters nearby" rule (M12) come later. Getting up uses a simplified `BedBlock.findStandUpPosition`: the first free spot on solid ground around the head, then around the foot, else on top of the bed. Vanilla tries the sides in a fixed order and also looks one block up and down.
+  - Containers: single and double chests, trapped chests (no redstone signal), barrels, ender chests (the player's own 27 slots, with the lid), and furnaces, smokers and blast furnaces. An opaque block over a chest keeps it shut, as in vanilla; cats can't sit on chests. There are no container sounds, and furnaces keep no record of recipes used.
+  - Signs: front and back text, dyes, glow ink, ink sacs and wax, as in vanilla. There are no click events and no text filtering. `/setblock` takes vanilla's sign NBT (`front_text`, `back_text`, `is_waxed`), and the save uses the same names. Glowing text sits 0.1 text pixels in front of its outline, where vanilla uses a polygon offset.
+  - Item use: hoes, shovels, axes (strip, scrape, unwax), shears on pumpkins, honeycomb on copper and signs, flint and steel (fire, campfires, candles), eating and drinking with vanilla's consume times and crumbs, cake, and right-clicking armor on. Milk and potions are drunk but do nothing. Buckets and bone meal come with M11, bows with M12.
+  - Attack strength recovers as in vanilla and resets on a swing at nothing or a change of item; a miss outside creative pauses attacking for 10 ticks. The crosshair or hotbar indicator shows it. Hitting entities comes with M12, so the indicator's full sprite never shows.
+  - HUD: hearts blink for 20 (healing: 10) ticks when health changes during invulnerability, and the lost health shows until it has held for 20 ticks, where vanilla waits one second of real time. Hardcore worlds use the hardcore hearts. There are no absorption, poison, wither or frozen hearts (no effects).
+  - The red hurt tint and the dying fall-over draw on the player model. Sleeping players lie in their bed in third person. Worn armor is not drawn yet (M12, with the armor layers).
+  - Item entities and experience orbs follow vanilla's physics, merging and pickup, and are saved with their chunk (item, age, pickup delay and health; orb value, count and age).

@@ -1,10 +1,12 @@
 #include "game/Commands.h"
 
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <format>
 #include <limits>
 
+#include "game/BlockEntities.h"
 #include "world/block/BlockRegistry.h"
 #include "world/level/Level.h"
 
@@ -51,16 +53,127 @@ std::vector<std::string> tokenizeCommand(std::string_view line) {
     while (i < line.size()) {
         while (i < line.size() && line[i] == ' ') ++i;
         size_t j = i;
-        int depth = 0; // spaces inside [...] stay in the token
-        while (j < line.size() && (line[j] != ' ' || depth > 0)) {
-            if (line[j] == '[') ++depth;
-            if (line[j] == ']') --depth;
+        int depth = 0; // spaces inside [...], {...} and quotes stay in the token
+        char quote = 0;
+        while (j < line.size() && (line[j] != ' ' || depth > 0 || quote)) {
+            const char c = line[j];
+            if (quote) {
+                if (c == '\\' && j + 1 < line.size()) ++j;
+                else if (c == quote) quote = 0;
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '[' || c == '{') {
+                ++depth;
+            } else if (c == ']' || c == '}') {
+                --depth;
+            }
             ++j;
         }
         if (j > i) out.emplace_back(line.substr(i, j - i));
         i = j;
     }
     return out;
+}
+
+namespace {
+
+struct SnbtParser {
+    std::string_view s;
+    size_t i = 0;
+
+    void skip() {
+        while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n')) ++i;
+    }
+    bool eat(char c) {
+        skip();
+        if (i < s.size() && s[i] == c) {
+            ++i;
+            return true;
+        }
+        return false;
+    }
+    static bool bare(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+               c == '.' || c == '+';
+    }
+    std::optional<std::string> string() {
+        skip();
+        if (i >= s.size()) return std::nullopt;
+        if (s[i] == '"' || s[i] == '\'') {
+            const char q = s[i++];
+            std::string out;
+            while (i < s.size() && s[i] != q) {
+                if (s[i] == '\\' && i + 1 < s.size()) ++i;
+                out += s[i++];
+            }
+            if (i >= s.size()) return std::nullopt;
+            ++i;
+            return out;
+        }
+        const size_t start = i;
+        while (i < s.size() && bare(s[i])) ++i;
+        if (i == start) return std::nullopt;
+        return std::string(s.substr(start, i - start));
+    }
+    std::optional<Json> value() {
+        skip();
+        if (i >= s.size()) return std::nullopt;
+        if (s[i] == '{') {
+            ++i;
+            Json obj = Json::object();
+            if (eat('}')) return obj;
+            do {
+                auto key = string();
+                if (!key || !eat(':')) return std::nullopt;
+                auto v = value();
+                if (!v) return std::nullopt;
+                obj[*key] = std::move(*v);
+            } while (eat(','));
+            if (!eat('}')) return std::nullopt;
+            return obj;
+        }
+        if (s[i] == '[') {
+            ++i;
+            Json arr = Json::array();
+            // Typed arrays ([I; 1, 2]) read like lists.
+            if (i + 1 < s.size() && (s[i] == 'I' || s[i] == 'B' || s[i] == 'L') && s[i + 1] == ';') i += 2;
+            if (eat(']')) return arr;
+            do {
+                auto v = value();
+                if (!v) return std::nullopt;
+                arr.push_back(std::move(*v));
+            } while (eat(','));
+            if (!eat(']')) return std::nullopt;
+            return arr;
+        }
+        const bool quoted = s[i] == '"' || s[i] == '\'';
+        auto text = string();
+        if (!text) return std::nullopt;
+        if (quoted) return Json(*text);
+        if (*text == "true") return Json(true);
+        if (*text == "false") return Json(false);
+        // A number, maybe with a type suffix.
+        std::string_view n = *text;
+        if (!n.empty() && std::string_view("bBsSlLfFdD").find(n.back()) != std::string_view::npos &&
+            n.size() > 1 && (std::isdigit(static_cast<unsigned char>(n[n.size() - 2])) || n[n.size() - 2] == '.'))
+            n.remove_suffix(1);
+        double d = 0.0;
+        if (parseDouble(n, d)) {
+            if (n.find('.') == std::string_view::npos && n.find('e') == std::string_view::npos) return Json(int64_t(d));
+            return Json(d);
+        }
+        return Json(*text);
+    }
+};
+
+} // namespace
+
+std::optional<Json> parseSnbt(std::string_view text) {
+    SnbtParser p{text};
+    auto v = p.value();
+    p.skip();
+    if (!v || p.i != text.size()) return std::nullopt;
+    return v;
 }
 
 Commands::Commands() {
@@ -151,7 +264,7 @@ Commands::Commands() {
         if (src.feedback) src.feedback("Gave " + std::to_string(count) + " " + a[0]);
         return true;
     });
-    add("setblock", "/setblock <x> <y> <z> <block>", [](CommandSource& src, Args a, std::string& err) {
+    add("setblock", "/setblock <x> <y> <z> <block>[{nbt}]", [](CommandSource& src, Args a, std::string& err) {
         if (!src.level || a.size() != 4) {
             err = "expected 4 arguments";
             return false;
@@ -161,12 +274,24 @@ Commands::Commands() {
             err = "bad coordinates";
             return false;
         }
-        const auto state = src.level->registry().parse(a[3], &err);
+        // The block, then its block entity's data in SNBT (vanilla BlockStateParser).
+        const size_t brace = a[3].find('{');
+        std::optional<Json> nbt;
+        if (brace != std::string::npos) {
+            nbt = parseSnbt(std::string_view(a[3]).substr(brace));
+            if (!nbt || !nbt->is_object()) {
+                err = "bad block entity data";
+                return false;
+            }
+        }
+        const auto state = src.level->registry().parse(a[3].substr(0, brace), &err);
         if (!state) return false;
         if (!src.level->setBlock(*pos, *state)) {
             err = "that position is not loaded";
             return false;
         }
+        if (nbt && src.level->itemRegistry())
+            if (auto be = src.level->blockEntity(*pos)) be->load(*nbt, *src.level->itemRegistry());
         if (src.feedback) src.feedback(std::format("Changed the block at {}, {}, {}", pos->x, pos->y, pos->z));
         return true;
     });
@@ -338,29 +463,135 @@ void Commands::addBasics() {
         return true;
     });
 
-    // The rules that exist so far, with vanilla's names.
-    add("gamerule", "/gamerule <doDaylightCycle> [true|false]", [](CommandSource& src, Args a, std::string& err) {
-        if (!src.level || a.empty() || a.size() > 2) {
-            err = "expected a rule and an optional value";
+    add("summon", "/summon <entity> [x y z] [nbt]", [](CommandSource& src, Args a, std::string& err) {
+        if (a.empty() || (a.size() != 1 && a.size() != 4 && a.size() != 5)) {
+            err = "expected an entity, then optionally a position and SNBT data";
             return false;
         }
-        if (a[0] != "doDaylightCycle") {
-            err = "unknown game rule " + a[0];
+        glm::dvec3 at = src.position;
+        if (a.size() >= 4) {
+            const auto x = parseCoordinate(a[1], src.position.x), y = parseCoordinate(a[2], src.position.y),
+                       z = parseCoordinate(a[3], src.position.z);
+            if (!x || !y || !z) {
+                err = "bad coordinates";
+                return false;
+            }
+            at = {*x, *y, *z};
+        }
+        Json data = Json::object();
+        if (a.size() == 5) {
+            auto parsed = parseSnbt(a[4]);
+            if (!parsed || !parsed->is_object()) {
+                err = "bad SNBT data " + a[4];
+                return false;
+            }
+            data = std::move(*parsed);
+        }
+        std::string type = a[0];
+        if (type.starts_with("minecraft:")) type.erase(0, 10);
+        if (!src.summon || !src.summon(type, at, data, err)) {
+            if (err.empty()) err = "can't summon " + a[0];
             return false;
         }
-        bool& rule = src.level->daylightCycle;
-        if (a.size() == 1) {
-            if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], rule));
-            return true;
-        }
-        if (a[1] != "true" && a[1] != "false") {
-            err = "expected true or false";
-            return false;
-        }
-        rule = a[1] == "true";
-        if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], rule));
+        if (src.feedback) src.feedback("Summoned new " + type);
         return true;
     });
+
+    // Vanilla /item replace block <pos> container.<slot> with <item> [count].
+    add("item", "/item replace block <x> <y> <z> container.<slot> with <item> [count]",
+        [](CommandSource& src, Args a, std::string& err) {
+            if (a.size() < 8 || a.size() > 9 || a[0] != "replace" || a[1] != "block" || a[6] != "with" ||
+                !a[5].starts_with("container.")) {
+                err = "expected replace block <x> <y> <z> container.<slot> with <item> [count]";
+                return false;
+            }
+            const auto pos = parseBlockPos(a, 2, src.position);
+            long long slot = 0, count = 1;
+            if (!pos || !parseLong(std::string_view(a[5]).substr(10), slot) || (a.size() == 9 && !parseLong(a[8], count))) {
+                err = "bad position, slot or count";
+                return false;
+            }
+            if (!src.replaceBlockSlot || !src.replaceBlockSlot(*pos, int(slot), a[7], int(count))) {
+                err = "that block has no such slot, or the item is unknown";
+                return false;
+            }
+            if (src.feedback) src.feedback(std::format("Replaced a slot at {}, {}, {} with {}", pos->x, pos->y, pos->z, a[7]));
+            return true;
+        });
+
+    add("kill", "/kill", [](CommandSource& src, Args a, std::string& err) {
+        if (!a.empty() && a[0] != "@s" && a[0] != src.name) {
+            err = "only the player can be killed";
+            return false;
+        }
+        if (!src.kill) return false;
+        src.kill();
+        if (src.feedback) src.feedback("Killed " + src.name);
+        return true;
+    });
+
+    // /experience (/xp) add|set|query <target> ...: the target is always the player.
+    const Handler experience = [](CommandSource& src, Args a, std::string& err) {
+        if (!src.addExperience || !src.experience || a.size() < 2) {
+            err = "expected add|set|query, a target and an amount";
+            return false;
+        }
+        if (a[0] == "query") {
+            const bool levels = a.size() > 2 && a[2] == "levels";
+            if (src.feedback)
+                src.feedback(std::format("{} has {} experience {}", src.name, src.experience(levels), levels ? "levels" : "points"));
+            return true;
+        }
+        long long amount = 0;
+        if ((a[0] != "add" && a[0] != "set") || a.size() < 3 || !parseLong(a[2], amount)) {
+            err = "expected add|set <target> <amount> [points|levels]";
+            return false;
+        }
+        const bool levels = a.size() > 3 && a[3] == "levels";
+        if (a[0] == "set") {
+            if (amount < 0) {
+                err = "the amount can't be negative";
+                return false;
+            }
+            src.addExperience(-src.experience(levels) + int(amount), levels);
+        } else {
+            src.addExperience(int(amount), levels);
+        }
+        if (src.feedback)
+            src.feedback(std::format("{} {} experience {} {} {}", a[0] == "add" ? "Gave" : "Set", amount,
+                                     levels ? "levels" : "points", a[0] == "add" ? "to" : "on", src.name));
+        return true;
+    };
+    add("experience", "/experience (add|set|query) <targets> <amount> [points|levels]", experience);
+    add("xp", "/xp (add|set|query) <targets> <amount> [points|levels]", experience);
+
+    // The rules that exist so far, with vanilla's names.
+    add("gamerule", "/gamerule <doDaylightCycle|keepInventory|naturalRegeneration> [true|false]",
+        [](CommandSource& src, Args a, std::string& err) {
+            if (!src.level || a.empty() || a.size() > 2) {
+                err = "expected a rule and an optional value";
+                return false;
+            }
+            bool* rule = a[0] == "doDaylightCycle"       ? &src.level->daylightCycle
+                         : a[0] == "keepInventory"       ? &src.level->keepInventory
+                         : a[0] == "naturalRegeneration" ? &src.level->naturalRegeneration
+                                                         : nullptr;
+            if (!rule) {
+                err = "unknown game rule " + a[0];
+                return false;
+            }
+            if (a.size() == 1) {
+                if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], *rule));
+                return true;
+            }
+            if (a[1] != "true" && a[1] != "false") {
+                err = "expected true or false";
+                return false;
+            }
+            *rule = a[1] == "true";
+            if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], *rule));
+            return true;
+        });
 }
 
 void Commands::add(std::string name, std::string usage, Handler handler, int permission) {

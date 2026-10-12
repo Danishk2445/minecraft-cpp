@@ -131,17 +131,36 @@ bool writeWorldInfo(const std::filesystem::path& worldDir, const WorldInfo& info
 }
 
 Json savePlayer(const Player& p) {
-    Json inv = Json::array();
-    for (size_t i = 0; i < p.inventory.main.size(); ++i) {
-        const ItemStack& s = p.inventory.main[i];
-        if (!s.empty()) inv.push_back({{"slot", i}, {"id", s.item->id}, {"count", s.count}});
+    Json ender = Json::array();
+    for (size_t i = 0; i < p.enderItems.size(); ++i) {
+        Json s = stackToJson(p.enderItems[i]);
+        if (s.is_null()) continue;
+        s["slot"] = i;
+        ender.push_back(std::move(s));
     }
+    // Vanilla slot numbers: 0-35 main, 36-39 armor (feet to head), 40 off hand.
+    Json inv = Json::array();
+    for (int i = 0; i <= Inventory::kOffhandSlot; ++i) {
+        Json s = stackToJson(p.inventory.slot(i));
+        if (s.is_null()) continue;
+        s["slot"] = i;
+        inv.push_back(std::move(s));
+    }
+    Json respawn = nullptr;
+    if (p.respawnPos) respawn = {p.respawnPos->x, p.respawnPos->y, p.respawnPos->z};
     return {{"pos", {p.pos.x, p.pos.y, p.pos.z}},
+            {"respawn", std::move(respawn)},
             {"rotation", {p.yaw, p.pitch}},
             {"mode", gameModeName(p.mode())},
             {"flying", p.flying},
             {"selected", p.inventory.selected},
-            {"inventory", std::move(inv)}};
+            {"inventory", std::move(inv)},
+            {"ender_items", std::move(ender)},
+            {"health", p.health},
+            {"food", {{"level", p.food.foodLevel}, {"saturation", p.food.saturation}, {"exhaustion", p.food.exhaustion}}},
+            {"air", p.airSupply},
+            {"fire", p.remainingFireTicks},
+            {"xp", {{"level", p.experienceLevel}, {"progress", p.experienceProgress}, {"total", p.totalExperience}, {"score", p.score}}}};
 }
 
 void loadPlayer(Player& p, const Json& j, const ItemRegistry& items) {
@@ -154,12 +173,32 @@ void loadPlayer(Player& p, const Json& j, const ItemRegistry& items) {
     p.flying = j.value("flying", false) && p.mode() != GameMode::Survival && p.mode() != GameMode::Adventure;
     p.inventory = Inventory{};
     p.inventory.selected = std::clamp(j.value("selected", 0), 0, Inventory::kHotbarSize - 1);
-    for (const Json& s : j.value("inventory", Json::array())) {
+    const Json inventory = j.value("inventory", Json::array());
+    for (const Json& s : inventory) {
         const int slot = s.value("slot", -1);
-        const Item* item = items.find(s.value("id", std::string()));
-        if (slot < 0 || slot >= Inventory::kMainSize || !item) continue;
-        p.inventory.main[size_t(slot)] = {item, std::clamp(s.value("count", 1), 1, item->maxStack)};
+        if (slot < 0 || slot > Inventory::kOffhandSlot) continue;
+        p.inventory.slot(slot) = stackFromJson(s, items);
     }
+    p.respawnPos.reset();
+    if (const Json r = j.value("respawn", Json()); r.is_array() && r.size() == 3)
+        p.respawnPos = BlockPos{r[0].get<int>(), r[1].get<int>(), r[2].get<int>()};
+    p.enderItems = {};
+    const Json ender = j.value("ender_items", Json::array());
+    for (const Json& s : ender) {
+        const int slot = s.value("slot", -1);
+        if (slot >= 0 && slot < int(p.enderItems.size())) p.enderItems[size_t(slot)] = stackFromJson(s, items);
+    }
+    p.health = std::clamp(j.value("health", p.maxHealth), 0.0f, p.maxHealth);
+    const Json food = j.value("food", Json::object()), xp = j.value("xp", Json::object());
+    p.food.foodLevel = std::clamp(food.value("level", 20), 0, 20);
+    p.food.saturation = std::clamp(food.value("saturation", 5.0f), 0.0f, float(p.food.foodLevel));
+    p.food.exhaustion = std::clamp(food.value("exhaustion", 0.0f), 0.0f, 40.0f);
+    p.airSupply = std::clamp(j.value("air", p.maxAirSupply), -20, p.maxAirSupply);
+    p.remainingFireTicks = std::max(0, j.value("fire", 0));
+    p.experienceLevel = std::max(0, xp.value("level", 0));
+    p.experienceProgress = std::clamp(xp.value("progress", 0.0f), 0.0f, 1.0f);
+    p.totalExperience = std::max(0, xp.value("total", 0));
+    p.score = std::max(0, xp.value("score", 0));
 }
 
 std::optional<Json> readPlayerFile(const std::filesystem::path& worldDir) {

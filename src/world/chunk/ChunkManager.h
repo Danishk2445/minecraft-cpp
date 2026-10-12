@@ -51,10 +51,13 @@ public:
     // extras (scheduled ticks): `saveExtra(pos, unloading)` collects them, `loadedExtra`
     // hands them back on load.
     void setStorage(std::shared_ptr<const ChunkStorage> storage) { storage_ = std::move(storage); }
+    // `extraDirty(pos)` says a chunk must be saved for its extras although no block changed.
     void setPersistenceHooks(std::function<Json(ChunkPos, bool unloading)> saveExtra,
-                             std::function<void(ChunkPos, const Json&)> loadedExtra) {
+                             std::function<void(ChunkPos, const Json&)> loadedExtra,
+                             std::function<bool(ChunkPos)> extraDirty = {}) {
         saveExtra_ = std::move(saveExtra);
         loadedExtra_ = std::move(loadedExtra);
+        extraDirty_ = std::move(extraDirty);
     }
     // Saves every edited chunk (in jobs); returns how many were queued.
     int saveAll();
@@ -157,6 +160,8 @@ private:
     std::shared_ptr<const ChunkStorage> storage_;
     std::function<Json(ChunkPos, bool)> saveExtra_;
     std::function<void(ChunkPos, const Json&)> loadedExtra_;
+    std::function<bool(ChunkPos)> extraDirty_;
+    bool needsSave(const Entry& e) const { return e.chunk && (e.dirty() || (extraDirty_ && extraDirty_(e.pos))); }
     std::unordered_map<ChunkPos, int> savesInFlight_; // count per chunk
 };
 

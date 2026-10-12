@@ -216,13 +216,5 @@ std::vector<std::pair<BlockPos, StateId>> placementStates(const BlockRegistry& r
     return out;
 }
 
-float destroyProgressPerTick(const Block& block, const Player& player) {
-    if (block.hardness < 0.0f) return 0.0f;
-    if (block.hardness == 0.0f) return 1.0f;
-    float speed = 1.0f; // empty hand
-    if (player.inWater && player.waterHeight > player.eyeHeight()) speed /= 5.0f;
-    if (!player.onGround) speed /= 5.0f;
-    return speed / block.hardness / (block.requiresTool ? 100.0f : 30.0f);
-}
 
 } // namespace mc

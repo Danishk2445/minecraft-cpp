@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#wool_carpets"
+  ],
+  "exclude": [
+    "gray_carpet"
+  ]
+}

@@ -10,6 +10,7 @@ namespace mc {
 enum class CloudMode : uint8_t { Off, Fast, Fancy };
 enum class ParticleMode : uint8_t { All, Decreased, Minimal };
 enum class ChatVisibility : uint8_t { Full, Commands, Hidden };
+enum class AttackIndicator : uint8_t { Off, Crosshair, Hotbar };
 
 struct Options {
     // Video
@@ -26,6 +27,7 @@ struct Options {
     CloudMode clouds = CloudMode::Fancy;
     ParticleMode particles = ParticleMode::All;
     int menuBlur = 5;         // menu background blurriness, 0..10
+    AttackIndicator attackIndicator = AttackIndicator::Crosshair;
     // Controls
     float mouseSensitivity = 0.5f; // 0..1
     bool invertMouse = false;

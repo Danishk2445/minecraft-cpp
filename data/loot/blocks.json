@@ -1,0 +1,2998 @@
+{
+  "_comment": [
+    "Block loot: what breaking a block drops, as in vanilla 1.21.8 without enchantments (no Silk Touch, no",
+    "Fortune) and without explosions. The first rule whose match (and when) fits the block decides; a block",
+    "matching no rule drops one of its own item, if it has one. Drops are rolled independently. Rules describe",
+    "a harvest with the right tool: blocks that need one drop nothing without it. Checked by tools/check_loot.py."
+  ],
+  "rules": [
+    {
+      "_section": "Blocks that never drop anything",
+      "_comment": "Technical and unbreakable blocks (vanilla noLootTable or an empty table)",
+      "match": [
+        "air",
+        "bedrock",
+        "barrier",
+        "light",
+        "structure_block",
+        "structure_void",
+        "jigsaw",
+        "command_block",
+        "chain_command_block",
+        "repeating_command_block",
+        "test_block",
+        "test_instance_block",
+        "end_portal_frame",
+        "reinforced_deepslate"
+      ],
+      "drops": []
+    },
+    {
+      "_comment": "Empty loot tables (a cake's slices are eaten, not dropped)",
+      "match": [
+        "cake",
+        "frogspawn",
+        "suspicious_sand",
+        "suspicious_gravel",
+        "trial_spawner",
+        "vault",
+        "budding_amethyst"
+      ],
+      "drops": []
+    },
+    {
+      "_comment": "Vanilla xp is 15 + nextInt(15) + nextInt(15), written here as its range",
+      "match": [
+        "spawner"
+      ],
+      "drops": [],
+      "xp": [
+        15,
+        43
+      ]
+    },
+    {
+      "_comment": "Silk Touch only, so nothing here (ice still melts into water; a chiseled bookshelf still spills its books)",
+      "match": [
+        "glass",
+        "*_stained_glass",
+        "glass_pane",
+        "*_stained_glass_pane",
+        "ice",
+        "packed_ice",
+        "blue_ice",
+        "small_amethyst_bud",
+        "medium_amethyst_bud",
+        "large_amethyst_bud",
+        "infested_*",
+        "*_coral",
+        "*_coral_fan",
+        "*_coral_wall_fan",
+        "bee_nest",
+        "turtle_egg",
+        "chiseled_bookshelf",
+        "mushroom_stem",
+        "sculk_vein"
+      ],
+      "drops": []
+    },
+    {
+      "_comment": "Silk Touch only; 1 xp",
+      "match": [
+        "sculk"
+      ],
+      "drops": [],
+      "xp": [
+        1,
+        1
+      ]
+    },
+    {
+      "_comment": "Silk Touch only; 5 xp",
+      "match": [
+        "sculk_catalyst",
+        "sculk_sensor",
+        "calibrated_sculk_sensor",
+        "sculk_shrieker"
+      ],
+      "drops": [],
+      "xp": [
+        5,
+        5
+      ]
+    },
+    {
+      "_section": "Ores",
+      "match": [
+        "coal_ore",
+        "deepslate_coal_ore"
+      ],
+      "drops": [
+        {
+          "item": "coal"
+        }
+      ],
+      "xp": [
+        0,
+        2
+      ]
+    },
+    {
+      "match": [
+        "iron_ore",
+        "deepslate_iron_ore"
+      ],
+      "drops": [
+        {
+          "item": "raw_iron"
+        }
+      ]
+    },
+    {
+      "match": [
+        "copper_ore",
+        "deepslate_copper_ore"
+      ],
+      "drops": [
+        {
+          "item": "raw_copper",
+          "count": [
+            2,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "match": [
+        "gold_ore",
+        "deepslate_gold_ore"
+      ],
+      "drops": [
+        {
+          "item": "raw_gold"
+        }
+      ]
+    },
+    {
+      "match": [
+        "redstone_ore",
+        "deepslate_redstone_ore"
+      ],
+      "drops": [
+        {
+          "item": "redstone",
+          "count": [
+            4,
+            5
+          ]
+        }
+      ],
+      "xp": [
+        1,
+        5
+      ]
+    },
+    {
+      "match": [
+        "lapis_ore",
+        "deepslate_lapis_ore"
+      ],
+      "drops": [
+        {
+          "item": "lapis_lazuli",
+          "count": [
+            4,
+            9
+          ]
+        }
+      ],
+      "xp": [
+        2,
+        5
+      ]
+    },
+    {
+      "match": [
+        "diamond_ore",
+        "deepslate_diamond_ore"
+      ],
+      "drops": [
+        {
+          "item": "diamond"
+        }
+      ],
+      "xp": [
+        3,
+        7
+      ]
+    },
+    {
+      "match": [
+        "emerald_ore",
+        "deepslate_emerald_ore"
+      ],
+      "drops": [
+        {
+          "item": "emerald"
+        }
+      ],
+      "xp": [
+        3,
+        7
+      ]
+    },
+    {
+      "match": [
+        "nether_quartz_ore"
+      ],
+      "drops": [
+        {
+          "item": "quartz"
+        }
+      ],
+      "xp": [
+        2,
+        5
+      ]
+    },
+    {
+      "match": [
+        "nether_gold_ore"
+      ],
+      "drops": [
+        {
+          "item": "gold_nugget",
+          "count": [
+            2,
+            6
+          ]
+        }
+      ],
+      "xp": [
+        0,
+        1
+      ]
+    },
+    {
+      "_comment": "Vanilla: 2-5 nuggets with chance 0.1, otherwise the block",
+      "match": [
+        "gilded_blackstone"
+      ],
+      "drops": [
+        {
+          "item": "gold_nugget",
+          "count": [
+            2,
+            5
+          ],
+          "chance": 0.1,
+          "else": {
+            "item": "self"
+          }
+        }
+      ]
+    },
+    {
+      "_section": "Blocks that drop another block",
+      "match": [
+        "stone"
+      ],
+      "drops": [
+        {
+          "item": "cobblestone"
+        }
+      ]
+    },
+    {
+      "match": [
+        "deepslate"
+      ],
+      "drops": [
+        {
+          "item": "cobbled_deepslate"
+        }
+      ]
+    },
+    {
+      "match": [
+        "grass_block",
+        "podzol",
+        "mycelium",
+        "farmland",
+        "dirt_path"
+      ],
+      "drops": [
+        {
+          "item": "dirt"
+        }
+      ]
+    },
+    {
+      "match": [
+        "crimson_nylium",
+        "warped_nylium"
+      ],
+      "drops": [
+        {
+          "item": "netherrack"
+        }
+      ]
+    },
+    {
+      "_comment": "Living coral blocks drop their dead form",
+      "match": [
+        "tube_coral_block"
+      ],
+      "drops": [
+        {
+          "item": "dead_tube_coral_block"
+        }
+      ]
+    },
+    {
+      "match": [
+        "brain_coral_block"
+      ],
+      "drops": [
+        {
+          "item": "dead_brain_coral_block"
+        }
+      ]
+    },
+    {
+      "match": [
+        "bubble_coral_block"
+      ],
+      "drops": [
+        {
+          "item": "dead_bubble_coral_block"
+        }
+      ]
+    },
+    {
+      "match": [
+        "fire_coral_block"
+      ],
+      "drops": [
+        {
+          "item": "dead_fire_coral_block"
+        }
+      ]
+    },
+    {
+      "match": [
+        "horn_coral_block"
+      ],
+      "drops": [
+        {
+          "item": "dead_horn_coral_block"
+        }
+      ]
+    },
+    {
+      "match": [
+        "ender_chest"
+      ],
+      "drops": [
+        {
+          "item": "obsidian",
+          "count": 8
+        }
+      ]
+    },
+    {
+      "match": [
+        "bookshelf"
+      ],
+      "drops": [
+        {
+          "item": "book",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "match": [
+        "campfire"
+      ],
+      "drops": [
+        {
+          "item": "charcoal",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "match": [
+        "soul_campfire"
+      ],
+      "drops": [
+        {
+          "item": "soul_soil"
+        }
+      ]
+    },
+    {
+      "_section": "Blocks that drop resources",
+      "match": [
+        "clay"
+      ],
+      "drops": [
+        {
+          "item": "clay_ball",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "match": [
+        "snow_block"
+      ],
+      "drops": [
+        {
+          "item": "snowball",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "_comment": "One snowball per layer (8 layers give 8)",
+      "match": [
+        "snow"
+      ],
+      "drops": [
+        {
+          "item": "snowball",
+          "count_from": "layers"
+        }
+      ]
+    },
+    {
+      "match": [
+        "glowstone"
+      ],
+      "drops": [
+        {
+          "item": "glowstone_dust",
+          "count": [
+            2,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "match": [
+        "sea_lantern"
+      ],
+      "drops": [
+        {
+          "item": "prismarine_crystals",
+          "count": [
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon"
+      ],
+      "drops": [
+        {
+          "item": "melon_slice",
+          "count": [
+            3,
+            7
+          ]
+        }
+      ]
+    },
+    {
+      "_comment": "Vanilla: flint with chance 0.1, otherwise gravel",
+      "match": [
+        "gravel"
+      ],
+      "drops": [
+        {
+          "item": "flint",
+          "chance": 0.1,
+          "else": {
+            "item": "self"
+          }
+        }
+      ]
+    },
+    {
+      "_comment": "4 shards with a pickaxe (vanilla #cluster_max_harvestables); other tools or a bare hand get 2",
+      "match": [
+        "amethyst_cluster"
+      ],
+      "drops": [
+        {
+          "item": "amethyst_shard",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "_comment": "Vanilla count is uniform -6..2 clamped to 0: 0 at 7/9, 1 at 1/9, 2 at 1/9",
+      "match": [
+        "brown_mushroom_block"
+      ],
+      "drops": [
+        {
+          "item": "brown_mushroom",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.2222222
+        }
+      ]
+    },
+    {
+      "match": [
+        "red_mushroom_block"
+      ],
+      "drops": [
+        {
+          "item": "red_mushroom",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.2222222
+        }
+      ]
+    },
+    {
+      "match": [
+        "chorus_plant"
+      ],
+      "drops": [
+        {
+          "item": "chorus_fruit",
+          "count": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "_comment": "Vanilla also gives 20-24 xp, but only for natural hearts (a state this game doesn't track)",
+      "match": [
+        "creaking_heart"
+      ],
+      "drops": [
+        {
+          "item": "resin_clump",
+          "count": [
+            1,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "_comment": "Broken with a tool from #breaks_decorated_pots the pot cracks into its sherds (bricks on a plain pot)",
+      "match": [
+        "decorated_pot"
+      ],
+      "when": {
+        "cracked": "true"
+      },
+      "drops": [
+        {
+          "item": "brick",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "_section": "Counts from block state",
+      "match": [
+        "#slabs"
+      ],
+      "when": {
+        "type": "double"
+      },
+      "drops": [
+        {
+          "item": "self",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "match": [
+        "#candles"
+      ],
+      "drops": [
+        {
+          "item": "self",
+          "count_from": "candles"
+        }
+      ]
+    },
+    {
+      "match": [
+        "sea_pickle"
+      ],
+      "drops": [
+        {
+          "item": "self",
+          "count_from": "pickles"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pink_petals",
+        "wildflowers"
+      ],
+      "drops": [
+        {
+          "item": "self",
+          "count_from": "flower_amount"
+        }
+      ]
+    },
+    {
+      "match": [
+        "leaf_litter"
+      ],
+      "drops": [
+        {
+          "item": "self",
+          "count_from": "segment_amount"
+        }
+      ]
+    },
+    {
+      "_section": "Two-block structures drop from one part",
+      "_comment": "Only the lower half drops",
+      "match": [
+        "#doors",
+        "#tall_flowers",
+        "small_dripleaf",
+        "pitcher_crop"
+      ],
+      "when": {
+        "half": "upper"
+      },
+      "drops": []
+    },
+    {
+      "_comment": "Only the head drops",
+      "match": [
+        "#beds"
+      ],
+      "when": {
+        "part": "foot"
+      },
+      "drops": []
+    },
+    {
+      "match": [
+        "tall_grass"
+      ],
+      "drops": [
+        {
+          "item": "wheat_seeds",
+          "chance": 0.125
+        }
+      ],
+      "shears": [
+        {
+          "item": "short_grass",
+          "count": 2
+        }
+      ],
+      "player_only": true,
+      "_comment": "Vanilla: whichever half the player breaks drops (with the player's tool); the other half, removed by the update, drops nothing"
+    },
+    {
+      "match": [
+        "large_fern"
+      ],
+      "drops": [
+        {
+          "item": "wheat_seeds",
+          "chance": 0.125
+        }
+      ],
+      "shears": [
+        {
+          "item": "fern",
+          "count": 2
+        }
+      ],
+      "player_only": true,
+      "_comment": "Vanilla: whichever half the player breaks drops (with the player's tool); the other half, removed by the update, drops nothing"
+    },
+    {
+      "match": [
+        "tall_seagrass"
+      ],
+      "drops": [],
+      "shears": [
+        {
+          "item": "seagrass",
+          "count": 2
+        }
+      ],
+      "player_only": true,
+      "_comment": "Vanilla: whichever half the player breaks drops (with the player's tool); the other half, removed by the update, drops nothing"
+    },
+    {
+      "match": [
+        "small_dripleaf"
+      ],
+      "drops": [],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "_section": "Leaves",
+      "_comment": "Shears: the leaves. Otherwise a sapling, sticks and (oak, dark oak) apples, each by chance",
+      "match": [
+        "oak_leaves"
+      ],
+      "drops": [
+        {
+          "item": "oak_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        },
+        {
+          "item": "apple",
+          "chance": 0.005
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "spruce_leaves"
+      ],
+      "drops": [
+        {
+          "item": "spruce_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "birch_leaves"
+      ],
+      "drops": [
+        {
+          "item": "birch_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "jungle_leaves"
+      ],
+      "drops": [
+        {
+          "item": "jungle_sapling",
+          "chance": 0.025
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "acacia_leaves"
+      ],
+      "drops": [
+        {
+          "item": "acacia_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "dark_oak_leaves"
+      ],
+      "drops": [
+        {
+          "item": "dark_oak_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        },
+        {
+          "item": "apple",
+          "chance": 0.005
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pale_oak_leaves"
+      ],
+      "drops": [
+        {
+          "item": "pale_oak_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cherry_leaves"
+      ],
+      "drops": [
+        {
+          "item": "cherry_sapling",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "azalea_leaves"
+      ],
+      "drops": [
+        {
+          "item": "azalea",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "flowering_azalea_leaves"
+      ],
+      "drops": [
+        {
+          "item": "flowering_azalea",
+          "chance": 0.05
+        },
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "_comment": "Mangroves grow propagules on their leaves instead of dropping saplings",
+      "match": [
+        "mangrove_leaves"
+      ],
+      "drops": [
+        {
+          "item": "stick",
+          "count": [
+            1,
+            2
+          ],
+          "chance": 0.02
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "_section": "Plants",
+      "match": [
+        "short_grass",
+        "fern"
+      ],
+      "drops": [
+        {
+          "item": "wheat_seeds",
+          "chance": 0.125
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "dead_bush"
+      ],
+      "drops": [
+        {
+          "item": "stick",
+          "count": [
+            0,
+            2
+          ]
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "_comment": "Shears only. Vanilla drops one glow lichen per face; a rule can't count faces, so it is one",
+      "match": [
+        "bush",
+        "short_dry_grass",
+        "tall_dry_grass",
+        "seagrass",
+        "vine",
+        "hanging_roots",
+        "pale_hanging_moss",
+        "nether_sprouts",
+        "glow_lichen"
+      ],
+      "drops": [],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "_comment": "Needs a sword or shears to drop at all",
+      "match": [
+        "cobweb"
+      ],
+      "drops": [
+        {
+          "item": "string"
+        }
+      ],
+      "shears": [
+        {
+          "item": "self"
+        }
+      ]
+    },
+    {
+      "match": [
+        "weeping_vines",
+        "weeping_vines_plant"
+      ],
+      "drops": [
+        {
+          "item": "weeping_vines",
+          "chance": 0.33
+        }
+      ],
+      "shears": [
+        {
+          "item": "weeping_vines"
+        }
+      ]
+    },
+    {
+      "match": [
+        "twisting_vines",
+        "twisting_vines_plant"
+      ],
+      "drops": [
+        {
+          "item": "twisting_vines",
+          "chance": 0.33
+        }
+      ],
+      "shears": [
+        {
+          "item": "twisting_vines"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cave_vines",
+        "cave_vines_plant"
+      ],
+      "when": {
+        "berries": "true"
+      },
+      "drops": [
+        {
+          "item": "glow_berries"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cave_vines",
+        "cave_vines_plant"
+      ],
+      "drops": []
+    },
+    {
+      "match": [
+        "kelp_plant"
+      ],
+      "drops": [
+        {
+          "item": "kelp"
+        }
+      ]
+    },
+    {
+      "match": [
+        "bamboo_sapling"
+      ],
+      "drops": [
+        {
+          "item": "bamboo"
+        }
+      ]
+    },
+    {
+      "match": [
+        "big_dripleaf_stem"
+      ],
+      "drops": [
+        {
+          "item": "big_dripleaf"
+        }
+      ]
+    },
+    {
+      "_comment": "A hanging propagule drops only once grown (age 4)",
+      "match": [
+        "mangrove_propagule"
+      ],
+      "when": {
+        "hanging": "true",
+        "age": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      "drops": []
+    },
+    {
+      "_comment": "Only a carpet with a base drops",
+      "match": [
+        "pale_moss_carpet"
+      ],
+      "when": {
+        "bottom": "false"
+      },
+      "drops": []
+    },
+    {
+      "_section": "Crops",
+      "_comment": "Ripe: the crop plus 1 + binomial(3, 4/7) seeds",
+      "match": [
+        "wheat"
+      ],
+      "when": {
+        "age": "7"
+      },
+      "drops": [
+        {
+          "item": "wheat"
+        },
+        {
+          "item": "wheat_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5714286
+            ],
+            "plus": 1
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "wheat"
+      ],
+      "drops": [
+        {
+          "item": "wheat_seeds"
+        }
+      ]
+    },
+    {
+      "match": [
+        "beetroots"
+      ],
+      "when": {
+        "age": "3"
+      },
+      "drops": [
+        {
+          "item": "beetroot"
+        },
+        {
+          "item": "beetroot_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5714286
+            ],
+            "plus": 1
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "beetroots"
+      ],
+      "drops": [
+        {
+          "item": "beetroot_seeds"
+        }
+      ]
+    },
+    {
+      "match": [
+        "carrots"
+      ],
+      "when": {
+        "age": "7"
+      },
+      "drops": [
+        {
+          "item": "carrot",
+          "count": {
+            "binomial": [
+              3,
+              0.5714286
+            ],
+            "plus": 2
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "carrots"
+      ],
+      "drops": [
+        {
+          "item": "carrot"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potatoes"
+      ],
+      "when": {
+        "age": "7"
+      },
+      "drops": [
+        {
+          "item": "potato",
+          "count": {
+            "binomial": [
+              3,
+              0.5714286
+            ],
+            "plus": 2
+          }
+        },
+        {
+          "item": "poisonous_potato",
+          "chance": 0.02
+        }
+      ]
+    },
+    {
+      "match": [
+        "potatoes"
+      ],
+      "drops": [
+        {
+          "item": "potato"
+        }
+      ]
+    },
+    {
+      "match": [
+        "nether_wart"
+      ],
+      "when": {
+        "age": "3"
+      },
+      "drops": [
+        {
+          "item": "nether_wart",
+          "count": [
+            2,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "match": [
+        "cocoa"
+      ],
+      "when": {
+        "age": "2"
+      },
+      "drops": [
+        {
+          "item": "cocoa_beans",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "match": [
+        "cocoa"
+      ],
+      "drops": [
+        {
+          "item": "cocoa_beans"
+        }
+      ]
+    },
+    {
+      "match": [
+        "sweet_berry_bush"
+      ],
+      "when": {
+        "age": "3"
+      },
+      "drops": [
+        {
+          "item": "sweet_berries",
+          "count": [
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "match": [
+        "sweet_berry_bush"
+      ],
+      "when": {
+        "age": "2"
+      },
+      "drops": [
+        {
+          "item": "sweet_berries",
+          "count": [
+            1,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "_comment": "A bush without berries drops nothing",
+      "match": [
+        "sweet_berry_bush"
+      ],
+      "drops": []
+    },
+    {
+      "match": [
+        "torchflower_crop"
+      ],
+      "drops": [
+        {
+          "item": "torchflower_seeds"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pitcher_crop"
+      ],
+      "when": {
+        "age": "4"
+      },
+      "drops": [
+        {
+          "item": "pitcher_plant"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pitcher_crop"
+      ],
+      "drops": [
+        {
+          "item": "pitcher_pod"
+        }
+      ]
+    },
+    {
+      "_comment": "Stems drop binomial(3, (age + 1) / 15) seeds",
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "0"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.0666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "1"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.1333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "2"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.2
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "3"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.2666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "4"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.3333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "5"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.4
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "6"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.4666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "melon_stem"
+      ],
+      "when": {
+        "age": "7"
+      },
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "attached_melon_stem"
+      ],
+      "drops": [
+        {
+          "item": "melon_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "0"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.0666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "1"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.1333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "2"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.2
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "3"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.2666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "4"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.3333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "5"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.4
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "6"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.4666667
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "pumpkin_stem"
+      ],
+      "when": {
+        "age": "7"
+      },
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "match": [
+        "attached_pumpkin_stem"
+      ],
+      "drops": [
+        {
+          "item": "pumpkin_seeds",
+          "count": {
+            "binomial": [
+              3,
+              0.5333333
+            ],
+            "plus": 0
+          }
+        }
+      ]
+    },
+    {
+      "_section": "State-dependent",
+      "_comment": "Unstable TNT (vanilla's unstable=true) drops nothing",
+      "match": [
+        "tnt"
+      ],
+      "when": {
+        "unstable": "true"
+      },
+      "drops": []
+    },
+    {
+      "_section": "Blocks without an item of their own",
+      "match": [
+        "water_cauldron",
+        "lava_cauldron",
+        "powder_snow_cauldron"
+      ],
+      "drops": [
+        {
+          "item": "cauldron"
+        }
+      ]
+    },
+    {
+      "match": [
+        "redstone_wire"
+      ],
+      "drops": [
+        {
+          "item": "redstone"
+        }
+      ]
+    },
+    {
+      "match": [
+        "tripwire"
+      ],
+      "drops": [
+        {
+          "item": "string"
+        }
+      ]
+    },
+    {
+      "_comment": "Wall-mounted forms drop their standing item",
+      "match": [
+        "wall_torch"
+      ],
+      "drops": [
+        {
+          "item": "torch"
+        }
+      ]
+    },
+    {
+      "match": [
+        "soul_wall_torch"
+      ],
+      "drops": [
+        {
+          "item": "soul_torch"
+        }
+      ]
+    },
+    {
+      "match": [
+        "redstone_wall_torch"
+      ],
+      "drops": [
+        {
+          "item": "redstone_torch"
+        }
+      ]
+    },
+    {
+      "match": [
+        "oak_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "oak_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "spruce_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "spruce_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "birch_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "birch_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "jungle_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "jungle_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "acacia_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "acacia_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "dark_oak_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "dark_oak_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pale_oak_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "pale_oak_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "mangrove_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "mangrove_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cherry_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "cherry_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "bamboo_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "bamboo_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "crimson_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "crimson_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "warped_wall_sign"
+      ],
+      "drops": [
+        {
+          "item": "warped_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "oak_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "oak_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "spruce_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "spruce_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "birch_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "birch_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "jungle_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "jungle_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "acacia_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "acacia_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "dark_oak_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "dark_oak_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pale_oak_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "pale_oak_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "mangrove_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "mangrove_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cherry_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "cherry_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "bamboo_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "bamboo_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "crimson_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "crimson_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "warped_wall_hanging_sign"
+      ],
+      "drops": [
+        {
+          "item": "warped_hanging_sign"
+        }
+      ]
+    },
+    {
+      "match": [
+        "white_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "white_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "orange_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "orange_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "magenta_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "magenta_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "light_blue_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "light_blue_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "yellow_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "yellow_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "lime_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "lime_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pink_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "pink_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "gray_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "gray_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "light_gray_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "light_gray_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cyan_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "cyan_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "purple_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "purple_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "blue_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "blue_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "brown_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "brown_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "green_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "green_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "red_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "red_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "black_wall_banner"
+      ],
+      "drops": [
+        {
+          "item": "black_banner"
+        }
+      ]
+    },
+    {
+      "match": [
+        "skeleton_wall_skull"
+      ],
+      "drops": [
+        {
+          "item": "skeleton_skull"
+        }
+      ]
+    },
+    {
+      "match": [
+        "wither_skeleton_wall_skull"
+      ],
+      "drops": [
+        {
+          "item": "wither_skeleton_skull"
+        }
+      ]
+    },
+    {
+      "match": [
+        "zombie_wall_head"
+      ],
+      "drops": [
+        {
+          "item": "zombie_head"
+        }
+      ]
+    },
+    {
+      "match": [
+        "creeper_wall_head"
+      ],
+      "drops": [
+        {
+          "item": "creeper_head"
+        }
+      ]
+    },
+    {
+      "match": [
+        "piglin_wall_head"
+      ],
+      "drops": [
+        {
+          "item": "piglin_head"
+        }
+      ]
+    },
+    {
+      "match": [
+        "dragon_wall_head"
+      ],
+      "drops": [
+        {
+          "item": "dragon_head"
+        }
+      ]
+    },
+    {
+      "match": [
+        "player_wall_head"
+      ],
+      "drops": [
+        {
+          "item": "player_head"
+        }
+      ]
+    },
+    {
+      "_comment": "A candle cake drops its candle; the cake is lost",
+      "match": [
+        "candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "white_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "white_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "orange_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "orange_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "magenta_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "magenta_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "light_blue_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "light_blue_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "yellow_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "yellow_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "lime_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "lime_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "pink_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "pink_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "gray_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "gray_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "light_gray_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "light_gray_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "cyan_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "cyan_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "purple_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "purple_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "blue_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "blue_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "brown_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "brown_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "green_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "green_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "red_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "red_candle"
+        }
+      ]
+    },
+    {
+      "match": [
+        "black_candle_cake"
+      ],
+      "drops": [
+        {
+          "item": "black_candle"
+        }
+      ]
+    },
+    {
+      "_comment": "Potted plants drop the pot and the plant",
+      "match": [
+        "potted_oak_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "oak_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_spruce_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "spruce_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_birch_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "birch_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_jungle_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "jungle_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_acacia_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "acacia_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_dark_oak_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "dark_oak_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_pale_oak_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "pale_oak_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_cherry_sapling"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "cherry_sapling"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_mangrove_propagule"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "mangrove_propagule"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_fern"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "fern"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_dandelion"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "dandelion"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_poppy"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "poppy"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_blue_orchid"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "blue_orchid"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_allium"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "allium"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_azure_bluet"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "azure_bluet"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_red_tulip"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "red_tulip"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_orange_tulip"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "orange_tulip"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_white_tulip"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "white_tulip"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_pink_tulip"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "pink_tulip"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_oxeye_daisy"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "oxeye_daisy"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_cornflower"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "cornflower"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_lily_of_the_valley"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "lily_of_the_valley"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_wither_rose"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "wither_rose"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_torchflower"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "torchflower"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_open_eyeblossom"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "open_eyeblossom"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_closed_eyeblossom"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "closed_eyeblossom"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_red_mushroom"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "red_mushroom"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_brown_mushroom"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "brown_mushroom"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_dead_bush"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "dead_bush"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_cactus"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "cactus"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_bamboo"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "bamboo"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_crimson_fungus"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "crimson_fungus"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_warped_fungus"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "warped_fungus"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_crimson_roots"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "crimson_roots"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_warped_roots"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "warped_roots"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_azalea_bush"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "azalea"
+        }
+      ]
+    },
+    {
+      "match": [
+        "potted_flowering_azalea_bush"
+      ],
+      "drops": [
+        {
+          "item": "flower_pot"
+        },
+        {
+          "item": "flowering_azalea"
+        }
+      ]
+    }
+  ]
+}

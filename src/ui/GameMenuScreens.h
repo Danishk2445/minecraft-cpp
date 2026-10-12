@@ -110,4 +110,13 @@ private:
     std::string draft_;
 };
 
+// In bed (vanilla InBedChatScreen): the chat line and Leave Bed; Esc gets up too.
+class SleepScreen : public ChatScreen {
+public:
+    SleepScreen(ScreenContext ctx, Chat& chat) : ChatScreen(ctx, chat, "") {}
+    void init(glm::vec2 size) override;
+    bool keyPressed(int key, int scancode, int mods) override;
+    bool closeOnEscape() const override { return false; }
+};
+
 } // namespace mc

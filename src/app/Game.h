@@ -45,6 +45,8 @@ public:
     Difficulty difficulty() const override;
     void setDifficulty(Difficulty d) override;
     void sendChat(const std::string& line) override;
+    void respawn() override;
+    void leaveBed() override;
 
 private:
     bool init();
@@ -104,6 +106,7 @@ private:
     long long tickCount_ = 0;
     bool harnessDone_ = false;
     bool harnessStarted_ = false; // --exec and --screen ran
+    long long harnessStartTick_ = 0; // when, so --ticks counts from there in a world
     bool screenshotRequested_ = false;
     bool toolOnly_ = false; // a --dump-* tool ran inside init()
     int exitCode_ = 0;

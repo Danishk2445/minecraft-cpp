@@ -11,6 +11,8 @@
 
 #include <glm/glm.hpp>
 
+#include "core/Json.h"
+#include "core/Math.h"
 #include "game/WorldParams.h"
 
 namespace mc {
@@ -39,6 +41,17 @@ struct CommandSource {
     std::function<bool(std::string_view item, int count)> give;
     // Harness: a failed assertion (/assertblock) is reported here.
     std::function<void(const std::string&)> assertionFailed;
+    // Spawns an entity of `type` ("item", "experience_orb", ...) at a point with SNBT data;
+    // false for a type that can't be summoned.
+    std::function<bool(std::string_view type, const glm::dvec3& at, const Json& data, std::string& error)> summon;
+    // /item replace block: puts `count` of item `id` into a container's slot; false when the
+    // block has no such slot or the item is unknown.
+    std::function<bool(const BlockPos&, int slot, std::string_view id, int count)> replaceBlockSlot;
+    // /kill: the player dies (vanilla genericKill, past invulnerability and armor).
+    std::function<void()> kill;
+    // Experience: adds points or levels (negative removes); the query reads them.
+    std::function<void(int amount, bool levels)> addExperience;
+    std::function<int(bool levels)> experience;
 };
 
 class Commands {
@@ -72,6 +85,10 @@ private:
 
 // "~", "~-2.5" or "12": relative to `base` when prefixed with '~'.
 std::optional<double> parseCoordinate(std::string_view token, double base);
+// Splits on spaces, keeping [...], {...} and quoted strings whole.
 std::vector<std::string> tokenizeCommand(std::string_view line);
+// Vanilla SNBT ({Item:{id:"minecraft:diamond",count:3b}}) as JSON: compounds, lists,
+// quoted or bare strings, numbers (suffixes b s l f d dropped) and true/false.
+std::optional<Json> parseSnbt(std::string_view text);
 
 } // namespace mc

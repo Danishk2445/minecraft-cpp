@@ -12,6 +12,8 @@
 
 #include "entity/Particles.h"
 #include "entity/Player.h"
+#include "game/BlockEntities.h"
+#include "game/ContainerMenus.h"
 #include "game/WorldParams.h"
 #include "gfx/Camera.h"
 #include "ui/Screen.h"
@@ -51,6 +53,20 @@ public:
     void runCommand(const std::string& line, const std::function<void(const std::string&)>& reply);
 
     Player& player() { return *player_; }
+    // The menu of the block the player opened, if its screen is up.
+    Menu* openMenu() { return openMenu_.get(); }
+    // A screen the world asks for outside input (the death screen, a block's menu, or
+    // "close" when the open menu's block is gone), once.
+    std::string takePendingScreen() { return std::exchange(pendingScreen_, {}); }
+    // Back at the spawn with full health (spectating, in hardcore).
+    void respawnPlayer();
+    // Out of bed (the Leave Bed button, or morning).
+    void wakeUp();
+    // The sign being edited (for the edit screen) and which side.
+    std::shared_ptr<SignBlockEntity> editingSign() const { return editingSign_; }
+    bool editingFront() const { return editingFront_; }
+    void stopEditingSign();
+    bool hardcore() const { return params_.hardcore; }
     Level& level() { return *level_; }
     InventoryMenu& inventoryMenu();
     const Camera& camera() const { return camera_; }
@@ -87,9 +103,41 @@ private:
     bool controlDown(int key, std::string_view action) const;
     void tickInteraction();
     void breakBlock(const BlockPos& p);
+    // The player died: the death message, drops and experience, then the death screen.
+    void die();
+    bool eatCake(const BlockPos& pos, StateId state);
+    // A line above the hotbar (vanilla displayClientMessage to the action bar).
+    void message(const std::string& key);
+    // Right-click with armor in hand: it swaps with what is worn in its slot.
+    bool equipFromHand(ItemStack& stack);
+    // Breaking blocks and swinging at nothing (the attack button), once a tick.
+    void tickAttack(bool attackHeld);
+    // Signs: dyes, glow ink and wax by hand; otherwise the facing side opens for editing.
+    bool useSign(const BlockPos& pos, StateId state);
+    void editSign(const BlockPos& pos, bool front);
+    float signYaw(StateId state) const;
+    // Beds: sets the respawn point, and at night lies down in it.
+    bool useBed(const BlockPos& pos, StateId state);
+    void tickSleep();
+    glm::dvec3 standUpPosition(const BlockPos& head) const;
+    // Tools and other items used on a block (hoes, axes, flint and steel, ...).
+    bool useHeldItemOn(const BlockPos& pos, Direction face);
+    // Eating and drinking: started by use, held to the end, then the food counts.
+    void startUsingItem();
+    void continueUsingItem(bool held);
+    // Right-click on a block with a menu (crafting table, ...): opens it.
+    bool openBlockMenu(const BlockPos& pos, StateId state);
+    // Closes the open menu when its block is gone or the player too far.
+    void checkOpenMenu();
+    // What breaking `state` with `held` drops (loot tables arrive in data/loot).
+    std::vector<ItemStack> blockDrops(StateId state, const ItemStack& held);
+    // A tool wearing out: its pieces fly (vanilla breakItem particles).
+    void spawnItemBreak(const Item& item);
     void spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face);
     bool placeBlock();
     void renderHud(glm::ivec2 fb, float partialTick, const std::function<void()>& renderGui);
+    // Items, orbs and pickup animations for the entity renderer.
+    void submitEntities(float partialTick, int skyDarken);
     // Vanilla GameRenderer.tryTakeScreenshotIfNeeded: once the whole view is drawn, the
     // middle square of it becomes the world list's 64x64 icon.png (if there is none).
     void captureIcon(glm::ivec2 fb);
@@ -117,11 +165,24 @@ private:
     } breaking_;
     int destroyDelay_ = 0; // ticks before the next block may break (vanilla destroyDelay)
     int useDelay_ = 0;     // ticks before the next placement repeats while held
+    int missTime_ = 0;     // ticks of no attacking after a swing at nothing (vanilla missTime)
     int jumpTapTimer_ = 0; // double-tap jump window (vanilla jumpTriggerTime)
     bool jumpWasDown_ = false;
     int attackClicks_ = 0, useClicks_ = 0, pickClicks_ = 0; // presses since the last tick
     long long tickCount_ = 0;
     bool assertionFailed_ = false;
+    struct PickupAnimation {
+        std::unique_ptr<Entity> entity; // as it was when picked up
+        int count = 1;
+        int life = 0; // ticks of 3
+    };
+    std::vector<PickupAnimation> pickups_;
+    bool deathHandled_ = false;
+    std::string pendingScreen_;
+    std::unique_ptr<Menu> openMenu_;
+    std::shared_ptr<SignBlockEntity> editingSign_;
+    bool editingFront_ = true;
+    std::optional<MenuAccess> menuAccess_;
     bool hasIcon_ = false;
 };
 

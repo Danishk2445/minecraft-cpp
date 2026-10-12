@@ -38,6 +38,9 @@ void animateHumanoid(ModelPart& root, const HumanoidPose& pose);
 // LivingEntityRenderer.render with setupRotations (yaw 180 - body), the (-1, -1, 1)
 // flip, the renderer's `scale` and the -1.501 drop; `yOffset` is the render offset
 // (crouching players sit 2/16 lower).
-glm::mat4 livingModelTransform(float bodyYaw, float scale, float yOffset = 0.0f);
+glm::mat4 livingModelTransform(float bodyYaw, float scale, float yOffset = 0.0f, float flipDegrees = 0.0f);
+// Vanilla setupRotations: the dying fall over sideways, all the way (90 degrees) in about
+// 12 ticks; `deathTime` includes the partial tick, 0 when alive.
+float deathFlipDegrees(float deathTime);
 
 } // namespace mc

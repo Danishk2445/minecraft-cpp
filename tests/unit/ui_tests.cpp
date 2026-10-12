@@ -97,13 +97,16 @@ TEST(Options, RoundTripAndClamping) {
     o.invertMouse = true;
     o.chatVisibility = ChatVisibility::Commands;
     o.menuBlur = 0;
+    o.attackIndicator = AttackIndicator::Hotbar;
     const Options back = Options::fromJson(o.toJson());
     EXPECT_EQ(back.toJson(), o.toJson());
     EXPECT_TRUE(back.unlimitedFps());
     std::string err;
     const Options clamped =
-        Options::fromJson(R"({"fov": 500, "renderDistance": 1, "gamma": -3, "clouds": 9, "menuBlur": 99, "extra": 1})", &err);
+        Options::fromJson(R"({"fov": 500, "renderDistance": 1, "gamma": -3, "clouds": 9, "menuBlur": 99, "attackIndicator": 7, "extra": 1})", &err);
     EXPECT_EQ(err, "");
+    EXPECT_EQ(back.attackIndicator, AttackIndicator::Hotbar);
+    EXPECT_EQ(clamped.attackIndicator, AttackIndicator::Crosshair);
     EXPECT_EQ(clamped.menuBlur, 10);
     EXPECT_EQ(clamped.fov, 110);
     EXPECT_EQ(clamped.renderDistance, 2);

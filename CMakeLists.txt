@@ -281,6 +281,66 @@ if(XVFB_RUN AND Python3_FOUND)
         --screenshot ${MC_TEST_RUN}/third_person.png --exit)
     mc_py_test(gl_third_person_check gl_third_person check_image.py ${MC_TEST_RUN}/third_person.png
         --size 1280x720 --no-magenta --region 590,380,690,460 --mean-rgb 30,109,103 --tol 12)
+
+    # M10: sign text in the world (block entity data from /setblock): dye colors at 0.4,
+    # glowing text full-bright with its outline (cream around black), wall and hanging signs.
+    set(MC_SIGN_COMMANDS
+        "/setblock 0 -60 0 oak_sign[rotation=0]{front_text:{messages:[\"Hello\",\"World!\",\"\",\"\"]}}"
+        "/setblock 1 -60 0 birch_sign[rotation=0]{front_text:{messages:[\"Red\",\"text\",\"is here\",\"too long line of text for a sign\"],color:\"red\"}}"
+        "/fill 2 -60 -1 2 -58 -1 stone"
+        "/setblock 2 -59 0 oak_wall_sign[facing=south]{front_text:{messages:[\"Wall\",\"sign\",\"\",\"\"]}}"
+        "/setblock 3 -58 0 stone"
+        "/setblock 3 -59 0 oak_hanging_sign[rotation=0]{front_text:{messages:[\"Hang\",\"ing\",\"sign\",\"\"]}}"
+        "/setblock 4 -60 0 spruce_sign[rotation=0]{front_text:{messages:[\"Glow\",\"lime\",\"\",\"\"],color:\"lime\",has_glowing_text:1b}}"
+        "/setblock 5 -60 0 dark_oak_sign[rotation=0]{front_text:{messages:[\"Glow\",\"black\",\"\",\"\"],has_glowing_text:1b}}")
+    set(MC_SIGN_ARGS)
+    foreach(cmd IN LISTS MC_SIGN_COMMANDS)
+        list(APPEND MC_SIGN_ARGS --exec "${cmd}")
+    endforeach()
+    mc_gl_test(gl_signs --gamemode spectator --world-type flat --render-distance 4 --size 1280x720 --time 6000
+        --freeze-time --pos 3,-58.4,3.2 --look 180,15 --wait-chunks ${MC_SIGN_ARGS} --ticks 5
+        --screenshot ${MC_TEST_RUN}/signs.png --exit)
+    mc_py_test(gl_signs_black gl_signs check_image.py ${MC_TEST_RUN}/signs.png --no-magenta
+        --region 70,320,265,410 --count-rgb 0,0,0 --tol 10 --min-count 200)
+    mc_py_test(gl_signs_red gl_signs check_image.py ${MC_TEST_RUN}/signs.png
+        --region 265,320,460,410 --count-rgb 102,0,0 --tol 20 --min-count 500)
+    mc_py_test(gl_signs_glowing gl_signs check_image.py ${MC_TEST_RUN}/signs.png
+        --region 820,320,1010,410 --count-rgb 191,255,0 --tol 25 --min-count 150)
+    mc_py_test(gl_signs_outline gl_signs check_image.py ${MC_TEST_RUN}/signs.png
+        --region 1010,320,1200,410 --count-rgb 240,235,204 --tol 20 --min-count 400)
+
+    # M10: screens from using things: a chest (a diamond in slot 4), a furnace 120 ticks into
+    # its first raw iron (the arrow three fifths white), the editor of a sign just placed, and
+    # the death screen.
+    set(MC_USE_SCENE --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
+        --pos 0.5,-58.38,0.5 --wait-chunks --gamemode survival)
+    mc_gl_test(gl_chest_screen ${MC_USE_SCENE} --look 0,29 --exec "/setblock 0 -60 2 chest"
+        --exec "/item replace block 0 -60 2 container.4 with diamond 7"
+        --exec "/item replace block 0 -60 2 container.13 with oak_log 32" --hold use --ticks 5
+        --screenshot ${MC_TEST_RUN}/chest_screen.png --exit)
+    mc_py_test(gl_chest_screen_panel gl_chest_screen check_image.py ${MC_TEST_RUN}/chest_screen.png
+        --no-magenta --region 600,118,880,145 --mean-rgb 198,198,198 --tol 2)
+    mc_py_test(gl_chest_screen_diamond gl_chest_screen check_image.py ${MC_TEST_RUN}/chest_screen.png
+        --region 622,166,660,204 --mean-rgb 112,182,176 --tol 12)
+    mc_gl_test(gl_furnace_screen ${MC_USE_SCENE} --look 0,29 --exec "/setblock 0 -60 2 furnace[facing=north]"
+        --exec "/item replace block 0 -60 2 container.0 with raw_iron 4"
+        --exec "/item replace block 0 -60 2 container.1 with coal 1" --hold use --ticks 120
+        --screenshot ${MC_TEST_RUN}/furnace_screen.png --exit)
+    mc_py_test(gl_furnace_screen_arrow gl_furnace_screen check_image.py ${MC_TEST_RUN}/furnace_screen.png
+        --no-magenta --region 617,230,653,240 --mean-rgb 249,249,249 --tol 8)
+    mc_gl_test(gl_sign_edit_screen ${MC_USE_SCENE} --look 0,40 --exec "/give oak_sign 2" --hold use --ticks 5
+        --screenshot ${MC_TEST_RUN}/sign_edit_screen.png --exit)
+    mc_py_test(gl_sign_edit_screen_board gl_sign_edit_screen check_image.py ${MC_TEST_RUN}/sign_edit_screen.png
+        --no-magenta --region 500,240,780,320 --mean-rgb 165,135,81 --tol 12)
+    mc_gl_test(gl_death_screen ${MC_USE_SCENE} --look 0,20 --exec "/kill" --ticks 30
+        --screenshot ${MC_TEST_RUN}/death_screen.png --exit)
+    mc_py_test(gl_death_screen_check gl_death_screen check_image.py ${MC_TEST_RUN}/death_screen.png
+        --no-magenta --region 100,40,500,140 --mean-rgb 139,124,154 --tol 10)
+    # Dying (in lava) with a chest open still shows the death screen (its Respawn button).
+    mc_gl_test(gl_death_with_chest_open ${MC_USE_SCENE} --look 0,29 --exec "/setblock 0 -60 2 chest"
+        --exec "/setblock 0 -60 0 lava" --hold use --ticks 200 --screenshot ${MC_TEST_RUN}/death_chest.png --exit)
+    mc_py_test(gl_death_with_chest_open_check gl_death_with_chest_open check_image.py ${MC_TEST_RUN}/death_chest.png
+        --no-magenta --region 350,404,420,446 --mean-rgb 111,111,111 --tol 6)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

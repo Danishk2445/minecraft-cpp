@@ -1,0 +1,8 @@
+{
+  "values": [
+    "#wool"
+  ],
+  "exclude": [
+    "yellow_wool"
+  ]
+}

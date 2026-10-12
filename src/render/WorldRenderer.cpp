@@ -40,6 +40,19 @@ bool WorldRenderer::init() {
 
 void WorldRenderer::tick() { flicker_.tick(); }
 
+void WorldRenderer::setDynamicBlockEntities(std::unordered_set<BlockPos> positions, ChunkManager& chunks) {
+    static const std::unordered_set<BlockPos> kNone;
+    const auto& current = options_.dynamicBlockEntities ? *options_.dynamicBlockEntities : kNone;
+    if (positions == current) return;
+    // Remesh every section whose membership changed.
+    auto touch = [&](const BlockPos& p) { chunks.markSectionDirty(ChunkPos::of(p), sectionIndexOfY(p.y)); };
+    for (const BlockPos& p : positions)
+        if (!current.contains(p)) touch(p);
+    for (const BlockPos& p : current)
+        if (!positions.contains(p)) touch(p);
+    options_.dynamicBlockEntities = std::make_shared<const std::unordered_set<BlockPos>>(std::move(positions));
+}
+
 void WorldRenderer::update(ChunkManager& chunkManager, JobSystem& jobs) {
     for (const ChunkPos& p : chunkManager.takeDropped()) {
         chunks_.dropChunk(p);

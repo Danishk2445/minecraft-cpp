@@ -1,0 +1,21 @@
+{
+  "_comment": "Food and farming recipes (vanilla 1.21.8). Cooking raw food is in families.json (cook_food).",
+  "recipes": [
+    {"type": "shaped", "pattern": ["###"], "key": {"#": "wheat"}, "result": {"id": "bread"}},
+    {"type": "shaped", "pattern": ["AAA", "BEB", "CCC"], "key": {"A": "milk_bucket", "B": "sugar", "E": "#eggs", "C": "wheat"}, "result": {"id": "cake"}},
+    {"type": "shaped", "pattern": ["#X#"], "key": {"#": "wheat", "X": "cocoa_beans"}, "result": {"id": "cookie", "count": 8}},
+    {"type": "shapeless", "ingredients": ["pumpkin", "sugar", "#eggs"], "result": {"id": "pumpkin_pie"}},
+    {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "gold_ingot", "X": "apple"}, "result": {"id": "golden_apple"}},
+    {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "gold_nugget", "X": "carrot"}, "result": {"id": "golden_carrot"}},
+    {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "gold_nugget", "X": "melon_slice"}, "result": {"id": "glistering_melon_slice"}},
+    {"type": "shapeless", "ingredients": ["brown_mushroom", "red_mushroom", "bowl"], "result": {"id": "mushroom_stew"}},
+    {"type": "shapeless", "ingredients": ["baked_potato", "cooked_rabbit", "bowl", "carrot", "brown_mushroom"], "result": {"id": "rabbit_stew"}},
+    {"type": "shapeless", "ingredients": ["baked_potato", "cooked_rabbit", "bowl", "carrot", "red_mushroom"], "result": {"id": "rabbit_stew"}},
+    {"type": "shapeless", "ingredients": ["bowl", "beetroot", "beetroot", "beetroot", "beetroot", "beetroot", "beetroot"], "result": {"id": "beetroot_soup"}},
+    {"type": "shapeless", "ingredients": ["sugar_cane"], "result": {"id": "sugar"}},
+    {"type": "shapeless", "ingredients": ["honey_bottle"], "result": {"id": "sugar", "count": 3}},
+    {"type": "shapeless", "ingredients": ["honey_block", "glass_bottle", "glass_bottle", "glass_bottle", "glass_bottle"], "result": {"id": "honey_bottle", "count": 4}},
+    {"type": "shapeless", "ingredients": ["melon_slice"], "result": {"id": "melon_seeds"}},
+    {"type": "shapeless", "ingredients": ["pumpkin"], "result": {"id": "pumpkin_seeds", "count": 4}}
+  ]
+}

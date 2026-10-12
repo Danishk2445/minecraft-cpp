@@ -1,0 +1,25 @@
+{
+  "_comment": "Tools, weapons and armor that are not part of a material family (vanilla 1.21.8). Tiered tools and armor are in families.json.",
+  "recipes": [
+    {"type": "shaped", "pattern": [" #X", "# X", " #X"], "key": {"#": "stick", "X": "string"}, "result": {"id": "bow"}},
+    {"type": "shaped", "pattern": ["#$#", "@T@", " # "], "key": {"#": "stick", "$": "iron_ingot", "@": "string", "T": "tripwire_hook"}, "result": {"id": "crossbow"}},
+    {"type": "shaped", "pattern": ["X", "#", "Y"], "key": {"X": "flint", "#": "stick", "Y": "feather"}, "result": {"id": "arrow", "count": 4}},
+    {"type": "shaped", "pattern": [" # ", "#X#", " # "], "key": {"#": "glowstone_dust", "X": "arrow"}, "result": {"id": "spectral_arrow", "count": 2}},
+    {"type": "shaped", "pattern": ["WoW", "WWW", " W "], "key": {"W": "#planks", "o": "iron_ingot"}, "result": {"id": "shield"}},
+    {"type": "shaped", "pattern": ["#", "I"], "key": {"#": "heavy_core", "I": "breeze_rod"}, "result": {"id": "mace"}},
+    {"type": "shaped", "pattern": ["  #", " #X", "# X"], "key": {"#": "stick", "X": "string"}, "result": {"id": "fishing_rod"}},
+    {"type": "shapeless", "ingredients": ["iron_ingot", "flint"], "result": {"id": "flint_and_steel"}},
+    {"type": "shaped", "pattern": [" #", "# "], "key": {"#": "iron_ingot"}, "result": {"id": "shears"}},
+    {"type": "shaped", "pattern": ["# #", " # "], "key": {"#": "iron_ingot"}, "result": {"id": "bucket"}},
+    {"type": "shaped", "pattern": [" # ", "#X#", " # "], "key": {"#": "iron_ingot", "X": "redstone"}, "result": {"id": "compass"}},
+    {"type": "shaped", "pattern": ["SSS", "SCS", "SSS"], "key": {"S": "echo_shard", "C": "compass"}, "result": {"id": "recovery_compass"}},
+    {"type": "shaped", "pattern": [" # ", "#X#", " # "], "key": {"#": "gold_ingot", "X": "redstone"}, "result": {"id": "clock"}},
+    {"type": "shaped", "pattern": ["#", "X", "X"], "key": {"#": "amethyst_shard", "X": "copper_ingot"}, "result": {"id": "spyglass"}},
+    {"type": "shaped", "pattern": ["X", "#", "I"], "key": {"X": "feather", "#": "copper_ingot", "I": "stick"}, "result": {"id": "brush"}},
+    {"type": "shaped", "pattern": ["###", "#X#", "###"], "key": {"#": "paper", "X": "compass"}, "result": {"id": "map"}},
+    {"type": "shaped", "pattern": ["-", "#"], "key": {"-": "string", "#": "leather"}, "result": {"id": "bundle"}},
+    {"type": "shaped", "pattern": ["XXX", "X X"], "key": {"X": "turtle_scute"}, "result": {"id": "turtle_helmet"}},
+    {"type": "shaped", "pattern": ["X  ", "XXX", "X X"], "key": {"X": "armadillo_scute"}, "result": {"id": "wolf_armor"}},
+    {"type": "shaped", "pattern": ["X X", "XXX", "X X"], "key": {"X": "leather"}, "result": {"id": "leather_horse_armor"}}
+  ]
+}

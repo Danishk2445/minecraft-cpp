@@ -1,0 +1,25 @@
+{
+  "values": [
+    "dirt",
+    "coarse_dirt",
+    "rooted_dirt",
+    "grass_block",
+    "podzol",
+    "mycelium",
+    "farmland",
+    "dirt_path",
+    "mud",
+    "muddy_mangrove_roots",
+    "clay",
+    "sand",
+    "red_sand",
+    "suspicious_sand",
+    "gravel",
+    "suspicious_gravel",
+    "soul_sand",
+    "soul_soil",
+    "snow",
+    "snow_block",
+    "*_concrete_powder"
+  ]
+}

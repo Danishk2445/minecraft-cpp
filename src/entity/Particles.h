@@ -31,6 +31,9 @@ public:
     // One chip off `face` of a block being mined (vanilla ParticleEngine.crack).
     void addBlockHit(const BlockRegistry& reg, StateId state, const BlockPos& pos, Direction face, int sprite,
                      uint32_t tint);
+    // Pieces of an item flying out in front of the eyes (vanilla LivingEntity.spawnItemParticles
+    // with BreakingItemParticle): a tool breaking, food being eaten.
+    void addItemParticles(const glm::dvec3& eye, float yaw, float pitch, int sprite, int count);
     // Moves, collides and ages every particle; removes the expired ones.
     void tick(const BlockGetter& level);
     const std::vector<Particle>& particles() const { return particles_; }

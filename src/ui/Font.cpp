@@ -34,6 +34,33 @@ float Font::draw(GuiBatch& batch, std::string_view text, float x, float y, uint3
     return drawPass(batch, cps, x, y, argb, false, random_);
 }
 
+void Font::glyphQuads(std::string_view text, float x, float y, uint32_t argb, std::vector<GlyphQuad>& out) const {
+    if ((argb & 0xFC000000u) == 0) argb |= 0xFF000000u;
+    const Image& sheet = set_.sheet();
+    const float invW = 1.0f / float(sheet.width), invH = 1.0f / float(sheet.height);
+    const std::u32string cps = decodeUtf8(text);
+    uint32_t random = random_;
+    set_.forEachStyled(cps, TextStyle{}, [&](char32_t c, const TextStyle& style) {
+        const uint32_t color = style.hasColor ? (argb & 0xFF000000u) | style.color : argb;
+        const char32_t shown = style.obfuscated ? set_.obfuscated(c, random = random * 1664525u + 1013904223u) : c;
+        const Glyph& g = set_.glyph(shown);
+        if (g.visible) {
+            const float w = float(g.cellW) * g.scale, h = float(g.cellH) * g.scale;
+            const float top = y + g.up, bottom = top + h;
+            const float skewTop = style.italic ? 1.0f - 0.25f * g.up : 0.0f;
+            const float skewBottom = style.italic ? 1.0f - 0.25f * (g.up + h) : 0.0f;
+            const glm::vec2 uv0(float(g.sheetX) * invW, float(g.sheetY) * invH);
+            const glm::vec2 uv1(float(g.sheetX + g.cellW) * invW, float(g.sheetY + g.cellH) * invH);
+            for (int pass = 0; pass < (style.bold ? 2 : 1); ++pass) {
+                const float gx = x + float(pass) * FontSet::kBoldOffset;
+                out.push_back({{{gx + skewTop, top}, {gx + skewBottom, bottom}, {gx + skewBottom + w, bottom}, {gx + skewTop + w, top}},
+                               uv0, uv1, color});
+            }
+        }
+        x += set_.advance(c, style);
+    });
+}
+
 float Font::drawPass(GuiBatch& batch, std::u32string_view text, float x, float y, uint32_t argb, bool shadowPass,
                      uint32_t random) const {
     const Image& sheet = set_.sheet();

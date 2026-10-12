@@ -25,20 +25,23 @@ glm::mat4 rotZ(const glm::mat4& m, float degrees) { return glm::rotate(m, glm::r
 FirstPersonRenderer::FirstPersonRenderer() : player_(playerModel(false)) {}
 
 void FirstPersonRenderer::tick(const Player& player) {
-    // The hand rises while it shows what is held and dips (0.4 a tick) to swap in a new item.
+    // The hand rises while it shows what is held and dips (0.4 a tick) to swap in a new item;
+    // the main hand only rises as far as the attack strength cubed (it dips after a swing).
     // Vanilla compares stack identity: here the same slot and item (counts may change).
-    auto update = [](Hand& h, const Item* item, int slot) {
+    auto update = [](Hand& h, const Item* item, int slot, float full) {
         h.oldHeight = h.height;
         const bool same = h.shown == item && h.slot == slot;
-        h.height += std::clamp((same ? 1.0f : 0.0f) - h.height, -0.4f, 0.4f); // attack cooldown arrives with combat
+        h.height += std::clamp((same ? full : 0.0f) - h.height, -0.4f, 0.4f);
         if (h.height < 0.1f) {
             h.shown = item;
             h.slot = slot;
         }
     };
     const ItemStack& main = player.inventory.selectedStack();
-    update(main_, main.empty() ? nullptr : main.item, player.inventory.selected);
-    update(off_, player.inventory.offhand.empty() ? nullptr : player.inventory.offhand.item, Inventory::kOffhandSlot);
+    const float strength = player.attackStrengthScale(1.0f);
+    update(main_, main.empty() ? nullptr : main.item, player.inventory.selected, strength * strength * strength);
+    update(off_, player.inventory.offhand.empty() ? nullptr : player.inventory.offhand.item, Inventory::kOffhandSlot,
+           1.0f);
 }
 
 void FirstPersonRenderer::render(EntityRenderer& entities, const ClientAssets& assets, const Player& player,
@@ -79,16 +82,30 @@ void FirstPersonRenderer::render(EntityRenderer& entities, const ClientAssets& a
                                  glm::dvec3(0.0), m, light);
             continue;
         }
-        // renderArmWithItem: swing offsets, then applyItemArmTransform and applyItemArmAttackTransform.
-        const float g = std::sqrt(s);
-        glm::mat4 m = glm::translate(base, glm::vec3(side * -0.4f * std::sin(g * kPi), 0.2f * std::sin(g * kPi * 2.0f),
-                                                     -0.2f * std::sin(s * kPi)));
-        m = glm::translate(m, glm::vec3(side * 0.56f, -0.52f + equipped * -0.6f, -0.72f));
-        m = rotY(m, side * (45.0f + std::sin(s * s * kPi) * -20.0f));
-        const float a = std::sin(g * kPi);
-        m = rotZ(m, side * a * -20.0f);
-        m = rotX(m, a * -80.0f);
-        m = rotY(m, side * -45.0f);
+        glm::mat4 m = base;
+        if (player.usingItem() && left == player.useOffhand) {
+            // applyEatTransform: the item bobs to the mouth, then applyItemArmTransform.
+            const float f = float(player.useItemRemaining) - pt + 1.0f;
+            const float f1 = f / float(player.useItem->useTicks);
+            if (f1 < 0.8f) m = glm::translate(m, glm::vec3(0.0f, std::abs(std::cos(f / 4.0f * kPi) * 0.1f), 0.0f));
+            const float f3 = 1.0f - std::pow(f1, 27.0f);
+            m = glm::translate(m, glm::vec3(f3 * 0.6f * side, f3 * -0.5f, 0.0f));
+            m = rotY(m, side * f3 * 90.0f);
+            m = rotX(m, f3 * 10.0f);
+            m = rotZ(m, side * f3 * 30.0f);
+            m = glm::translate(m, glm::vec3(side * 0.56f, -0.52f + equipped * -0.6f, -0.72f));
+        } else {
+            // renderArmWithItem: swing offsets, then applyItemArmTransform and applyItemArmAttackTransform.
+            const float g = std::sqrt(s);
+            m = glm::translate(m, glm::vec3(side * -0.4f * std::sin(g * kPi), 0.2f * std::sin(g * kPi * 2.0f),
+                                            -0.2f * std::sin(s * kPi)));
+            m = glm::translate(m, glm::vec3(side * 0.56f, -0.52f + equipped * -0.6f, -0.72f));
+            m = rotY(m, side * (45.0f + std::sin(s * s * kPi) * -20.0f));
+            const float a = std::sin(g * kPi);
+            m = rotZ(m, side * a * -20.0f);
+            m = rotX(m, a * -80.0f);
+            m = rotY(m, side * -45.0f);
+        }
         const ItemStack& held = left ? player.inventory.offhand : player.inventory.selectedStack();
         const ItemStack shown = held.item == hand.shown ? held : ItemStack{hand.shown, 1};
         ItemModelContext ctx;
