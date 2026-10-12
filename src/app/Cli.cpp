@@ -94,8 +94,13 @@ const std::vector<Option>& options() {
              auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), o.seed);
              return ec == std::errc() && p == v.data() + v.size();
          }},
-        {"--render-distance", "N", "render distance in chunks (2-32, default 12)",
-         [](CliOptions& o, std::string_view v) { return parseInt(v, o.renderDistance) && o.renderDistance >= 2 && o.renderDistance <= 32; }},
+        {"--render-distance", "N", "render distance in chunks (2-32; overrides the option)",
+         [](CliOptions& o, std::string_view v) {
+             int rd = 0;
+             if (!parseInt(v, rd) || rd < 2 || rd > 32) return false;
+             o.renderDistance = rd;
+             return true;
+         }},
         {"--exec", "CMDS", "commands to run once the spawn area is ready (';'-separated; repeatable)",
          [](CliOptions& o, std::string_view v) {
              size_t pos = 0;
@@ -123,7 +128,12 @@ const std::vector<Option>& options() {
         {"--debug-overlay", "", "show the F3 debug screen",
          [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
         {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
-         [](CliOptions& o, std::string_view v) { return parseBool(v, o.smoothLighting); }},
+         [](CliOptions& o, std::string_view v) {
+             bool on = true;
+             if (!parseBool(v, on)) return false;
+             o.smoothLighting = on;
+             return true;
+         }},
         {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
          [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
         {"--world", "NAME", "play the saved world <gamedir>/saves/NAME, creating it (with --seed and --world-type) if missing",
@@ -163,12 +173,25 @@ const std::vector<Option>& options() {
              }
              return true;
          }},
-        {"--screen", "NAME", "harness: open a screen once the spawn area is ready (inventory: the survival or creative one)",
+        {"--screen", "NAME",
+         "harness: open a screen at start, or in a world once the spawn area is ready (inventory, pause, options, "
+         "video, chat, title, worlds, create)",
          [](CliOptions& o, std::string_view v) {
-             if (v != "inventory") return false;
+             static constexpr std::string_view kScreens[] = {"inventory", "pause",  "options", "video",
+                                                             "chat",      "title",  "worlds",  "create"};
+             if (std::find(std::begin(kScreens), std::end(kScreens), v) == std::end(kScreens)) return false;
              o.screen = v;
+             if (v == "inventory" || v == "pause" || v == "chat") o.worldRequested = true;
              return true;
          }},
+        {"--play", "NAME",
+         "harness: start at the title and open the world <gamedir>/saves/NAME (created if missing) the way the world "
+         "list does, behind the loading screen",
+         [](CliOptions& o, std::string_view v) { return o.play = v, !v.empty(); }},
+        {"--splash", "TEXT", "harness: show this splash on the title screen (empty: none) instead of a random one",
+         [](CliOptions& o, std::string_view v) { return o.splash = std::string(v), true; }},
+        {"--bake-panorama", "", "render the title screen panorama into <gamedir>/panorama, then exit",
+         [](CliOptions& o, std::string_view) { return o.bakePanorama = true; }},
         {"--perspective", "VIEW", "first (default), back or front: first person or the F5 third-person views",
          [](CliOptions& o, std::string_view v) {
              if (v != "first" && v != "back" && v != "front") return false;
@@ -252,6 +275,12 @@ std::optional<CliOptions> parseCli(int argc, char** argv, std::string& error) {
             error = std::format("bad value '{}' for {} (expected {})", value, arg, opt->arg);
             return std::nullopt;
         }
+        // Options about a world open it directly instead of the title screen.
+        static constexpr std::string_view kWorldOptions[] = {
+            "--world", "--world-type", "--seed", "--pos", "--look", "--gamemode", "--exec", "--time",
+            "--freeze-time", "--perspective", "--hold", "--wait-chunks", "--debug-overlay"};
+        if (std::find(std::begin(kWorldOptions), std::end(kWorldOptions), arg) != std::end(kWorldOptions))
+            out.worldRequested = true;
     }
     return out;
 }

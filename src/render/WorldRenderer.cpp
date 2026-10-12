@@ -102,7 +102,7 @@ void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int render
     chunks_.renderOpaque(camera, viewProj, assets_.blockAtlasTexture(), renderDistance, fog);
     entities_.render(viewProj, fog);
     chunks_.renderTranslucent(camera, viewProj, assets_.blockAtlasTexture(), fog);
-    sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick);
+    if (clouds != CloudMode::Off) sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick, clouds == CloudMode::Fancy);
 }
 
 void WorldRenderer::renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick) {

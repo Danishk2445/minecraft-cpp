@@ -1,6 +1,8 @@
 // WorldRenderer.h -- turns mesh-ready chunks into GPU meshes and draws the world.
 #pragma once
 
+#include "game/Options.h"
+
 #include <array>
 #include <memory>
 #include <unordered_map>
@@ -46,6 +48,7 @@ public:
     void renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera, glm::ivec2 viewport,
                          float partialTick);
     float gamma = 0.5f; // the Brightness option (0 = Moody, 1 = Bright)
+    CloudMode clouds = CloudMode::Fancy;
 
     // No mesh jobs running.
     bool idle() const { return inFlight_ == 0; }

@@ -12,7 +12,7 @@ The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering
 - [x] M6 Player: physics, modes, breaking, placing, shape updates, items core, ticks, saves
 - [x] M7 Entity models: ModelPart, block-entity renderers, player model, F5
 - [x] M8 GUI core: GUI, fonts, HUD, item rendering, Menu/Slot, inventories
-- [ ] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
+- [x] M9 Menus: title/panorama, world list/create, options, pause, chat, commands
 - [ ] M10 Survival: tools, food, armor, loot, item entities, XP, health, crafting, furnaces, containers, beds, signs
 - [ ] M11 Simulation: random ticks, fluids, falling blocks, TNT, fire, farming, weather, particles
 - [ ] M12 Mobs: models, AI, A*, spawning, combat, breeding
@@ -79,7 +79,7 @@ Recorded per milestone.
   - Placement covers the vanilla rules for stairs, slabs (with doubling), doors (approximate hinge choice), beds, double plants, trapdoors, buttons, levers, grindstones, torches, signs, banners, heads, ladders, rails (straight), chests (pairing), hoppers, pistons, observers, dispensers, barrels, anvils, lanterns, rods and pillars; other blocks fall back to their `facing`/`axis`/`rotation` properties. Wall `tall` sides follow only whether the block above has a sturdy bottom face.
   - Saves keep only edited chunks: every chunk still generates (so neighbors receive its tree and plant writes), and a saved chunk's blocks replace the generated ones before lighting. Light is not saved. `/assertblock` stands in for the planned `--dump-world-state` diff.
   - Particles: block break and mining debris only (vanilla TerrainParticle); other particle types come with the simulation milestone.
-  - The hotbar shows slot counts and the selected item's name; item icons arrive with the GUI milestone. Creative starts with a few building blocks because the creative inventory comes later.
+  - The hotbar shows slot counts and the selected item's name; item icons arrive with the GUI milestone.
 - **M7:**
   - Block entities are baked into the chunk meshes as static models.
     - Chest lids stay shut until container menus arrive (M10). Banners don't wave, and the bell doesn't swing.
@@ -89,7 +89,6 @@ Recorded per milestone.
   - Not drawn: the books of enchanting tables and lecterns, beacon beams, and the contents of spawners, vaults and campfires.
   - The player is always Steve with wide arms. Vanilla picks one of nine default skins from the player's UUID.
   - Items in hand are not drawn yet: third-person held items and the first-person hand come with item rendering (M8).
-  - Entity shadows are always on; the option arrives with the options screen (M9).
   - Spectators see their own head at 15% opacity in third person, with the body hidden, as in vanilla.
   - The harness's `--hold forward,attack,...` holds controls down for a whole run. It drives the walking, mining and sneaking screenshots.
 - **M8:**
@@ -102,3 +101,12 @@ Recorded per milestone.
   - The 2x2 crafting grid accepts items but crafts nothing until recipes (M10). There is no recipe book (out of scope).
   - First-person hands have no view bobbing (M13). The attack-cooldown dip of the held item arrives with combat (M10).
   - Items on the ground (item entities) arrive with M10.
+- **M9:**
+  - The pack's panorama is six 1×1 placeholders, so the game bakes its own into `<gamedir>/panorama` on first start (a few seconds): our seed 42 from (−60, 79, −250) at time 2500. `--bake-panorama` re-bakes it; with `--seed`, `--pos`, `--look` and `--time` it bakes another view. The pack's `panorama_overlay` is transparent, so nothing tints it.
+  - Title screen: no fade-in. The version line names this game, and the corner where vanilla shows its copyright line reads "Not an official Minecraft product." Multiplayer, Realms, Language (en_us only) and Accessibility are disabled.
+  - World list: Edit World and Re-Create are disabled. There are no lock, version or backup warnings, and every world shows version 1.21.8. Deleting the last world leaves an empty list; vanilla moves on to Create World.
+  - Create World: Generate Structures and Bonus Chest are fixed off, since this game has neither. Customize (superflat presets), Game Rules, Experiments and Data Packs are disabled. World types are Default, Superflat and Debug Mode, all in the cycle; vanilla shows Debug Mode only with Shift and also has Large Biomes, Amplified and Single Biome. Hardcore worlds are saved as hardcore, and their one-life death screen comes with death (M10).
+  - Loading screen: the map shows our pipeline stages in vanilla's ChunkStatus colors, over the render-distance square instead of vanilla's spawn chunk radius.
+  - "Saving world" is shown for a single frame, because saving blocks the main thread.
+  - Commands use vanilla's syntax, but without target selectors (they act on the player), tab completion or translated feedback. `/gamerule` knows only doDaylightCycle; the other rules arrive with their systems. `/clear` takes no target. The 16 commands: help, list, me, seed, say, difficulty, gamemode, give, clear, tp/teleport, time, gamerule, setblock, fill and the harness's assertblock.
+  - Options are saved as `options.json`, not vanilla's `options.txt`. Particles has no effect yet: the only particles are block breaking and mining, which vanilla shows at every setting. View Bobbing arrives with M13. Menu Background Blur sits in Video Settings (vanilla also has it under Accessibility).

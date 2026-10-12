@@ -30,6 +30,7 @@ public:
 
     // Starts a frame's submissions; positions become relative to `cameraPos`.
     void begin(const glm::dvec3& cameraPos);
+    bool shadows = true; // the Entity Shadows option
     // A posed model: `transform` maps model root space (blocks) to world space
     // relative to `origin`. `light` is (block, sky), 0..15.
     // Below full `alpha` the model is blended (vanilla's translucent entity render types).

@@ -85,6 +85,13 @@ if(GTest_FOUND)
     target_precompile_headers(mc_tests PRIVATE src/core/Pch.h)
     include(GoogleTest)
     gtest_discover_tests(mc_tests PROPERTIES LABELS unit DISCOVERY_TIMEOUT 60)
+    # Client code that needs no GL context (screen layouts and behavior).
+    file(GLOB_RECURSE MC_CLIENT_TESTS CONFIGURE_DEPENDS tests/client/*.cpp)
+    add_executable(mc_client_tests ${MC_CLIENT_TESTS})
+    target_link_libraries(mc_client_tests PRIVATE mc_client GTest::gtest_main)
+    target_compile_options(mc_client_tests PRIVATE ${MC_WARNINGS})
+    target_precompile_headers(mc_client_tests PRIVATE src/core/Pch.h)
+    gtest_discover_tests(mc_client_tests PROPERTIES LABELS unit DISCOVERY_TIMEOUT 60)
 else()
     message(WARNING "GTest not found: unit tests are disabled")
 endif()
@@ -215,6 +222,58 @@ if(XVFB_RUN AND Python3_FOUND)
         --screenshot ${MC_TEST_RUN}/creative_screen.png --exit)
     mc_py_test(gl_creative_screen_check gl_creative_screen check_image.py ${MC_TEST_RUN}/creative_screen.png
         --size 1280x720 --no-magenta --min-colors 1000 --region 700,166,840,172 --mean-rgb 198,198,198 --tol 2)
+
+    # M9: the title-side screens, in their own game directory (its panorama and saves).
+    set(MC_TITLE_RUN ${MC_TEST_RUN}/title)
+    set(MC_TITLE_ARGS --gamedir ${MC_TITLE_RUN} --size 1280x720 --splash Splash!)
+    mc_gl_test(gl_panorama_bake --gamedir ${MC_TITLE_RUN} --bake-panorama)
+    mc_py_test(gl_panorama_sky gl_panorama_bake check_image.py ${MC_TITLE_RUN}/panorama/panorama_4.png
+        --size 1024x1024 --region 384,384,640,640 --mean-rgb 142,174,234 --tol 15)
+    mc_py_test(gl_panorama_view gl_panorama_bake check_image.py ${MC_TITLE_RUN}/panorama/panorama_0.png
+        --no-magenta --min-colors 5000)
+    # The title over the panorama: the logo, and the disabled Realms button's left part.
+    mc_gl_test(gl_title_screen ${MC_TITLE_ARGS} --screen title --frames 2 --screenshot ${MC_TEST_RUN}/title.png --exit)
+    mc_py_test(gl_title_screen_check gl_title_screen check_image.py ${MC_TEST_RUN}/title.png
+        --size 1280x720 --no-magenta --region 350,475,470,520 --mean-rgb 44,44,44 --tol 4)
+    mc_py_test(gl_title_logo_check gl_title_screen check_image.py ${MC_TEST_RUN}/title.png
+        --region 255,90,1023,222 --mean-rgb 112,108,100 --tol 10)
+    # A world opened as the world list does: the loading screen's chunk map, then the game,
+    # which saves the world's icon.
+    mc_gl_test(gl_loading_screen ${MC_TITLE_ARGS} --play Loading --world-type flat --frames 1
+        --screenshot ${MC_TEST_RUN}/loading.png --exit)
+    mc_py_test(gl_loading_screen_check gl_loading_screen check_image.py ${MC_TEST_RUN}/loading.png
+        --region 565,285,715,435 --count-rgb 84,84,84 --tol 2 --min-count 10000)
+    mc_gl_test(gl_play_world ${MC_TITLE_ARGS} --play "Test World" --world-type flat --wait-chunks
+        --screenshot ${MC_TEST_RUN}/play_world.png --exit)
+    mc_py_test(gl_play_world_icon gl_play_world check_image.py "${MC_TITLE_RUN}/saves/Test World/icon.png"
+        --size 64x64 --min-colors 50)
+    # The world list (white names) and Create World (its footer button).
+    mc_gl_test(gl_world_list ${MC_TITLE_ARGS} --screen worlds --frames 2 --screenshot ${MC_TEST_RUN}/world_list.png --exit)
+    mc_py_test(gl_world_list_check gl_world_list check_image.py ${MC_TEST_RUN}/world_list.png
+        --no-magenta --region 343,160,600,185 --count-rgb 255,255,255 --tol 2 --min-count 300)
+    mc_gl_test(gl_create_world ${MC_TITLE_ARGS} --screen create --frames 2 --screenshot ${MC_TEST_RUN}/create_world.png --exit)
+    mc_py_test(gl_create_world_check gl_create_world check_image.py ${MC_TEST_RUN}/create_world.png
+        --no-magenta --region 180,645,250,690 --mean-rgb 113,113,113 --tol 6)
+    set_tests_properties(gl_title_screen gl_loading_screen gl_play_world gl_world_list gl_create_world
+        PROPERTIES DEPENDS gl_panorama_bake)
+    set_tests_properties(gl_world_list PROPERTIES DEPENDS "gl_panorama_bake;gl_loading_screen;gl_play_world")
+
+    # M9: the menus over a world (blurred behind them; a button's plain left part), and the
+    # chat line, which darkens the world under it by half.
+    set(MC_MENU_SCENE --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
+        --pos 0.5,-58.38,0.5 --look 30,20 --wait-chunks --ticks 3)
+    mc_gl_test(gl_pause_screen ${MC_MENU_SCENE} --screen pause --screenshot ${MC_TEST_RUN}/pause_screen.png --exit)
+    mc_py_test(gl_pause_screen_check gl_pause_screen check_image.py ${MC_TEST_RUN}/pause_screen.png
+        --size 1280x720 --no-magenta --region 345,230,520,270 --mean-rgb 111,111,111 --tol 4)
+    mc_gl_test(gl_options_screen ${MC_MENU_SCENE} --screen options --screenshot ${MC_TEST_RUN}/options_screen.png --exit)
+    mc_py_test(gl_options_screen_check gl_options_screen check_image.py ${MC_TEST_RUN}/options_screen.png
+        --no-magenta --region 345,645,520,690 --mean-rgb 111,111,111 --tol 4)
+    mc_gl_test(gl_video_screen ${MC_MENU_SCENE} --screen video --screenshot ${MC_TEST_RUN}/video_screen.png --exit)
+    mc_py_test(gl_video_screen_check gl_video_screen check_image.py ${MC_TEST_RUN}/video_screen.png
+        --no-magenta --region 345,645,520,690 --mean-rgb 111,111,111 --tol 4)
+    mc_gl_test(gl_chat_screen ${MC_MENU_SCENE} --screen chat --screenshot ${MC_TEST_RUN}/chat_screen.png --exit)
+    mc_py_test(gl_chat_screen_check gl_chat_screen check_image.py ${MC_TEST_RUN}/chat_screen.png
+        --region 20,682,340,712 --mean-rgb 41,53,25 --tol 8)
 
     # M7: the F5 view from behind: the player model (Steve's shirt) with its shadow.
     mc_gl_test(gl_third_person --world-type flat --gamemode creative --render-distance 4 --size 1280x720 --time 6000

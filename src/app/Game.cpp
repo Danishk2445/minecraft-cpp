@@ -1,251 +1,492 @@
 #include "app/Game.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <ctime>
 #include <format>
+#include <random>
+#include <thread>
 
 #include <GLFW/glfw3.h>
 
+#include "app/WorldSession.h"
+#include "core/Fs.h"
 #include "core/Log.h"
+#include "game/CreativeTabs.h"
+#include "game/Item.h"
+#include "game/Menu.h"
 #include "gfx/GL.h"
 #include "gfx/Screenshot.h"
-#include "game/Item.h"
-#include "game/Placement.h"
 #include "gfx/Shader.h"
 #include "render/ClientAssets.h"
 #include "render/Gallery.h"
-#include "render/BlockOverlay.h"
 #include "resources/Language.h"
-#include "render/EntityRenderer.h"
-#include "render/WorldRenderer.h"
-#include "game/Menu.h"
-#include "ui/GuiGraphics.h"
-#include "ui/Hud.h"
-#include "game/CreativeTabs.h"
+#include "ui/Chat.h"
 #include "ui/CreativeScreen.h"
+#include "ui/GameMenuScreens.h"
+#include "ui/GuiGraphics.h"
 #include "ui/InventoryScreen.h"
-#include "world/light/LightEngine.h"
-#include "world/block/BlockBehavior.h"
-#include "world/block/BlockRegistry.h"
+#include "ui/TitleScreens.h"
 #include "world/biome/Biome.h"
-#include "world/gen/ChunkGenerator.h"
-#include "world/gen/OverworldGenerator.h"
-#include "world/gen/feature/BiomeDecorator.h"
-#include "world/level/Environment.h"
+#include "world/block/BlockRegistry.h"
 #include "world/level/Level.h"
-#include "world/storage/ChunkStorage.h"
-#include "world/storage/WorldSave.h"
 
 namespace mc {
+namespace {
 
-Game::Game(CliOptions options) : opts_(std::move(options)) {}
+// The baked panorama: mid-morning over a river valley with a cherry grove on a hill.
+constexpr int64_t kPanoramaSeed = 42;
+constexpr glm::dvec3 kPanoramaEye{-60.0, 79.0, -250.0};
+constexpr float kPanoramaYaw = 0.0f;
+constexpr long long kPanoramaTime = 2500;
+constexpr int kPanoramaSize = 1024;
+constexpr int kPanoramaRenderDistance = 10;
+
+// Java String.hashCode (the splash list leaves out one line by its hash).
+int32_t javaHash(std::string_view s) {
+    uint32_t h = 0;
+    for (char c : s) h = 31 * h + uint32_t(static_cast<unsigned char>(c));
+    return int32_t(h);
+}
+
+} // namespace
+
+int Client::guiScale() const {
+    const int automatic = autoGuiScale(window.framebufferSize());
+    return options.guiScale > 0 ? std::min(options.guiScale, automatic) : automatic;
+}
+
+glm::vec2 Client::guiMouse() const {
+    const glm::ivec2 fb = window.framebufferSize(), win = window.windowSize();
+    const glm::dvec2 c = window.input().cursor();
+    const glm::vec2 px(float(c.x) * float(fb.x) / float(std::max(win.x, 1)),
+                       float(c.y) * float(fb.y) / float(std::max(win.y, 1)));
+    return px / float(guiScale());
+}
+
+Game::Game(CliOptions options) { client_.cli = std::move(options); }
 
 Game::~Game() { shutdown(); }
 
 bool Game::init() {
+    const CliOptions& cli = client_.cli;
     std::error_code ec;
-    std::filesystem::create_directories(opts_.gameDir / "logs", ec);
-    log::setFile((opts_.gameDir / "logs" / "latest.log").string());
-    log::info("Game directory: {}", std::filesystem::absolute(opts_.gameDir).string());
-    log::info("Resource pack: {}", opts_.assetsDir.string());
-    if (!std::filesystem::exists(opts_.assetsDir / "assets" / "minecraft")) {
-        log::error("No assets/minecraft under {} (use --assets)", opts_.assetsDir.string());
+    std::filesystem::create_directories(cli.gameDir / "logs", ec);
+    log::setFile((cli.gameDir / "logs" / "latest.log").string());
+    log::info("Game directory: {}", std::filesystem::absolute(cli.gameDir).string());
+    log::info("Resource pack: {}", cli.assetsDir.string());
+    if (!std::filesystem::exists(cli.assetsDir / "assets" / "minecraft")) {
+        log::error("No assets/minecraft under {} (use --assets)", cli.assetsDir.string());
         return false;
     }
+    // Options, with the command line's overrides for this run.
+    std::string err;
+    client_.options = Options::load(cli.gameDir / "options.json", &err);
+    if (!err.empty()) log::warn("{}", err);
+    if (cli.renderDistance) client_.options.renderDistance = *cli.renderDistance;
+    if (cli.smoothLighting) client_.options.smoothLighting = *cli.smoothLighting;
+    if (cli.vsync) client_.options.vsync = *cli.vsync;
 
-    Shader::setDirectory(opts_.shaderDir);
-
+    Shader::setDirectory(cli.shaderDir);
     WindowConfig wc;
-    wc.width = opts_.width;
-    wc.height = opts_.height;
-    wc.vsync = opts_.vsync.value_or(true);
-    wc.forceX11 = opts_.forceX11;
+    wc.width = cli.width;
+    wc.height = cli.height;
+    wc.vsync = client_.options.vsync;
+    wc.forceX11 = cli.forceX11;
 #ifndef NDEBUG
     wc.debugContext = true;
 #endif
-    if (opts_.glDebug) wc.debugContext = true;
-    if (!window_.create(wc)) return false;
+    if (cli.glDebug) wc.debugContext = true;
+    if (!client_.window.create(wc)) return false;
 
-    jobs_ = std::make_unique<JobSystem>(opts_.threads);
-    log::info("Job system: {} worker thread(s)", jobs_->workerCount());
+    client_.jobs = std::make_unique<JobSystem>(cli.threads);
+    log::info("Job system: {} worker thread(s)", client_.jobs->workerCount());
 
-    assets_ = std::make_unique<ClientAssets>();
-    if (!assets_->load(opts_.assetsDir)) return false;
+    client_.assets = std::make_unique<ClientAssets>();
+    if (!client_.assets->load(cli.assetsDir)) return false;
 
-    if (!opts_.dumpModelSheets.empty()) {
-        const int failures = dumpModelSheets(*assets_, opts_.dumpModelSheets, opts_.goldenTiles);
+    if (!cli.dumpModelSheets.empty()) {
+        const int failures = dumpModelSheets(*client_.assets, cli.dumpModelSheets, cli.goldenTiles);
         exitCode_ = failures == 0 ? 0 : 1;
         toolOnly_ = true;
         return true;
     }
-
-    gui_ = std::make_unique<GuiGraphics>();
-    if (!gui_->init(*assets_)) return false;
-    hud_ = std::make_unique<Hud>();
-    if (!opts_.dumpItemIcons.empty()) {
-        exitCode_ = dumpItemIcons(*assets_, gui_->items(), opts_.dumpItemIcons) == 0 ? 0 : 1;
+    client_.gui = std::make_unique<GuiGraphics>();
+    if (!client_.gui->init(*client_.assets)) return false;
+    client_.chat = std::make_unique<Chat>();
+    if (!cli.dumpItemIcons.empty()) {
+        exitCode_ = dumpItemIcons(*client_.assets, client_.gui->items(), cli.dumpItemIcons) == 0 ? 0 : 1;
         toolOnly_ = true;
         return true;
     }
-    showDebug_ = opts_.debugOverlay;
-
-    if (opts_.gallery) {
+    if (cli.gallery) {
         gallery_ = std::make_unique<Gallery>();
-        if (!gallery_->init(*assets_)) return false;
-        camera_.position = opts_.pos.value_or(gallery_->startPosition());
-        const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 35.0f));
-        camera_.yaw = look.x;
-        camera_.pitch = look.y;
+        if (!gallery_->init(*client_.assets)) return false;
+        galleryCamera_.position = cli.pos.value_or(gallery_->startPosition());
+        const glm::vec2 look = cli.look.value_or(glm::vec2(-45.0f, 35.0f));
+        galleryCamera_.yaw = look.x;
+        galleryCamera_.pitch = look.y;
         return true;
     }
-    return initWorld();
-}
-
-bool Game::initWorld() {
-    registry_ = std::make_unique<BlockRegistry>();
-    std::string err;
-    if (!registry_->build(assets_->blockModels(), assets_->blockAtlas(), opts_.dataDir, &err))
-        log::warn("block registry: {}", err); // problems are logged; the world still runs
-
-    lang_ = std::make_unique<Language>();
-    if (!lang_->load(assets_->pack())) log::warn("no language file in the resource pack");
-    items_ = std::make_unique<ItemRegistry>();
-    if (!items_->load(assets_->pack(), *registry_, opts_.dataDir, &err)) log::warn("items: {}", err);
-    log::info("Items: {}", items_->size());
-    creativeTabs_ = std::make_unique<CreativeTabs>();
-    if (!creativeTabs_->load(opts_.dataDir, *items_, &err)) log::warn("creative tabs: {}", err);
-
-    biomes_ = std::make_unique<BiomeRegistry>();
-    if (!biomes_->load(opts_.dataDir, opts_.assetsDir, &err)) {
-        log::error("biomes: {}", err);
-        return false;
+    if (!loadRegistries()) return false;
+    if (cli.bakePanorama) {
+        exitCode_ = bakePanorama(cli.gameDir / "panorama") ? 0 : 1;
+        toolOnly_ = true;
+        return true;
     }
-    // A saved world keeps its seed and type; a new one takes them from the options.
-    std::optional<WorldInfo> info;
-    worldType_ = opts_.worldType;
-    worldSeed_ = opts_.seed;
-    if (!opts_.world.empty()) {
-        worldDir_ = opts_.gameDir / "saves" / opts_.world;
-        info = readWorldInfo(worldDir_);
-        if (info) {
-            worldType_ = info->type;
-            worldSeed_ = info->seed;
-            log::info("Loading world '{}' (type {}, seed {})", opts_.world, worldType_, worldSeed_);
-        } else {
-            log::info("Creating world '{}' in {}", opts_.world, worldDir_.string());
-        }
-        opts_.worldType = worldType_;
-        opts_.seed = worldSeed_;
+    if (!cli.play.empty()) {
+        // As if picked in the world list: the title, then the loading screen, then the game.
+        loadSplash();
+        loadPanorama();
+        openTitle();
+        WorldParams params;
+        params.folder = params.name = cli.play;
+        params.type = cli.worldType;
+        params.seed = cli.seed;
+        params.gameMode = cli.gameMode;
+        startWorld(params);
+        applyPending();
+        return world_ != nullptr;
     }
-    std::shared_ptr<const ChunkGenerator> generator;
-    if (opts_.worldType == "flat") {
-        generator = std::make_shared<FlatGenerator>(*registry_);
-    } else if (opts_.worldType == "debug") {
-        generator = std::make_shared<DebugGenerator>(*registry_);
-    } else {
-        auto decorator = std::make_shared<BiomeDecorator>();
-        if (!decorator->load(opts_.dataDir, *registry_, *biomes_, &err)) {
-            int shown = 0;
-            for (size_t start = 0; start < err.size() && shown < 30; ++shown) {
-                const size_t end = err.find('\n', start);
-                log::warn("features: {}", err.substr(start, end - start));
-                if (end == std::string::npos) break;
-                start = end + 1;
-            }
-        }
-        overworld_ = std::make_shared<OverworldGenerator>(*registry_, *biomes_, opts_.seed, std::move(decorator));
-        generator = overworld_;
+    if (cli.worldRequested) {
+        // The harness's world, opened at once.
+        WorldParams params;
+        params.folder = cli.world;
+        params.name = cli.world.empty() ? "New World" : cli.world;
+        params.type = cli.worldType;
+        params.seed = cli.seed;
+        params.gameMode = cli.gameMode;
+        params.commandLine = true;
+        startWorld(params);
+        applyPending();
+        return world_ != nullptr;
     }
-    level_ = std::make_unique<Level>(*registry_, generator, *jobs_, opts_.seed);
-    if (!worldDir_.empty()) {
-        level_->attachStorage(std::make_shared<ChunkStorage>(worldDir_, *registry_, biomes_.get()));
-        if (info) level_->loadData(info->level);
-    }
-    level_->chunks().setLightEngine(std::make_shared<LightEngine>(*registry_));
-    if (opts_.time) level_->setDayTime(*opts_.time);
-    level_->daylightCycle = !opts_.freezeTime;
-    worldRenderer_ = std::make_unique<WorldRenderer>(*assets_, *registry_, opts_.worldType == "default" ? biomes_.get() : nullptr);
-    if (!worldRenderer_->init()) return false;
-    worldRenderer_->mesherOptions().smoothLighting = opts_.smoothLighting;
-
-    overlay_ = std::make_unique<BlockOverlay>();
-    if (!overlay_->init(*assets_)) return false;
-
-    // The player stands at the spawn point; --pos places the camera (the eye) instead.
-    player_ = std::make_unique<Player>();
-    player_->setMode(gameModeFromName(opts_.gameMode).value_or(GameMode::Survival));
-    if (opts_.pos) {
-        glm::dvec3 eye = *opts_.pos;
-        if (std::isnan(eye.y)) { // --pos X,~,Z: 12 blocks above the terrain
-            const int x = int(std::floor(eye.x)), z = int(std::floor(eye.z));
-            eye.y = (overworld_ ? overworld_->terrainTop(x, z) + 1 : generator->spawnPoint().y) + 12.0;
-        }
-        player_->pos = eye - glm::dvec3(0.0, player_->eyeHeight(), 0.0);
-        // The float eye height leaves noise (y -60.0000000047 for an eye at -58.38): snap it off.
-        player_->pos.y = std::round(player_->pos.y * 1e6) / 1e6;
-    } else {
-        player_->pos = generator->spawnPoint();
-    }
-    player_->oldPos = player_->pos;
-    const glm::vec2 look = opts_.look.value_or(glm::vec2(-45.0f, 25.0f));
-    player_->setRotation(look.x, look.y);
-    camera_.position = player_->eyePos();
-    camera_.yaw = look.x;
-    camera_.pitch = look.y;
-    perspective_ = opts_.perspective == "back"    ? Perspective::ThirdPersonBack
-                   : opts_.perspective == "front" ? Perspective::ThirdPersonFront
-                                                  : Perspective::FirstPerson;
-    if (!worldDir_.empty())
-        if (auto saved = readPlayerFile(worldDir_)) {
-            loadPlayer(*player_, *saved, *items_);
-            camera_.position = player_->eyePos();
-        }
-    eyeHeight_ = oldEyeHeight_ = player_->eyeHeight();
-    // Creative starts with a few building blocks until the creative inventory arrives (M8).
-    if (player_->mode() == GameMode::Creative && player_->inventory.main[0].empty()) {
-        const char* starter[9] = {"stone", "grass_block", "dirt", "cobblestone", "oak_planks", "oak_log", "glass",
-                                  "torch", "oak_stairs"};
-        for (int i = 0; i < 9; ++i)
-            if (const Item* item = items_->find(starter[i])) player_->inventory.main[size_t(i)] = {item, item->maxStack};
-    }
-    camera_.farPlane = float(opts_.renderDistance * 16 + 64) * 1.5f;
-    log::info("World: type {}, seed {}, render distance {}", generator->type(), opts_.seed, opts_.renderDistance);
+    loadSplash();
+    loadPanorama();
+    openTitle();
+    openHarnessScreen();
+    applyPending();
     return true;
 }
 
-void Game::saveWorld(bool wait) {
-    if (worldDir_.empty() || !level_ || !player_) return;
-    const int chunks = level_->chunks().saveAll();
-    std::string err;
-    if (!writeWorldInfo(worldDir_, {opts_.world, worldSeed_, worldType_, level_->saveData()}, &err)) log::error("{}", err);
-    if (!writePlayerFile(worldDir_, savePlayer(*player_), &err)) log::error("{}", err);
-    if (wait) {
-        while (level_->chunks().savesPending()) jobs_->waitIdle();
+void Game::openTitle() { setScreen(std::make_unique<TitleScreen>(screenContext())); }
+
+void Game::loadSplash() {
+    if (client_.cli.splash) {
+        splash_ = *client_.cli.splash;
+        return;
     }
-    log::info("Saved world '{}' ({} chunks)", opts_.world, chunks);
+    // Vanilla SplashManager: three days have their own; otherwise a random line.
+    const std::time_t now = std::time(nullptr);
+    std::tm tm{};
+    localtime_r(&now, &tm);
+    const int month = tm.tm_mon + 1, day = tm.tm_mday;
+    if (month == 12 && day == 24) splash_ = "Merry X-mas!";
+    else if (month == 1 && day == 1) splash_ = "Happy new year!";
+    else if (month == 10 && day == 31) splash_ = "OOoooOOOoooo! Spooky!";
+    if (!splash_.empty()) return;
+    std::vector<std::string> lines;
+    if (auto text = fs::readText(client_.assets->pack().file("minecraft", "texts/splashes.txt"))) {
+        size_t start = 0;
+        while (start < text->size()) {
+            size_t end = text->find('\n', start);
+            if (end == std::string::npos) end = text->size();
+            std::string line = text->substr(start, end - start);
+            start = end + 1;
+            while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) line.pop_back();
+            size_t first = 0;
+            while (first < line.size() && std::isspace(static_cast<unsigned char>(line[first]))) ++first;
+            line.erase(0, first);
+            // "This message will never appear on the splash screen, isn't that weird?"
+            if (!line.empty() && javaHash(line) != 125780783) lines.push_back(std::move(line));
+        }
+    }
+    if (lines.empty()) return;
+    std::mt19937 rng(std::random_device{}());
+    splash_ = lines[std::uniform_int_distribution<size_t>(0, lines.size() - 1)(rng)];
+}
+
+void Game::loadPanorama() {
+    const std::filesystem::path dir = client_.cli.gameDir / "panorama";
+    panorama_ = std::make_unique<Panorama>();
+    if (panorama_->load(dir)) return;
+    if (bakePanorama(dir) && panorama_->load(dir)) return;
+    log::warn("No title panorama: the menus get a plain background");
+}
+
+void Game::presentScreen(Screen& s) {
+    client_.window.pollEvents();
+    const glm::ivec2 fb = client_.window.framebufferSize();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fb.x, fb.y);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GuiGraphics& gui = *client_.gui;
+    gui.begin(fb, client_.guiScale());
+    s.init(gui.size());
+    s.render(gui, client_.guiMouse(), 0.0f);
+    gui.end();
+    client_.window.swapBuffers();
+}
+
+bool Game::bakePanorama(const std::filesystem::path& dir) {
+    log::info("Baking the title panorama into {}", dir.string());
+    Stopwatch timer;
+    const int renderDistance = client_.options.renderDistance;
+    client_.options.renderDistance = kPanoramaRenderDistance;
+    bool ok = false;
+    {
+        // An unsaved world (no folder). --seed, --pos, --look and --time choose another view.
+        const CliOptions& cli = client_.cli;
+        WorldParams params;
+        params.name = "Panorama";
+        params.seed = cli.worldRequested ? cli.seed : kPanoramaSeed;
+        params.gameMode = "spectator";
+        params.commandLine = cli.worldRequested;
+        WorldSession world(client_, params);
+        if (world.init()) {
+            if (!params.commandLine || !cli.time) world.level().setDayTime(kPanoramaTime);
+            world.level().daylightCycle = false;
+            glm::dvec3 eye = kPanoramaEye;
+            float yaw = kPanoramaYaw;
+            if (params.commandLine && cli.pos) {
+                eye = world.camera().position;
+                yaw = world.player().yaw;
+            }
+            world.setPose(eye, yaw, 0.0f);
+            log::info("Panorama view from {:.2f} {:.2f} {:.2f}, yaw {:.1f}", eye.x, eye.y, eye.z, yaw);
+            LoadingScreen progress(screenContext(), screenContext().translate("menu.working"));
+            while (!world.viewMeshed() && timer.seconds() < 300.0 && !client_.window.shouldClose()) {
+                world.frame(0.0);
+                client_.jobs->drainMain(8.0);
+                presentScreen(progress);
+            }
+            if (world.viewMeshed()) {
+                Texture color, depth;
+                color.create(kPanoramaSize, kPanoramaSize, 1);
+                depth.createDepth(kPanoramaSize, kPanoramaSize);
+                unsigned fbo = 0;
+                glCreateFramebuffers(1, &fbo);
+                glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, color.id(), 0);
+                glNamedFramebufferTexture(fbo, GL_DEPTH_STENCIL_ATTACHMENT, depth.id(), 0);
+                std::error_code ec;
+                std::filesystem::create_directories(dir, ec);
+                ok = glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+                for (int face = 0; ok && face < Panorama::kFaces; ++face) {
+                    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+                    world.renderScenery(Panorama::faceCamera(face, eye, yaw), glm::ivec2(kPanoramaSize));
+                    ok = captureFramebuffer(kPanoramaSize, kPanoramaSize)
+                             .savePng(dir / std::format("panorama_{}.png", face));
+                }
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glDeleteFramebuffers(1, &fbo);
+            }
+        }
+    }
+    client_.options.renderDistance = renderDistance;
+    if (ok) log::info("Baked the title panorama in {:.1f} s", timer.seconds());
+    else log::error("Could not bake the title panorama");
+    return ok;
+}
+
+bool Game::loadRegistries() {
+    const CliOptions& cli = client_.cli;
+    std::string err;
+    client_.registry = std::make_unique<BlockRegistry>();
+    if (!client_.registry->build(client_.assets->blockModels(), client_.assets->blockAtlas(), cli.dataDir, &err))
+        log::warn("block registry: {}", err); // problems are logged; the world still runs
+    client_.lang = std::make_unique<Language>();
+    if (!client_.lang->load(client_.assets->pack())) log::warn("no language file in the resource pack");
+    client_.items = std::make_unique<ItemRegistry>();
+    if (!client_.items->load(client_.assets->pack(), *client_.registry, cli.dataDir, &err)) log::warn("items: {}", err);
+    log::info("Items: {}", client_.items->size());
+    client_.creativeTabs = std::make_unique<CreativeTabs>();
+    if (!client_.creativeTabs->load(cli.dataDir, *client_.items, &err)) log::warn("creative tabs: {}", err);
+    client_.biomes = std::make_unique<BiomeRegistry>();
+    if (!client_.biomes->load(cli.dataDir, cli.assetsDir, &err)) {
+        log::error("biomes: {}", err);
+        return false;
+    }
+    return true;
 }
 
 void Game::shutdown() {
-    closeScreen(); // menus hand their items back before the save
-    saveWorld(true);
-    // Order matters: jobs reference the registry and assets until the pool is joined.
-    overlay_.reset();
-    worldRenderer_.reset();
-    player_.reset();
-    items_.reset();
-    level_.reset();
-    overworld_.reset();
-    screen_.reset();
-    inventoryMenu_.reset();
-    creativeTabs_.reset();
-    hud_.reset();
-    gui_.reset();
+    // Menus hand their items back before the world saves.
+    for (auto it = screens_.rbegin(); it != screens_.rend(); ++it) (*it)->removed();
+    screens_.clear();
+    world_.reset();
     gallery_.reset();
-    jobs_.reset();
-    biomes_.reset();
-    registry_.reset();
-    assets_.reset();
-    window_.destroy();
+    panorama_.reset();
+    client_.chat.reset();
+    client_.gui.reset();
+    // Jobs reference the registries and assets until the pool is joined.
+    client_.jobs.reset();
+    client_.creativeTabs.reset();
+    client_.items.reset();
+    client_.biomes.reset();
+    client_.registry.reset();
+    client_.assets.reset();
+    client_.window.destroy();
+}
+
+ScreenContext Game::screenContext() {
+    ScreenContext ctx;
+    ctx.lang = client_.lang.get();
+    ctx.items = client_.items.get();
+    ctx.host = this;
+    ctx.font = &client_.gui->font().glyphs();
+    return ctx;
+}
+
+void Game::setScreen(std::unique_ptr<Screen> screen) {
+    screenChanges_.push_back({ScreenChange::Kind::Set, std::move(screen)});
+}
+
+void Game::pushScreen(std::unique_ptr<Screen> screen) {
+    screenChanges_.push_back({ScreenChange::Kind::Push, std::move(screen)});
+}
+
+void Game::popScreen() { screenChanges_.push_back({ScreenChange::Kind::Pop, nullptr}); }
+
+void Game::startWorld(const WorldParams& params) { pendingWorld_ = std::make_unique<WorldParams>(params); }
+
+void Game::leaveWorld() {
+    if (!world_ || leaveWorldPending_) return;
+    // Vanilla disconnect: "Saving world" shows (one frame here) while the world saves.
+    leaveWorldPending_ = true;
+    leaveWorldFrame_ = frameCount_;
+    setScreen(std::make_unique<LoadingScreen>(screenContext(), screenContext().translate("menu.savingLevel")));
+}
+
+void Game::quitGame() { client_.window.setShouldClose(true); }
+
+void Game::optionsChanged() {
+    // Window settings apply at once; the rest is read where it is used.
+    client_.window.setVsync(client_.options.vsync);
+    if (client_.window.fullscreen() != client_.options.fullscreen) client_.window.toggleFullscreen();
+    std::string err;
+    if (!client_.options.save(client_.cli.gameDir / "options.json", &err)) log::warn("{}", err);
+}
+
+std::filesystem::path Game::savesDir() const { return client_.cli.gameDir / "saves"; }
+
+Difficulty Game::difficulty() const { return world_ ? world_->difficulty() : Difficulty::Normal; }
+
+void Game::setDifficulty(Difficulty d) {
+    if (world_) world_->setDifficulty(d);
+}
+
+void Game::sendChat(const std::string& line) {
+    if (line.empty()) return;
+    client_.chat->addSent(line);
+    if (!world_) return;
+    if (line[0] == '/') {
+        world_->runCommand(line.substr(1), [this](const std::string& msg) { client_.chat->addMessage(msg, tickCount_); });
+    } else {
+        client_.chat->addMessage("<Player> " + line, tickCount_);
+    }
+}
+
+WorldLoadStatus Game::worldLoadStatus() const { return world_ ? world_->loadStatus() : WorldLoadStatus{}; }
+
+void Game::applyScreenChanges() {
+    // The top of the stack changes; covered screens stay alive for going back.
+    std::vector<ScreenChange> changes;
+    changes.swap(screenChanges_);
+    for (ScreenChange& change : changes) {
+        Screen* before = screen();
+        switch (change.kind) {
+        case ScreenChange::Kind::Set:
+            for (auto it = screens_.rbegin(); it != screens_.rend(); ++it) (*it)->removed();
+            screens_.clear();
+            if (change.screen) screens_.push_back(std::move(change.screen));
+            break;
+        case ScreenChange::Kind::Push:
+            if (change.screen) screens_.push_back(std::move(change.screen));
+            break;
+        case ScreenChange::Kind::Pop:
+            if (!screens_.empty()) {
+                screens_.back()->removed();
+                screens_.pop_back();
+            }
+            break;
+        }
+        if (screen() && screen() != before) {
+            const glm::ivec2 fb = client_.window.framebufferSize();
+            screenSize_ = glm::vec2(fb) / float(client_.guiScale());
+            screen()->init(screenSize_);
+            client_.window.setCursorCaptured(false);
+            lastGuiMouse_ = client_.guiMouse();
+            guiButtonsDown_ = {};
+        }
+    }
+}
+
+void Game::applyPending() {
+    const bool hadScreen = screen() != nullptr;
+    applyScreenChanges();
+    if (leaveWorldPending_ && frameCount_ > leaveWorldFrame_) {
+        leaveWorldPending_ = false;
+        for (auto it = screens_.rbegin(); it != screens_.rend(); ++it) (*it)->removed();
+        screens_.clear();
+        world_.reset(); // saves
+        worldLoading_ = false;
+        client_.chat->clear();
+        client_.gui->forgetFileTextures(); // the world list reads the new icon
+        openTitle();
+    }
+    if (pendingWorld_) {
+        const WorldParams params = *pendingWorld_;
+        pendingWorld_.reset();
+        world_.reset();
+        worldLoading_ = false;
+        world_ = std::make_unique<WorldSession>(client_, params);
+        if (!world_->init()) {
+            log::error("Could not open world '{}'", params.name);
+            world_.reset();
+            if (!params.commandLine) openTitle();
+        } else if (!params.commandLine) {
+            // Vanilla LevelLoadingScreen until the spawn area is ready.
+            worldLoading_ = true;
+            setScreen(std::make_unique<LoadingScreen>(screenContext()));
+        }
+        meshedLogged_ = false;
+    }
+    applyScreenChanges();
+    client_.screenOpen = screen() != nullptr;
+    client_.chatOpen = dynamic_cast<ChatScreen*>(screen()) != nullptr;
+    // Back in the game: the mouse is grabbed again (vanilla grabMouse when the screen closes).
+    if (hadScreen && !screen() && world_) client_.window.setCursorCaptured(true);
+}
+
+std::unique_ptr<Screen> Game::makeScreen(const std::string& name) {
+    const ScreenContext ctx = screenContext();
+    if (name == "title") return std::make_unique<TitleScreen>(ctx);
+    if (name == "worlds") return std::make_unique<SelectWorldScreen>(ctx);
+    if (name == "create") return std::make_unique<CreateWorldScreen>(ctx);
+    if (name == "pause") return std::make_unique<PauseScreen>(ctx);
+    if (name == "options") return std::make_unique<OptionsScreen>(ctx);
+    if (name == "video") return std::make_unique<VideoSettingsScreen>(ctx);
+    if (name == "chat" || name == "command") return std::make_unique<ChatScreen>(ctx, *client_.chat, name == "command" ? "/" : "");
+    if (name == "inventory" && world_) {
+        Player& player = world_->player();
+        if (player.mode() == GameMode::Spectator) return nullptr;
+        if (player.mode() == GameMode::Creative)
+            return std::make_unique<CreativeScreen>(screenContext(), player, world_->inventoryMenu(), *client_.creativeTabs);
+        return std::make_unique<InventoryScreen>(screenContext(), world_->inventoryMenu(), player);
+    }
+    return nullptr;
+}
+
+void Game::openHarnessScreen() {
+    const std::string& name = client_.cli.screen;
+    if (name.empty() || name == "title") return;
+    // In a world it replaces the game view; at the title it opens over the title screen.
+    if (auto s = makeScreen(name)) {
+        if (world_) setScreen(std::move(s));
+        else pushScreen(std::move(s));
+    }
 }
 
 int Game::run() {
@@ -255,9 +496,10 @@ int Game::run() {
     double last = Window::time();
     double accumulator = 0.0;
     runTimer_.reset();
-    while (!window_.shouldClose()) {
-        window_.pollEvents();
-        handleGlobalKeys();
+    while (!client_.window.shouldClose()) {
+        client_.window.pollEvents();
+        handleInput();
+        applyPending();
 
         const double now = Window::time();
         const double frameDt = std::min(now - last, 0.25); // after a stall, skip ahead instead of catching up
@@ -269,584 +511,209 @@ int Game::run() {
             accumulator -= kTickSeconds;
             ++ticksThisFrame;
         }
+        applyPending();
 
-        updateCamera(frameDt);
-        updateWorld();
-        jobs_->drainMain(6.0);
+        // Vanilla PanoramaRenderer: 0.1 degrees per tick of real time.
+        panoramaSpin_ = std::fmod(panoramaSpin_ + float(frameDt / kTickSeconds) * 0.1f, 360.0f);
+        if (world_) {
+            world_->frame(frameDt);
+            if (worldLoading_ && world_->viewReady()) {
+                worldLoading_ = false;
+                setScreen(nullptr);
+                applyPending();
+            }
+            if (!meshedLogged_ && world_->viewMeshed()) {
+                meshedLogged_ = true;
+                log::info("View meshed after {:.2f} s", runTimer_.seconds());
+            }
+            if (!harnessStarted_ && client_.cli.worldRequested && world_->viewReady()) {
+                harnessStarted_ = true;
+                for (const auto& cmd : client_.cli.exec)
+                    world_->runCommand(cmd, [](const std::string& msg) { log::info("[command] {}", msg); });
+                openHarnessScreen();
+                applyPending();
+            }
+        } else if (gallery_) {
+            updateGallery(frameDt);
+        }
+        client_.jobs->drainMain(6.0);
         render(float(accumulator / kTickSeconds));
         ++frameCount_;
         afterFrame();
-        window_.swapBuffers();
+        client_.window.swapBuffers();
+        limitFramerate();
         updateTitle();
     }
-    if (worldRenderer_) {
-        const auto& r = worldRenderer_->chunkRenderer().stats();
-        log::info("Ran {} frames in {:.2f} s ({:.0f} fps avg); last frame drew {} of {} sections, {} draws, {} vertices",
-                  frameCount_, runTimer_.seconds(), double(frameCount_) / std::max(runTimer_.seconds(), 1e-6), r.drawn,
-                  r.sections, r.draws, r.vertices);
-    }
+    log::info("Ran {} frames in {:.2f} s ({:.0f} fps avg)", frameCount_, runTimer_.seconds(),
+              double(frameCount_) / std::max(runTimer_.seconds(), 1e-6));
     return exitCode_;
 }
 
-void Game::handleGlobalKeys() {
-    const Input& in = window_.input();
-    if (in.keyPressed(GLFW_KEY_F11)) window_.toggleFullscreen();
+void Game::handleInput() {
+    const Input& in = client_.window.input();
+    if (in.keyPressed(GLFW_KEY_F11)) client_.window.toggleFullscreen();
     if (in.keyPressed(GLFW_KEY_F2)) screenshotRequested_ = true;
-    if (screen_) {
+    if (screen()) {
         handleScreenInput();
         return;
     }
-    if (in.keyPressed(GLFW_KEY_F5)) perspective_ = Perspective((int(perspective_) + 1) % 3);
-    if (in.keyPressed(GLFW_KEY_F3)) showDebug_ = !showDebug_;
-    if (in.keyPressed(GLFW_KEY_E) && player_) {
-        openInventory();
+    if (!world_) {
+        if (in.keyPressed(GLFW_KEY_ESCAPE)) client_.window.setShouldClose(true);
+        if (in.mousePressed(GLFW_MOUSE_BUTTON_LEFT)) client_.window.setCursorCaptured(true);
         return;
     }
-    // F swaps the main and off hand (not for spectators).
-    if (in.keyPressed(GLFW_KEY_F) && player_ && player_->mode() != GameMode::Spectator)
-        std::swap(player_->inventory.selectedStack(), player_->inventory.offhand);
-    if (in.keyPressed(GLFW_KEY_ESCAPE)) {
-        if (window_.cursorCaptured()) window_.setCursorCaptured(false);
-        else window_.setShouldClose(true);
-    }
-    if (in.mousePressed(GLFW_MOUSE_BUTTON_LEFT) && !window_.cursorCaptured()) {
-        window_.setCursorCaptured(true);
-        return; // the capturing click is not an attack
-    }
-    if (!window_.cursorCaptured()) return;
-    attackClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_LEFT);
-    useClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_RIGHT);
-    pickClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_MIDDLE);
-    if (player_) {
-        int& selected = player_->inventory.selected;
-        for (int i = 0; i < 9; ++i)
-            if (in.keyPressed(GLFW_KEY_1 + i)) selected = i;
-        if (const double scroll = in.scrollY(); scroll != 0.0) selected = ((selected - (scroll > 0 ? 1 : -1)) % 9 + 9) % 9;
-    }
-}
-
-glm::vec2 Game::guiMouse() const {
-    const glm::ivec2 fb = window_.framebufferSize(), win = window_.windowSize();
-    const glm::dvec2 c = window_.input().cursor();
-    const glm::vec2 px(float(c.x) * float(fb.x) / float(std::max(win.x, 1)), float(c.y) * float(fb.y) / float(std::max(win.y, 1)));
-    return px / float(autoGuiScale(fb));
-}
-
-ScreenContext Game::screenContext() const {
-    ScreenContext ctx;
-    ctx.lang = lang_.get();
-    ctx.items = items_.get();
-    return ctx;
-}
-
-void Game::openScreen(std::unique_ptr<Screen> screen) {
-    if (screen_) closeScreen();
-    screen_ = std::move(screen);
-    window_.setCursorCaptured(false);
-    const glm::ivec2 fb = window_.framebufferSize();
-    screenSize_ = glm::vec2(fb) / float(autoGuiScale(fb));
-    screen_->init(screenSize_);
-    lastGuiMouse_ = guiMouse();
-    guiButtonsDown_ = {};
-}
-
-void Game::closeScreen() {
-    if (!screen_) return;
-    screen_->removed();
-    screen_.reset();
-    window_.setCursorCaptured(true);
-}
-
-void Game::openInventory() {
-    if (!player_ || player_->mode() == GameMode::Spectator) return;
-    if (!inventoryMenu_) inventoryMenu_ = std::make_unique<InventoryMenu>(player_->inventory);
-    if (player_->mode() == GameMode::Creative)
-        openScreen(std::make_unique<CreativeScreen>(screenContext(), *player_, *inventoryMenu_, *creativeTabs_));
-    else
-        openScreen(std::make_unique<InventoryScreen>(screenContext(), *inventoryMenu_, *player_));
+    const std::string request = world_->handleInput();
+    if (!request.empty())
+        if (auto s = makeScreen(request)) setScreen(std::move(s));
 }
 
 void Game::handleScreenInput() {
-    const Input& in = window_.input();
-    const glm::vec2 mouse = guiMouse();
+    Screen* s = screen();
+    const Input& in = client_.window.input();
+    const glm::vec2 mouse = client_.guiMouse();
     for (const Input::KeyEvent& e : in.keyEvents()) {
         if (e.action == GLFW_RELEASE) continue;
-        if (!screen_->keyPressed(e.key, e.scancode, e.mods) && e.key == GLFW_KEY_ESCAPE && e.action == GLFW_PRESS)
-            screen_->close();
+        if (!s->keyPressed(e.key, e.scancode, e.mods) && e.key == GLFW_KEY_ESCAPE && e.action == GLFW_PRESS &&
+            s->closeOnEscape())
+            s->close();
     }
-    for (char32_t c : in.typedText()) screen_->charTyped(c);
+    for (char32_t c : in.typedText()) s->charTyped(c);
     for (int b = 0; b < 3; ++b)
         if (in.mousePressed(b)) {
-            screen_->mouseClicked(mouse, b, in.mods());
+            s->mouseClicked(mouse, b, in.mods());
             guiButtonsDown_[size_t(b)] = true;
         }
     if (mouse != lastGuiMouse_)
         for (int b = 0; b < 3; ++b)
-            if (guiButtonsDown_[size_t(b)] && in.mouseDown(b)) screen_->mouseDragged(mouse, b, mouse - lastGuiMouse_);
+            if (guiButtonsDown_[size_t(b)] && in.mouseDown(b)) s->mouseDragged(mouse, b, mouse - lastGuiMouse_);
     for (int b = 0; b < 3; ++b)
         if (in.mouseReleased(b) && guiButtonsDown_[size_t(b)]) {
-            screen_->mouseReleased(mouse, b, in.mods());
+            s->mouseReleased(mouse, b, in.mods());
             guiButtonsDown_[size_t(b)] = false;
         }
-    if (in.scrollY() != 0.0) screen_->mouseScrolled(mouse, in.scrollY());
+    if (in.scrollY() != 0.0) s->mouseScrolled(mouse, in.scrollY());
     lastGuiMouse_ = mouse;
-    if (screen_->closing()) closeScreen();
-}
-
-void Game::updateCamera(double dt) {
-    const Input& in = window_.input();
-    if (player_) {
-        if (window_.cursorCaptured()) {
-            constexpr float kSensitivity = 0.15f;
-            const glm::dvec2 d = in.mouseDelta();
-            player_->yaw += float(d.x) * kSensitivity;
-            player_->pitch = std::clamp(player_->pitch + float(d.y) * kSensitivity, -90.0f, 90.0f);
-        }
-        return;
-    }
-    if (window_.cursorCaptured()) {
-        constexpr float kSensitivity = 0.15f;
-        const glm::dvec2 d = in.mouseDelta();
-        camera_.yaw += float(d.x) * kSensitivity;
-        camera_.pitch = std::clamp(camera_.pitch + float(d.y) * kSensitivity, -90.0f, 90.0f);
-    }
-    glm::vec3 move(0.0f);
-    const glm::vec3 fwd = glm::normalize(glm::vec3(camera_.forward().x, 0.0f, camera_.forward().z));
-    if (in.keyDown(GLFW_KEY_W)) move += fwd;
-    if (in.keyDown(GLFW_KEY_S)) move -= fwd;
-    if (in.keyDown(GLFW_KEY_D)) move += camera_.right();
-    if (in.keyDown(GLFW_KEY_A)) move -= camera_.right();
-    if (in.keyDown(GLFW_KEY_SPACE)) move.y += 1.0f;
-    if (in.keyDown(GLFW_KEY_LEFT_SHIFT)) move.y -= 1.0f;
-    if (glm::length(move) > 0.0f) {
-        const double speed = in.keyDown(GLFW_KEY_LEFT_CONTROL) ? 40.0 : 10.0;
-        camera_.position += glm::dvec3(glm::normalize(move)) * speed * dt;
-    }
-}
-
-void Game::updateWorld() {
-    if (!level_) return;
-    ChunkManager& chunks = level_->chunks();
-    chunks.setView(ChunkPos::of(BlockPos::containing(camera_.position)), opts_.renderDistance);
-    chunks.update();
-    worldRenderer_->update(chunks, *jobs_);
-    if (!meshedLogged_ && chunks.viewMeshed() && worldRenderer_->idle()) {
-        meshedLogged_ = true;
-        const auto& r = worldRenderer_->chunkRenderer();
-        log::info("View meshed after {:.2f} s: {} sections, {:.1f} MB of vertex pages", runTimer_.seconds(),
-                  r.sectionCount(), double(r.gpuBytes()) / (1 << 20));
-    }
-    if (!execDone_ && chunks.viewReady()) {
-        execDone_ = true;
-        for (const auto& cmd : opts_.exec) runCommand(cmd);
-        if (opts_.screen == "inventory") openInventory();
-    }
-}
-
-void Game::runCommand(const std::string& line) {
-    CommandSource src;
-    src.level = level_.get();
-    src.position = player_ ? player_->pos : camera_.position;
-    src.rotation = player_ ? glm::vec2(player_->yaw, player_->pitch) : glm::vec2(camera_.yaw, camera_.pitch);
-    src.feedback = [](const std::string& msg) { log::info("[command] {}", msg); };
-    src.teleport = [this](const glm::dvec3& p, std::optional<glm::vec2> rot) {
-        if (!player_) return;
-        player_->pos = player_->oldPos = p;
-        player_->velocity = glm::dvec3(0.0);
-        if (rot) player_->setRotation(rot->x, rot->y);
-    };
-    src.assertionFailed = [this](const std::string& msg) {
-        log::error("assertion failed: {}", msg);
-        exitCode_ = 1;
-    };
-    src.give = [this](std::string_view id, int count) {
-        const Item* item = items_ ? items_->find(id) : nullptr;
-        if (!item || !player_) return false;
-        player_->inventory.add(*item, count);
-        return true;
-    };
-    src.setGameMode = [this](std::string_view mode) {
-        auto m = gameModeFromName(mode);
-        if (!m || !player_) return false;
-        player_->setMode(*m);
-        return true;
-    };
-    std::string err;
-    if (!commands_.execute(src, line, &err)) log::warn("command '{}' failed: {}", line, err);
+    if (s->closing()) popScreen();
 }
 
 void Game::tick() {
     ++tickCount_;
-    assets_->tick();
-    if (level_ && player_) {
-        // The player waits (vanilla: frozen) until the chunk around it is ready.
-        const ChunkPos here = ChunkPos::of(BlockPos::containing(player_->pos));
-        if (player_->noPhysics || level_->chunks().isReady(here)) {
-            // Vanilla handles the mouse buttons before the entities tick.
-            tickInteraction();
-            player_->tick(*level_, readPlayerInput());
-            particles_.tick(*level_);
-        } else {
-            player_->oldPos = player_->pos;
-        }
-        hud_->tick(*player_, [this](const ItemStack& st) { return screenContext().itemName(st); });
-        worldRenderer_->tickHands(*player_);
-        // Vanilla Camera.tick: the eye height eases toward the player's (crouching).
-        oldEyeHeight_ = eyeHeight_;
-        eyeHeight_ += (player_->eyeHeight() - eyeHeight_) * 0.5f;
-    }
-    attackClicks_ = useClicks_ = pickClicks_ = 0;
-    if (screen_) screen_->tick();
-    if (level_) level_->tick();
-    // Autosave every 5 minutes, like vanilla.
-    if (level_ && tickCount_ % 6000 == 0) saveWorld(false);
-    if (worldRenderer_) worldRenderer_->tick();
-}
-
-// Vanilla Camera.setup: at the eyes, or for the F5 views up to 4 blocks behind them
-// (in front of them, looking back) but short of the blocks in between.
-void Game::setupCamera(float partialTick) {
-    const glm::dvec3 feet = glm::mix(player_->oldPos, player_->pos, double(partialTick));
-    camera_.position = feet + glm::dvec3(0.0, oldEyeHeight_ + (eyeHeight_ - oldEyeHeight_) * partialTick, 0.0);
-    camera_.yaw = player_->yaw;
-    camera_.pitch = player_->pitch;
-    if (perspective_ == Perspective::FirstPerson) return;
-    if (perspective_ == Perspective::ThirdPersonFront) {
-        camera_.yaw += 180.0f;
-        camera_.pitch = -camera_.pitch;
-    }
-    const glm::dvec3 forward(camera_.forward());
-    camera_.position -= forward * cameraDistance(*level_, camera_.position, forward, 4.0);
+    client_.chatTicks = tickCount_;
+    client_.assets->tick();
+    // Single player pauses under pause screens (vanilla Minecraft.pause).
+    const bool paused = screen() && screen()->isPauseScreen();
+    if (world_ && !paused) world_->tick();
+    if (screen()) screen()->tick();
 }
 
 void Game::render(float partialTick) {
-    const glm::ivec2 fb = window_.framebufferSize();
-    if (player_) {
-        setupCamera(partialTick);
-        updateTarget(partialTick);
-    }
-    if (worldRenderer_) {
-        EntityRenderer& entities = worldRenderer_->entities();
-        entities.begin(camera_.position);
-        if (perspective_ != Perspective::FirstPerson)
-            entities.submitPlayer(*player_, *level_, partialTick, skyDarkenLevel(level_->dayTime()));
-        worldRenderer_->render(camera_, fb, opts_.renderDistance, *level_, partialTick);
-        worldRenderer_->renderParticles(particles_, *level_, camera_, fb, partialTick);
-        if (target_ && player_->mode() != GameMode::Spectator) {
-            const int stage = breaking_.active && breaking_.pos == target_->pos ? int(breaking_.progress * 10.0f) - 1 : -1;
-            overlay_->render(camera_, fb, target_->pos, registry_->outlineShape(level_->getBlock(target_->pos)), stage);
-        }
-        if (perspective_ == Perspective::FirstPerson) worldRenderer_->renderHands(*player_, *level_, fb, partialTick);
-        renderHud(fb, partialTick);
+    const glm::ivec2 fb = client_.window.framebufferSize();
+    if (world_ && !worldLoading_) {
+        world_->fps = fps_;
+        world_->render(fb, partialTick, [&] { renderScreen(partialTick); });
     } else {
-        glViewport(0, 0, fb.x, fb.y);
+        renderWithoutWorld(fb, partialTick);
+    }
+}
+
+void Game::renderScreen(float partialTick) {
+    Screen* s = screen();
+    if (!s) return;
+    GuiGraphics& gui = *client_.gui;
+    // Re-lay out after a resize or a GUI scale change.
+    if (gui.size() != screenSize_) {
+        screenSize_ = gui.size();
+        s->init(screenSize_);
+    }
+    s->render(gui, client_.guiMouse(), partialTick);
+}
+
+void Game::renderWithoutWorld(glm::ivec2 fb, float partialTick) {
+    glViewport(0, 0, fb.x, fb.y);
+    if (gallery_) {
         glClearColor(120.0f / 255.0f, 167.0f / 255.0f, 1.0f, 1.0f); // vanilla daytime sky blue
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        if (gallery_) gallery_->render(camera_, fb);
-    }
-    if (showDebug_) renderDebugOverlay(fb);
-}
-
-bool Game::controlDown(int key, std::string_view action) const {
-    if (window_.cursorCaptured() && window_.input().keyDown(key)) return true;
-    return std::find(opts_.hold.begin(), opts_.hold.end(), action) != opts_.hold.end();
-}
-
-PlayerInput Game::readPlayerInput() {
-    PlayerInput in;
-    const bool jumpDown = controlDown(GLFW_KEY_SPACE, "jump");
-    // Vanilla double-tap: a second jump press within 7 ticks toggles creative flight.
-    if (jumpTapTimer_ > 0) --jumpTapTimer_;
-    if (jumpDown && !jumpWasDown_) {
-        if (jumpTapTimer_ == 0) {
-            jumpTapTimer_ = 7;
-        } else {
-            in.doubleTapJump = true;
-            jumpTapTimer_ = 0;
-        }
-    }
-    jumpWasDown_ = jumpDown;
-    in.forward = float(controlDown(GLFW_KEY_W, "forward")) - float(controlDown(GLFW_KEY_S, "back"));
-    in.strafe = float(controlDown(GLFW_KEY_A, "left")) - float(controlDown(GLFW_KEY_D, "right"));
-    in.jump = jumpDown;
-    in.sneak = controlDown(GLFW_KEY_LEFT_SHIFT, "sneak");
-    in.sprint = controlDown(GLFW_KEY_LEFT_CONTROL, "sprint");
-    return in;
-}
-
-void Game::updateTarget(float partialTick) {
-    target_.reset();
-    if (!level_ || !player_) return;
-    // Vanilla block_interaction_range: 4.5, plus 0.5 in creative; from the eyes in every view.
-    const double reach = player_->mode() == GameMode::Creative ? 5.0 : 4.5;
-    const glm::dvec3 eye =
-        glm::mix(player_->oldPos, player_->pos, double(partialTick)) + glm::dvec3(0.0, player_->eyeHeight(), 0.0);
-    target_ = raycastBlocks(*level_, eye, player_->viewVector(), reach);
-}
-
-// Debris (or, mining, a chip off `face`) with the block's particle texture.
-void Game::spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face) {
-    const auto choices = registry_->modelChoices(s);
-    if (choices.empty() || choices[0]->models.empty()) return;
-    const Block& b = registry_->blockOf(s);
-    // Vanilla tints the particles like the block's first tint index (but not grass blocks).
-    uint32_t tint = 0xFFFFFF;
-    if (b.tint.source != TintSource::None && b.id != "minecraft:grass_block")
-        tint = resolveTint(b.tint, 0, assets_->defaultBiomeColors());
-    const int sprite = choices[0]->models[0]->particleSprite;
-    if (face) particles_.addBlockHit(*registry_, s, p, *face, sprite, tint);
-    else particles_.addBlockBreak(*registry_, s, p, sprite, tint);
-}
-
-void Game::breakBlock(const BlockPos& p) {
-    const StateId s = level_->getBlock(p);
-    spawnBlockParticles(p, s, std::nullopt);
-    // A waterlogged block leaves its water behind.
-    const bool waterlogged = registry_->boolValue(s, "waterlogged") || registry_->blockOf(s).className == "water_plant";
-    level_->setBlockAndUpdate(p, waterlogged ? registry_->defaultState("water") : BlockRegistry::kAirState);
-}
-
-bool Game::placeBlock() {
-    if (!target_) return false;
-    ItemStack& held = player_->inventory.selectedStack();
-    if (held.empty() || !held.item->block) return false;
-    const Block& block = *held.item->block;
-    const bool consume = player_->mode() != GameMode::Creative;
-    const StateId clicked = level_->getBlock(target_->pos);
-    const double hitY = target_->point.y - double(target_->pos.y);
-    // A slab clicked on its open half becomes a double slab.
-    if (auto merged = mergeIntoClicked(*registry_, clicked, block, target_->face, hitY)) {
-        if (!level_->setBlockAndUpdate(target_->pos, *merged)) return false;
-        if (consume) player_->inventory.consumeSelected();
-        return true;
-    }
-    // Clicking a replaceable block (grass, snow layer) places into it; otherwise against the face.
-    const bool replace = (registry_->info(clicked).flags & kReplaceable) && registry_->info(clicked).block != block.index;
-    PlaceContext ctx;
-    ctx.pos = replace ? target_->pos : target_->pos.offset(target_->face);
-    ctx.clickedFace = target_->face;
-    ctx.hitPoint = target_->point;
-    ctx.yaw = player_->yaw;
-    ctx.pitch = player_->pitch;
-    ctx.replacingClicked = replace;
-    ctx.sneaking = player_->crouching;
-    const StateId there = level_->getBlock(ctx.pos);
-    if (!(registry_->info(there).flags & (kReplaceable | kAir))) {
-        // The neighbor may be a slab this one completes.
-        auto merged = mergeIntoClicked(*registry_, there, block, opposite(target_->face), hitY);
-        if (!merged || !level_->setBlockAndUpdate(ctx.pos, *merged)) return false;
-        if (consume) player_->inventory.consumeSelected();
-        return true;
-    }
-    const auto blocks = placementStates(*registry_, *level_, block, ctx);
-    if (blocks.empty()) return false;
-    // Never inside the player.
-    const AABB body = player_->box().inflated(-1e-7, -1e-7, -1e-7);
-    for (const auto& [p, s] : blocks)
-        for (const AABB& b : registry_->collisionShape(s))
-            if (b.moved(glm::dvec3(p.vec())).intersects(body)) return false;
-    for (const auto& [p, s] : blocks) level_->setBlockAndUpdate(p, s);
-    if (consume) player_->inventory.consumeSelected();
-    return true;
-}
-
-void Game::tickInteraction() {
-    if (!target_ || player_->mode() == GameMode::Spectator) {
-        breaking_.active = false;
-    }
-    if (destroyDelay_ > 0) --destroyDelay_;
-    if (useDelay_ > 0) --useDelay_;
-    const Input& in = window_.input();
-    const bool captured = window_.cursorCaptured();
-    const bool attackHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_LEFT)) || controlDown(-1, "attack");
-    const bool useHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_RIGHT)) || controlDown(-1, "use");
-    // Pick block (creative): the target's block into the selected slot.
-    if (pickClicks_ > 0 && target_ && player_->mode() == GameMode::Creative)
-        if (const Item* item = items_->forBlock(registry_->blockOf(level_->getBlock(target_->pos))))
-            player_->inventory.pick(*item);
-    // Use: on click, then every 4 ticks while held (vanilla rightClickDelay). Blocks that
-    // react to a hand (doors, levers, ...) take the click unless sneaking with an item.
-    if (target_ && player_->mode() != GameMode::Spectator &&
-        (useClicks_ > 0 || (useHeld && useDelay_ == 0))) {
-        const StateId s = level_->getBlock(target_->pos);
-        const bool bypass = player_->crouching && !player_->inventory.selectedStack().empty();
-        const auto use = bypass ? std::nullopt : useBlock(*registry_, s, horizontalFacing(player_->yaw));
-        // A successful use swings the arm.
-        if (use) {
-            if (use->state != s) level_->setBlockAndUpdate(target_->pos, use->state);
-            if (use->tickDelay > 0) level_->scheduleTick(target_->pos, registry_->info(use->state).block, use->tickDelay);
-            player_->swing();
-        } else if (placeBlock()) {
-            player_->swing();
-        }
-        useDelay_ = 4;
-    }
-    // Attack: creative breaks at once (5-tick pause between blocks); survival accumulates progress.
-    // A click swings even at nothing; holding on a block swings every tick (vanilla continueAttack).
-    const bool attacking = attackClicks_ > 0 || attackHeld;
-    if (attackClicks_ > 0 && player_->mode() != GameMode::Spectator) player_->swing();
-    if (!attacking || !target_ || player_->mode() == GameMode::Spectator || player_->mode() == GameMode::Adventure) {
-        breaking_.active = false;
+        gallery_->render(galleryCamera_, fb);
         return;
     }
-    player_->swing();
-    const BlockPos p = target_->pos;
-    const StateId s = level_->getBlock(p);
-    const Block& block = registry_->blockOf(s);
-    if (player_->mode() == GameMode::Creative) {
-        if (destroyDelay_ == 0 || attackClicks_ > 0) {
-            breakBlock(p);
-            destroyDelay_ = 5;
-        }
-        return;
-    }
-    if (destroyDelay_ > 0) return;
-    if (!breaking_.active || breaking_.pos != p) {
-        breaking_ = {p, 0.0f, true};
-    }
-    breaking_.progress += destroyProgressPerTick(block, *player_);
-    spawnBlockParticles(p, s, target_->face);
-    if (breaking_.progress >= 1.0f) {
-        breakBlock(p);
-        breaking_.active = false;
-        destroyDelay_ = 5;
-    }
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Vanilla Screen.renderPanorama: the cube, then the overlay stretched over it.
+    if (panorama_) panorama_->render(fb, panoramaSpin_, 10.0f);
+    GuiGraphics& gui = *client_.gui;
+    gui.begin(fb, client_.guiScale());
+    const glm::vec2 size = gui.size();
+    gui.texture("minecraft:gui/title/background/panorama_overlay", 0, 0, 0, 0, size.x, size.y, int(size.x), int(size.y));
+    renderScreen(partialTick);
+    gui.end();
 }
 
-void Game::renderHud(glm::ivec2 fb, float partialTick) {
-    if (!player_) return;
-    gui_->begin(fb, autoGuiScale(fb));
-    const glm::dvec3 eye = camera_.position;
-    const bool eyeInWater = perspective_ == Perspective::FirstPerson &&
-                            level_->fluid(BlockPos::containing(eye)).kind == FluidKind::Water;
-    ItemModelContext items;
-    items.timeOfDay = worldRenderer_->environment().timeOfDay;
-    items.holderPos = player_->pos;
-    items.holderYaw = player_->yaw;
-    items.spawnPos = glm::dvec3(level_->generator().spawnPoint());
-    items.spin = float(tickCount_ % 200) / 200.0f;
-    gui_->setItemContext(items);
-    hud_->render(*gui_, *player_, perspective_ == Perspective::FirstPerson, eyeInWater,
-                 [this](const ItemStack& stack, float x, float y) {
-                     gui_->item(stack, x, y);
-                     gui_->itemDecorations(stack, x, y);
-                 });
-    if (screen_) {
-        // Re-lay out after a resize.
-        if (gui_->size() != screenSize_) {
-            screenSize_ = gui_->size();
-            screen_->init(screenSize_);
-        }
-        screen_->render(*gui_, guiMouse(), partialTick);
+void Game::updateGallery(double dt) {
+    const Input& in = client_.window.input();
+    Camera& camera = galleryCamera_;
+    if (client_.window.cursorCaptured()) {
+        const glm::dvec2 d = in.mouseDelta();
+        const double k = client_.options.mouseDegreesPerCount();
+        camera.yaw += float(d.x * k);
+        camera.pitch = std::clamp(camera.pitch + float(d.y * k), -90.0f, 90.0f);
     }
-    gui_->end();
-}
-
-void Game::renderDebugOverlay(glm::ivec2 fb) {
-    std::vector<std::string> lines;
-    lines.push_back("Minecraft 1.21.8 (minecraft-cpp)");
-    const glm::dvec3& p = camera_.position;
-    if (level_) {
-        const auto& r = worldRenderer_->chunkRenderer().stats();
-        lines.push_back(std::format("{:.0f} fps  C: {}/{} sections, {} draws", fps_, r.drawn, r.sections, r.draws));
-        const auto st = level_->chunks().stats();
-        lines.push_back(std::format("Chunks: {} loaded, {} lit, {} ready, {} jobs", st.entries, st.lit, st.meshReady,
-                                    st.inFlight));
-        lines.push_back("");
-        lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));
-        const BlockPos b = BlockPos::containing(p);
-        lines.push_back(std::format("Block: {} {} {} [{} {} {}]", b.x, b.y, b.z, b.x & 15, b.y & 15, b.z & 15));
-        lines.push_back(std::format("Chunk: {} {} {} in {} {} {}", b.x & 15, b.y & 15, b.z & 15, b.x >> 4, b.y >> 4, b.z >> 4));
-        static const char* names[4] = {"south (Towards positive Z)", "west (Towards negative X)",
-                                       "north (Towards negative Z)", "east (Towards positive X)"};
-        const int facing = int(std::floor(std::fmod(std::fmod(camera_.yaw, 360.0f) + 360.0f + 45.0f, 360.0f) / 90.0f)) & 3;
-        lines.push_back(std::format("Facing: {} ({:.1f} / {:.1f})", names[facing], std::remainder(camera_.yaw, 360.0f),
-                                    camera_.pitch));
-        if (const Chunk* c = level_->chunks().chunk(ChunkPos::of(b))) {
-            const uint8_t l = c->lightAt(b.x & 15, b.y, b.z & 15);
-            lines.push_back(std::format("Client Light: {} ({} sky, {} block)", std::max(l >> 4, l & 15), l >> 4, l & 15));
-            if (overworld_ && b.y >= kWorldMinY && b.y <= kWorldMaxY) {
-                const Section& sec = c->sections[size_t(sectionIndexOfY(b.y))];
-                const BiomeId id = sec.biomes[size_t(((((b.y - kWorldMinY) & 15) >> 2) << 4) | (((b.z & 15) >> 2) << 2) | ((b.x & 15) >> 2))];
-                lines.push_back(std::format("Biome: {}", biomes_->get(id).id));
-            }
-        }
-        const auto& env = worldRenderer_->environment();
-        lines.push_back(std::format("Day {} Time {} (celestial {:.3f}, sky darken {:.2f})",
-                                    level_->dayTime() / 24000, level_->dayTime() % 24000, env.timeOfDay, env.skyDarken));
-        if (player_) {
-            lines.push_back(std::format("Mode: {}{}{}", gameModeName(player_->mode()), player_->flying ? ", flying" : "",
-                                        player_->onGround ? ", on ground" : ""));
-            if (target_) {
-                const BlockPos& t = target_->pos;
-                lines.push_back("");
-                lines.push_back(std::format("Targeted Block: {}, {}, {} ({})", t.x, t.y, t.z, directionName(target_->face)));
-                const std::string desc = registry_->describe(level_->getBlock(t));
-                const size_t bracket = desc.find('[');
-                lines.push_back(desc.substr(0, bracket));
-                if (bracket != std::string::npos) {
-                    // One property per line, like vanilla.
-                    std::string props = desc.substr(bracket + 1, desc.size() - bracket - 2);
-                    for (size_t start = 0; start <= props.size();) {
-                        const size_t comma = props.find(',', start);
-                        std::string kv = props.substr(start, comma - start);
-                        if (const size_t eq = kv.find('='); eq != std::string::npos) kv = kv.substr(0, eq) + ": " + kv.substr(eq + 1);
-                        lines.push_back(kv);
-                        if (comma == std::string::npos) break;
-                        start = comma + 1;
-                    }
-                }
-            }
-        }
-    } else {
-        lines.push_back(std::format("{:.0f} fps", fps_));
-        lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));
+    glm::vec3 move(0.0f);
+    const glm::vec3 fwd = glm::normalize(glm::vec3(camera.forward().x, 0.0f, camera.forward().z));
+    if (in.keyDown(GLFW_KEY_W)) move += fwd;
+    if (in.keyDown(GLFW_KEY_S)) move -= fwd;
+    if (in.keyDown(GLFW_KEY_D)) move += camera.right();
+    if (in.keyDown(GLFW_KEY_A)) move -= camera.right();
+    if (in.keyDown(GLFW_KEY_SPACE)) move.y += 1.0f;
+    if (in.keyDown(GLFW_KEY_LEFT_SHIFT)) move.y -= 1.0f;
+    if (glm::length(move) > 0.0f) {
+        const double speed = in.keyDown(GLFW_KEY_LEFT_CONTROL) ? 40.0 : 10.0;
+        camera.position += glm::dvec3(glm::normalize(move)) * speed * dt;
     }
-    gui_->begin(fb, autoGuiScale(fb));
-    for (size_t i = 0; i < lines.size(); ++i) {
-        if (lines[i].empty()) continue;
-        const float y = 2.0f + 9.0f * float(i);
-        gui_->fill(1, y - 1, 2.0f + float(gui_->textWidth(lines[i])) + 1.0f, y + 8, 0x90505050);
-        gui_->text(lines[i], 2, y, 0xFFE0E0E0, false);
-    }
-    gui_->end();
 }
 
 void Game::afterFrame() {
-    const glm::ivec2 fb = window_.framebufferSize();
+    const CliOptions& cli = client_.cli;
+    const glm::ivec2 fb = client_.window.framebufferSize();
     if (screenshotRequested_) {
         screenshotRequested_ = false;
-        saveScreenshot(nextScreenshotPath(opts_.gameDir / "screenshots"), fb.x, fb.y);
+        saveScreenshot(nextScreenshotPath(cli.gameDir / "screenshots"), fb.x, fb.y);
     }
+    if (world_ && world_->assertionFailed()) exitCode_ = 1;
     if (harnessDone_) return;
-    const bool harness = !opts_.screenshot.empty() || opts_.exitAfter;
-    if (!harness || frameCount_ < std::max(opts_.frames, 1) || tickCount_ < opts_.ticks) return;
-    if (level_ && (!opts_.exec.empty() || opts_.waitChunks)) {
-        if (!execDone_) return;
-        if (opts_.waitChunks && !(level_->chunks().viewMeshed() && worldRenderer_->idle())) return;
+    const bool harness = !cli.screenshot.empty() || cli.exitAfter;
+    if (!harness || frameCount_ < std::max(cli.frames, 1) || tickCount_ < cli.ticks) return;
+    if (world_ && cli.worldRequested && (!cli.exec.empty() || cli.waitChunks || !cli.screen.empty())) {
+        if (!harnessStarted_) return;
+        if (cli.waitChunks && !world_->viewMeshed()) return;
     }
     harnessDone_ = true;
-    if (!opts_.screenshot.empty()) saveScreenshot(opts_.screenshot, fb.x, fb.y);
-    if (opts_.exitAfter) window_.setShouldClose(true);
+    if (!cli.screenshot.empty()) saveScreenshot(cli.screenshot, fb.x, fb.y);
+    if (cli.exitAfter) client_.window.setShouldClose(true);
+}
+
+// Vanilla getFramerateLimit: the option in a world, 60 in menus; vsync paces itself.
+void Game::limitFramerate() {
+    const Options& o = client_.options;
+    const int limit = world_ ? (o.unlimitedFps() ? 0 : o.maxFps) : 60;
+    const double now = Window::time();
+    if (limit > 0 && !o.vsync && client_.cli.screenshot.empty()) {
+        const double frame = 1.0 / double(limit);
+        if (now - lastFrameEnd_ < frame) std::this_thread::sleep_for(std::chrono::duration<double>(frame - (now - lastFrameEnd_)));
+        lastFrameEnd_ = std::max(lastFrameEnd_ + frame, Window::time() - frame);
+    } else {
+        lastFrameEnd_ = now;
+    }
 }
 
 void Game::updateTitle() {
     ++framesSinceTitle_;
     if (titleTimer_.seconds() < 1.0) return;
-    const double fps = framesSinceTitle_ / titleTimer_.seconds();
-    fps_ = fps;
+    fps_ = framesSinceTitle_ / titleTimer_.seconds();
     framesSinceTitle_ = 0;
     titleTimer_.reset();
-    std::string title = std::format("Minecraft  |  {:.0f} fps", fps);
-    if (level_) {
-        const auto s = level_->chunks().stats();
-        const auto& r = worldRenderer_->chunkRenderer().stats();
-        title += std::format("  |  chunks {} (lit {}, ready {}, jobs {})  |  sections {}/{}  |  {:.0f} MB VRAM", s.entries,
-                             s.lit, s.meshReady, s.inFlight, r.drawn, r.sections,
-                             double(worldRenderer_->chunkRenderer().gpuBytes()) / (1 << 20));
-        title += std::format("  |  {:.1f} {:.1f} {:.1f}", camera_.position.x, camera_.position.y, camera_.position.z);
-    }
-    window_.setTitle(title);
+    std::string title = std::format("Minecraft  |  {:.0f} fps", fps_);
+    if (world_) title += "  |  " + world_->statusLine();
+    client_.window.setTitle(title);
 }
 
 } // namespace mc

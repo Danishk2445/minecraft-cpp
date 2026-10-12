@@ -1,6 +1,7 @@
 #include "ui/ContainerScreen.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 
 #include <GLFW/glfw3.h>
@@ -21,6 +22,33 @@ double nowSeconds() {
 } // namespace
 
 std::string ScreenContext::translate(const std::string& key) const { return lang ? lang->get(key) : key; }
+
+std::string ScreenContext::translate(const std::string& key, const std::vector<std::string>& args) const {
+    const std::string pattern = translate(key);
+    std::string out;
+    size_t next = 0;
+    for (size_t i = 0; i < pattern.size(); ++i) {
+        if (pattern[i] != '%' || i + 1 >= pattern.size()) {
+            out += pattern[i];
+            continue;
+        }
+        if (pattern[i + 1] == '%') {
+            out += '%';
+            ++i;
+        } else if (pattern[i + 1] == 's') {
+            if (next < args.size()) out += args[next++];
+            ++i;
+        } else if (std::isdigit(static_cast<unsigned char>(pattern[i + 1])) && i + 3 < pattern.size() &&
+                   pattern[i + 2] == '$' && pattern[i + 3] == 's') {
+            const size_t n = size_t(pattern[i + 1] - '1');
+            if (n < args.size()) out += args[n];
+            i += 3;
+        } else {
+            out += pattern[i];
+        }
+    }
+    return out;
+}
 
 std::string ScreenContext::itemName(const ItemStack& stack) const {
     if (stack.empty() || !items || !lang) return "";

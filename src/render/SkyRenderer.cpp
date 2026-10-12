@@ -208,7 +208,8 @@ void SkyRenderer::renderSky(const Camera& camera, float aspect, const Environmen
     glEnable(GL_DEPTH_TEST);
 }
 
-void SkyRenderer::renderClouds(const Camera& camera, float aspect, const EnvironmentState& env, double ticks) {
+void SkyRenderer::renderClouds(const Camera& camera, float aspect, const EnvironmentState& env, double ticks,
+                               bool fancy) {
     if (cloudImage_.empty()) return;
     const int w = cloudImage_.width, h = cloudImage_.height;
     auto cloudAt = [&](int x, int z) {
@@ -244,6 +245,11 @@ void SkyRenderer::renderClouds(const Camera& camera, float aspect, const Environ
             const float x0 = float(x * kCloudCell - camera.position.x - drift), x1 = x0 + float(kCloudCell);
             const float z0 = float(z * kCloudCell - camera.position.z - 0.33), z1 = z0 + float(kCloudCell);
             auto v = [&](float px, float py, float pz, uint32_t c) { return SkyVertex{{px, py, pz}, c, {}}; };
+            if (!fancy) { // one face toward the camera
+                if (y0 > 0.0f) quad(scratch_, v(x0, y0, z1, top), v(x0, y0, z0, top), v(x1, y0, z0, top), v(x1, y0, z1, top));
+                else quad(scratch_, v(x0, y0, z0, top), v(x0, y0, z1, top), v(x1, y0, z1, top), v(x1, y0, z0, top));
+                continue;
+            }
             if (!below) quad(scratch_, v(x0, y1, z0, top), v(x0, y1, z1, top), v(x1, y1, z1, top), v(x1, y1, z0, top));
             if (!above) quad(scratch_, v(x0, y0, z1, bottom), v(x0, y0, z0, bottom), v(x1, y0, z0, bottom), v(x1, y0, z1, bottom));
             if (!cloudAt(x, z - 1)) quad(scratch_, v(x1, y1, z0, ns), v(x1, y0, z0, ns), v(x0, y0, z0, ns), v(x0, y1, z0, ns));

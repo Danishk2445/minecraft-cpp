@@ -1,4 +1,8 @@
+#include <chrono>
 #include <memory>
+#include <thread>
+
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
@@ -10,6 +14,7 @@
 #include "world/block/BlockRegistry.h"
 #include "world/chunk/ChunkManager.h"
 #include "world/mesh/ChunkMesher.h"
+#include "world/storage/WorldSave.h"
 
 using namespace mc;
 
@@ -291,4 +296,82 @@ TEST(Commands, Tokenize) {
     EXPECT_EQ(parseCoordinate("~-2", 5.5), 3.5);
     EXPECT_EQ(parseCoordinate("12.25", 5.5), 12.25);
     EXPECT_FALSE(parseCoordinate("abc", 0).has_value());
+}
+
+// Operator commands need "Allow Commands"; the basics answer like vanilla.
+TEST(Commands, PermissionsAndBasics) {
+    Commands commands;
+    std::vector<std::string> out;
+    Difficulty difficulty = Difficulty::Normal;
+    CommandSource src;
+    src.permission = 0;
+    src.seed = -42;
+    src.feedback = [&](const std::string& m) { out.push_back(m); };
+    src.getDifficulty = [&] { return difficulty; };
+    src.setDifficulty = [&](Difficulty d) { difficulty = d; };
+    std::string err;
+    // Without commands allowed, operator commands are unknown and /help leaves them out.
+    EXPECT_FALSE(commands.execute(src, "/gamemode creative", &err));
+    EXPECT_EQ(err, "Unknown or incomplete command 'gamemode'");
+    EXPECT_TRUE(commands.execute(src, "/help", &err));
+    EXPECT_EQ(out, (std::vector<std::string>{"/help [command]", "/list", "/me <action>", "/seed"}));
+    out.clear();
+    EXPECT_TRUE(commands.execute(src, "/seed"));
+    EXPECT_TRUE(commands.execute(src, "/me waves hello"));
+    EXPECT_EQ(out, (std::vector<std::string>{"Seed: [-42]", "* Player waves hello"}));
+    out.clear();
+    // With them: the difficulty, and its "did not change" error.
+    src.permission = 4;
+    EXPECT_TRUE(commands.execute(src, "/difficulty"));
+    EXPECT_TRUE(commands.execute(src, "/difficulty hard"));
+    EXPECT_EQ(difficulty, Difficulty::Hard);
+    EXPECT_FALSE(commands.execute(src, "/difficulty hard", &err));
+    EXPECT_EQ(out, (std::vector<std::string>{"The difficulty is Normal", "The difficulty has been set to Hard"}));
+    EXPECT_GE(commands.names(4).size(), 15u);
+}
+
+// The world list and the Create World screen's folder names and seeds.
+TEST(WorldSaves, FoldersSeedsAndListing) {
+    const auto dir = std::filesystem::temp_directory_path() / ("mc_saves_test_" + std::to_string(::getpid()));
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    EXPECT_EQ(uniqueWorldFolder(dir, "New World"), "New World");
+    std::filesystem::create_directories(dir / "New World");
+    EXPECT_EQ(uniqueWorldFolder(dir, "New World"), "New World (1)");
+    std::filesystem::create_directories(dir / "New World (1)");
+    EXPECT_EQ(uniqueWorldFolder(dir, "New World"), "New World (2)");
+    EXPECT_EQ(uniqueWorldFolder(dir, "a/b:c*?"), "a_b_c__");
+    EXPECT_EQ(uniqueWorldFolder(dir, "con"), "_con");
+    EXPECT_EQ(uniqueWorldFolder(dir, "Wörld"), "Wörld");
+    EXPECT_EQ(uniqueWorldFolder(dir, "  "), "World");
+
+    // Seeds: numbers as typed, other text by Java's String.hashCode, empty is random.
+    EXPECT_EQ(seedFromString("12345", 7), 12345);
+    EXPECT_EQ(seedFromString("-9223372036854775808", 7), INT64_MIN);
+    EXPECT_EQ(seedFromString("a", 7), 97);
+    EXPECT_EQ(seedFromString("hello", 7), 99162322);
+    EXPECT_EQ(seedFromString("Minecraft", 7), -1595926131);
+    EXPECT_EQ(seedFromString("  ", 7), 7);
+
+    // Listing: worlds with a level.json, most recently played first.
+    WorldInfo a;
+    a.name = "Alpha";
+    ASSERT_TRUE(writeWorldInfo(dir / "New World", a));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    WorldInfo b;
+    b.name = "Beta";
+    b.gameMode = "creative";
+    b.cheats = true;
+    ASSERT_TRUE(writeWorldInfo(dir / "New World (1)", b));
+    const auto worlds = listWorlds(dir);
+    ASSERT_EQ(worlds.size(), 2u);
+    EXPECT_EQ(worlds[0].info.name, "Beta");
+    EXPECT_EQ(worlds[0].info.gameMode, "creative");
+    EXPECT_TRUE(worlds[0].info.cheats);
+    EXPECT_GT(worlds[0].info.lastPlayed, 0);
+    EXPECT_EQ(worlds[1].folder, "New World");
+    EXPECT_TRUE(deleteWorld(dir, "New World"));
+    EXPECT_EQ(listWorlds(dir).size(), 1u);
+    EXPECT_FALSE(deleteWorld(dir, ".."));
+    std::filesystem::remove_all(dir);
 }

@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <string_view>
+#include <vector>
 
 #include "gfx/Texture.h"
 #include "resources/FontSet.h"
@@ -25,10 +26,14 @@ public:
     // Draws formatted text with its top-left corner at (x, y); `argb` is the base
     // color (opaque when its alpha is 0, like vanilla). Returns the end x.
     float draw(GuiBatch& batch, std::string_view text, float x, float y, uint32_t argb, bool shadow = true) const;
+    // Centered like vanilla drawCenteredString: x - width / 2 in whole pixels.
     void drawCentered(GuiBatch& batch, std::string_view text, float centerX, float y, uint32_t argb,
                       bool shadow = true) const {
-        draw(batch, text, centerX - float(width(text)) / 2.0f, y, argb, shadow);
+        draw(batch, text, centerX - float(width(text) / 2), y, argb, shadow);
     }
+    // Splits formatted text into lines no wider than `width`, at spaces when possible;
+    // each new line repeats the formatting in effect (vanilla ComponentRenderUtils.wrapComponents).
+    std::vector<std::string> split(std::string_view text, float width) const { return set_.split(text, width); }
 
 private:
     float drawPass(GuiBatch& batch, std::u32string_view text, float x, float y, uint32_t argb, bool shadowPass,

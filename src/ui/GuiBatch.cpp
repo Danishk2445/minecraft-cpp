@@ -35,16 +35,23 @@ bool GuiBatch::init() {
 void GuiBatch::begin(glm::ivec2 fb, int scale) {
     scale_ = std::max(scale, 1);
     size_ = glm::vec2(fb) / float(scale_);
-    glViewport(0, 0, fb.x, fb.y);
+    framebuffer_ = fb;
+    texture_ = nullptr;
+    blend_ = Blend::Alpha;
+    transformed_ = false;
+    vertices_.clear();
+    restoreState();
+}
+
+void GuiBatch::restoreState() {
+    glViewport(0, 0, framebuffer_.x, framebuffer_.y);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    if (blend_ == Blend::Invert) glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
+    else glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     shader_.use();
     shader_.set("uProj", glm::ortho(0.0f, size_.x, size_.y, 0.0f, -1.0f, 1.0f));
-    texture_ = nullptr;
-    blend_ = Blend::Alpha;
-    vertices_.clear();
 }
 
 void GuiBatch::setBlend(Blend blend) {
@@ -55,8 +62,11 @@ void GuiBatch::setBlend(Blend blend) {
     else glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void GuiBatch::quad(const glm::vec2 (&p)[4], float u0, float v0, float u1, float v1, uint32_t argb) {
+void GuiBatch::quad(const glm::vec2 (&corners)[4], float u0, float v0, float u1, float v1, uint32_t argb) {
     const uint32_t c = ((argb >> 16) & 0xFF) | (argb & 0xFF00) | ((argb & 0xFF) << 16) | (argb & 0xFF000000u);
+    glm::vec2 p[4] = {corners[0], corners[1], corners[2], corners[3]};
+    if (transformed_)
+        for (glm::vec2& v : p) v = glm::vec2(transform_ * glm::vec3(v, 1.0f));
     vertices_.insert(vertices_.end(), {{p[0], {u0, v0}, c},
                                        {p[1], {u0, v1}, c},
                                        {p[2], {u1, v1}, c},

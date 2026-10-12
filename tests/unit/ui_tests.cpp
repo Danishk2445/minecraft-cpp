@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "game/Options.h"
 #include "resources/FontSet.h"
 #include "resources/ResourcePack.h"
 #include "ui/GuiScale.h"
@@ -79,4 +80,37 @@ TEST(GuiScale, AutoScale) {
     EXPECT_EQ(autoGuiScale({854, 480}), 2);
     EXPECT_EQ(autoGuiScale({320, 240}), 1);
     EXPECT_EQ(autoGuiScale({1920, 1080}, 2), 2);
+}
+
+// Options survive a save and load; bad values are clamped, unknown keys ignored.
+TEST(Options, RoundTripAndClamping) {
+    Options o;
+    o.fov = 90;
+    o.renderDistance = 20;
+    o.guiScale = 3;
+    o.maxFps = 260;
+    o.vsync = false;
+    o.gamma = 1.0f;
+    o.clouds = CloudMode::Fast;
+    o.particles = ParticleMode::Minimal;
+    o.mouseSensitivity = 0.25f;
+    o.invertMouse = true;
+    o.chatVisibility = ChatVisibility::Commands;
+    o.menuBlur = 0;
+    const Options back = Options::fromJson(o.toJson());
+    EXPECT_EQ(back.toJson(), o.toJson());
+    EXPECT_TRUE(back.unlimitedFps());
+    std::string err;
+    const Options clamped =
+        Options::fromJson(R"({"fov": 500, "renderDistance": 1, "gamma": -3, "clouds": 9, "menuBlur": 99, "extra": 1})", &err);
+    EXPECT_EQ(err, "");
+    EXPECT_EQ(clamped.menuBlur, 10);
+    EXPECT_EQ(clamped.fov, 110);
+    EXPECT_EQ(clamped.renderDistance, 2);
+    EXPECT_FLOAT_EQ(clamped.gamma, 0.0f);
+    EXPECT_EQ(clamped.clouds, CloudMode::Fancy);
+    Options::fromJson("not json", &err);
+    EXPECT_NE(err, "");
+    // Vanilla mouse sensitivity: 0.5 turns 0.15 degrees per count.
+    EXPECT_NEAR(Options{}.mouseDegreesPerCount(), 0.15, 1e-9);
 }

@@ -271,4 +271,44 @@ char32_t FontSet::obfuscated(char32_t c, uint32_t random) const {
     return it->second[random % it->second.size()];
 }
 
+std::vector<std::string> FontSet::split(std::string_view text, float width) const {
+    const FontSet& font = *this;
+    std::vector<std::string> out;
+    const std::u32string cps = decodeUtf8(text);
+    std::u32string line, carried;
+    float w = 0.0f;
+    size_t lastSpace = std::u32string::npos;
+    TextStyle style;
+    std::u32string codes; // § codes seen on this line so far
+    for (size_t i = 0; i < cps.size(); ++i) {
+        const char32_t c = cps[i];
+        if (c == U'§' && i + 1 < cps.size()) {
+            FontSet::applyFormat(style, TextStyle{}, cps[i + 1]);
+            line += c;
+            line += cps[i + 1];
+            codes += c;
+            codes += cps[++i];
+            continue;
+        }
+        const float adv = font.advance(c, style);
+        if (w + adv > width && !line.empty()) {
+            std::u32string next;
+            if (lastSpace != std::u32string::npos) {
+                next = line.substr(lastSpace + 1);
+                line.resize(lastSpace);
+            }
+            out.push_back(encodeUtf8(line));
+            line = codes + next;
+            w = 0.0f;
+            for (char32_t n : next) w += font.advance(n, style);
+            lastSpace = std::u32string::npos;
+        }
+        if (c == U' ') lastSpace = line.size();
+        line += c;
+        w += adv;
+    }
+    out.push_back(encodeUtf8(line));
+    return out;
+}
+
 } // namespace mc

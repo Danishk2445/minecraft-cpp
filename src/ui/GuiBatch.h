@@ -29,6 +29,15 @@ public:
                   uint32_t argb = 0xFFFFFFFF);
     void flush();
     void end();
+    // Re-applies the pass's GL state after other drawing in the middle of it (the menu blur).
+    void restoreState();
+
+    // A 2D affine transform (GUI pixels) applied to everything drawn until reset.
+    void setTransform(const glm::mat3& m) {
+        transform_ = m;
+        transformed_ = true;
+    }
+    void resetTransform() { transformed_ = false; }
 
     // Alpha blending, or vanilla's crosshair blend that inverts what is underneath.
     enum class Blend : uint8_t { Alpha, Invert };
@@ -54,7 +63,10 @@ private:
     size_t capacity_ = 0;
     int scale_ = 1;
     Blend blend_ = Blend::Alpha;
+    glm::mat3 transform_{1.0f};
+    bool transformed_ = false;
     glm::vec2 size_{0.0f};
+    glm::ivec2 framebuffer_{0};
 };
 
 } // namespace mc

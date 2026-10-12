@@ -385,6 +385,13 @@ void ChunkManager::markSectionDirty(ChunkPos c, int si) {
     if (e && e->meshReady) e->meshDirty |= 1u << si;
 }
 
+void ChunkManager::markAllMeshesDirty() {
+    for (auto& [pos, e] : entries_)
+        if (e->meshReady)
+            for (int i = 0; i < kSectionCount; ++i)
+                if (e->chunk->sections[size_t(i)].blocks) e->meshDirty |= 1u << i;
+}
+
 void ChunkManager::markMeshDirty(const BlockPos& p) {
     // Every section overlapping the 3x3x3 block box around p (AO and culling read one block over).
     const int x0 = floorDiv(p.x - 1, 16), x1 = floorDiv(p.x + 1, 16);

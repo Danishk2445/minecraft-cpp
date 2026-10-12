@@ -99,6 +99,7 @@ void EntityRenderer::submitModel(const ModelPart& root, int texWidth, int texHei
 }
 
 void EntityRenderer::submitShadow(const Level& level, const glm::dvec3& feet, float radius, int skyDarken) {
+    if (!shadows) return;
     const glm::dvec3 toCamera = feet - cameraPos_;
     const float strength = float(1.0 - glm::dot(toCamera, toCamera) / 256.0); // fades out at 16 blocks
     if (strength <= 0.0f) return;

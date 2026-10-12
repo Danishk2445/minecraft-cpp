@@ -83,6 +83,8 @@ public:
     // Marks sections for remeshing (used by light updates).
     void markMeshDirty(const BlockPos& p);
     void markSectionDirty(ChunkPos c, int sectionIndex);
+    // Every meshed section, e.g. after a change to how meshes are built (smooth lighting).
+    void markAllMeshesDirty();
 
     // Mesh scheduling for the renderer: ready chunks with dirty sections, nearest first.
     struct MeshWork {

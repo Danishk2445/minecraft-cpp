@@ -37,7 +37,7 @@ struct CliOptions {
     std::string gameMode = "survival"; // survival | creative | adventure | spectator
     std::string world;                 // save name under <gameDir>/saves; empty: an unsaved world
     long long seed = 0;
-    int renderDistance = 12;
+    std::optional<int> renderDistance; // overrides the option
     std::vector<std::string> exec; // commands run once the spawn area is ready
     std::vector<std::string> hold; // harness: controls held down the whole run (forward, attack, ...)
     bool waitChunks = false;       // harness: also wait until every visible chunk is meshed
@@ -45,13 +45,16 @@ struct CliOptions {
     std::optional<long long> time; // --time: initial time of day (ticks)
     bool freezeTime = false;       // stop the daylight cycle (deterministic screenshots)
     bool debugOverlay = false;     // show the F3 screen from the start
-    bool smoothLighting = true;
+    std::optional<bool> smoothLighting; // overrides the option
 
     // Camera / world placement
     std::optional<glm::dvec3> pos;  // --pos X,Y,Z
     std::optional<glm::vec2> look;  // --look YAW,PITCH (degrees)
     std::string perspective = "first"; // first | back | front (F5 views)
-    std::string screen;                // harness: open this screen once the world is ready (inventory)
+    std::string screen;                // harness: open this screen (in a world once it is ready)
+    std::optional<std::string> splash; // harness: this title splash instead of a random one
+    std::string play; // harness: open saves/<play> as the world list does (title, loading screen, game)
+    bool worldRequested = false;       // some option names a world: open it instead of the title screen
 
     // Tools
     std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit
@@ -64,6 +67,7 @@ struct CliOptions {
     int benchGen = 0;                      // generate and light about N chunks, report throughput, exit
     std::filesystem::path slice;           // write a vertical x/y cross-section PNG of the terrain, then exit
     bool checkData = false;                // load blocks, tags, biomes and features; report every problem; exit
+    bool bakePanorama = false;             // render the title panorama into <gameDir>/panorama, then exit
 
     std::string logLevel = "info";
     bool help = false;

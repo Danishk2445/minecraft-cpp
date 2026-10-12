@@ -60,6 +60,9 @@ public:
     }
     // Width of formatted text in GUI pixels (vanilla StringSplitter.stringWidth).
     float width(std::string_view text) const;
+    // Splits formatted text into lines no wider than `width`, at spaces when possible;
+    // each new line repeats the formatting in effect (vanilla ComponentRenderUtils.wrapComponents).
+    std::vector<std::string> split(std::string_view text, float width) const;
     // Calls f(codePoint, style) for every character outside § codes, which update the
     // style; §r resets it to `base` (vanilla StringDecomposer.iterateFormatted).
     template <class F>

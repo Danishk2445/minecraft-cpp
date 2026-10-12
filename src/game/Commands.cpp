@@ -3,6 +3,7 @@
 #include <charconv>
 #include <cmath>
 #include <format>
+#include <limits>
 
 #include "world/block/BlockRegistry.h"
 #include "world/level/Level.h"
@@ -63,7 +64,8 @@ std::vector<std::string> tokenizeCommand(std::string_view line) {
 }
 
 Commands::Commands() {
-    add("tp", "/tp <x> <y> <z> [yaw pitch]", [](CommandSource& src, Args a, std::string& err) {
+    addBasics();
+    const Handler teleport = [](CommandSource& src, Args a, std::string& err) {
         if (a.size() != 3 && a.size() != 5) {
             err = "expected 3 or 5 arguments";
             return false;
@@ -84,9 +86,11 @@ Commands::Commands() {
             rot = glm::vec2(float(*yaw), float(*pitch));
         }
         if (src.teleport) src.teleport({*x, *y, *z}, rot);
-        if (src.feedback) src.feedback(std::format("Teleported to {:.2f}, {:.2f}, {:.2f}", *x, *y, *z));
+        if (src.feedback) src.feedback(std::format("Teleported {} to {:.2f}, {:.2f}, {:.2f}", src.name, *x, *y, *z));
         return true;
-    });
+    };
+    add("tp", "/tp <x> <y> <z> [yaw pitch]", teleport);
+    add("teleport", "/teleport <x> <y> <z> [yaw pitch]", teleport);
 
     add("gamemode", "/gamemode <survival|creative|adventure|spectator>", [](CommandSource& src, Args a, std::string& err) {
         if (a.size() != 1) {
@@ -97,7 +101,11 @@ Commands::Commands() {
             err = "unknown game mode " + a[0];
             return false;
         }
-        if (src.feedback) src.feedback("Set own game mode to " + a[0]);
+        if (src.feedback) {
+            std::string mode = a[0];
+            if (!mode.empty()) mode[0] = char(std::toupper(static_cast<unsigned char>(mode[0])));
+            src.feedback("Set own game mode to " + mode + " Mode");
+        }
         return true;
     });
     add("assertblock", "/assertblock <x> <y> <z> <block>", [](CommandSource& src, Args a, std::string& err) {
@@ -220,8 +228,143 @@ Commands::Commands() {
         });
 }
 
-void Commands::add(std::string name, std::string usage, Handler handler) {
-    commands_[std::move(name)] = {std::move(usage), std::move(handler)};
+void Commands::addBasics() {
+    add("help", "/help [command]", [this](CommandSource& src, Args a, std::string& err) {
+        if (a.size() > 1) {
+            err = "expected at most one command";
+            return false;
+        }
+        if (a.size() == 1) {
+            auto it = commands_.find(a[0]);
+            if (it == commands_.end() || src.permission < it->second.permission) {
+                err = "unknown command " + a[0];
+                return false;
+            }
+            if (src.feedback) src.feedback(it->second.usage);
+            return true;
+        }
+        if (src.feedback)
+            for (const auto& [name, c] : commands_)
+                if (src.permission >= c.permission) src.feedback(c.usage);
+        return true;
+    }, kAnyone);
+
+    // Single player shows the seed to anyone (vanilla asks for operators on servers only).
+    add("seed", "/seed", [](CommandSource& src, Args a, std::string& err) {
+        if (!a.empty()) {
+            err = "expected no arguments";
+            return false;
+        }
+        if (src.feedback) src.feedback(std::format("Seed: [{}]", src.seed));
+        return true;
+    }, kAnyone);
+
+    add("difficulty", "/difficulty [peaceful|easy|normal|hard]", [](CommandSource& src, Args a, std::string& err) {
+        if (!src.getDifficulty || !src.setDifficulty || a.size() > 1) {
+            err = "expected an optional difficulty";
+            return false;
+        }
+        auto display = [](Difficulty d) {
+            std::string n(difficultyName(d));
+            n[0] = char(std::toupper(static_cast<unsigned char>(n[0])));
+            return n;
+        };
+        const Difficulty now = src.getDifficulty();
+        if (a.empty()) {
+            if (src.feedback) src.feedback("The difficulty is " + display(now));
+            return true;
+        }
+        const auto d = difficultyFromName(a[0]);
+        if (!d) {
+            err = "unknown difficulty " + a[0];
+            return false;
+        }
+        if (*d == now) {
+            err = "The difficulty did not change; it is already set to " + display(now);
+            return false;
+        }
+        src.setDifficulty(*d);
+        if (src.feedback) src.feedback("The difficulty has been set to " + display(*d));
+        return true;
+    });
+
+    add("list", "/list", [](CommandSource& src, Args, std::string&) {
+        if (src.feedback) src.feedback("There are 1 of a max of 8 players online: " + src.name);
+        return true;
+    }, kAnyone);
+
+    auto joined = [](Args a) {
+        std::string text;
+        for (const std::string& w : a) text += (text.empty() ? "" : " ") + w;
+        return text;
+    };
+    add("say", "/say <message>", [joined](CommandSource& src, Args a, std::string& err) {
+        if (a.empty()) {
+            err = "expected a message";
+            return false;
+        }
+        if (src.feedback) src.feedback("[" + src.name + "] " + joined(a));
+        return true;
+    });
+    add("me", "/me <action>", [joined](CommandSource& src, Args a, std::string& err) {
+        if (a.empty()) {
+            err = "expected an action";
+            return false;
+        }
+        if (src.feedback) src.feedback("* " + src.name + " " + joined(a));
+        return true;
+    }, kAnyone);
+
+    add("clear", "/clear [item] [maxCount]", [](CommandSource& src, Args a, std::string& err) {
+        if (!src.clear || a.size() > 2) {
+            err = "expected an optional item and count";
+            return false;
+        }
+        long long max = -1;
+        if (a.size() == 2 && (!parseLong(a[1], max) || max < 0)) {
+            err = "bad count " + a[1];
+            return false;
+        }
+        const int removed = src.clear(a.empty() ? nullptr : &a[0], max < 0 ? std::numeric_limits<int>::max() : int(max));
+        if (removed < 0) {
+            err = "unknown item " + a[0];
+            return false;
+        }
+        if (removed == 0) {
+            err = "No items were found on player " + src.name;
+            return false;
+        }
+        if (src.feedback) src.feedback(std::format("Removed {} item(s) from player {}", removed, src.name));
+        return true;
+    });
+
+    // The rules that exist so far, with vanilla's names.
+    add("gamerule", "/gamerule <doDaylightCycle> [true|false]", [](CommandSource& src, Args a, std::string& err) {
+        if (!src.level || a.empty() || a.size() > 2) {
+            err = "expected a rule and an optional value";
+            return false;
+        }
+        if (a[0] != "doDaylightCycle") {
+            err = "unknown game rule " + a[0];
+            return false;
+        }
+        bool& rule = src.level->daylightCycle;
+        if (a.size() == 1) {
+            if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], rule));
+            return true;
+        }
+        if (a[1] != "true" && a[1] != "false") {
+            err = "expected true or false";
+            return false;
+        }
+        rule = a[1] == "true";
+        if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], rule));
+        return true;
+    });
+}
+
+void Commands::add(std::string name, std::string usage, Handler handler, int permission) {
+    commands_[std::move(name)] = {std::move(usage), std::move(handler), permission};
 }
 
 bool Commands::execute(CommandSource& source, std::string_view line, std::string* error) {
@@ -233,8 +376,9 @@ bool Commands::execute(CommandSource& source, std::string_view line, std::string
         return false;
     }
     auto it = commands_.find(tokens[0]);
-    if (it == commands_.end()) {
-        if (error) *error = std::format("unknown command '{}'", tokens[0]);
+    // Operator commands don't exist for others (vanilla: unknown command).
+    if (it == commands_.end() || source.permission < it->second.permission) {
+        if (error) *error = std::format("Unknown or incomplete command '{}'", tokens[0]);
         return false;
     }
     const bool ok = it->second.handler(source, Args(tokens).subspan(1), err);
@@ -242,9 +386,10 @@ bool Commands::execute(CommandSource& source, std::string_view line, std::string
     return ok;
 }
 
-std::vector<std::string> Commands::names() const {
+std::vector<std::string> Commands::names(int permission) const {
     std::vector<std::string> out;
-    for (const auto& [n, c] : commands_) out.push_back(n);
+    for (const auto& [n, c] : commands_)
+        if (permission >= c.permission) out.push_back(n);
     return out;
 }
 

@@ -1,132 +1,109 @@
-// Game.h -- owns the window and subsystems and runs the fixed-tick main loop.
+// Game.h -- runs the client: the fixed-tick main loop, the screen stack and the
+// open world (if any). Screens act on it through ScreenHost.
 #pragma once
 
 #include <array>
-#include <filesystem>
 #include <memory>
-#include <optional>
+#include <string>
+#include <vector>
 
-#include "app/Cli.h"
-#include "core/JobSystem.h"
-#include "entity/Particles.h"
-#include "entity/Player.h"
-#include "world/level/Raycast.h"
+#include "app/Client.h"
 #include "core/Timer.h"
-#include "game/Commands.h"
+#include "game/WorldParams.h"
 #include "gfx/Camera.h"
-#include "platform/Window.h"
+#include "render/Panorama.h"
+#include "ui/Screen.h"
 
 namespace mc {
 
-class BiomeRegistry;
-class BlockRegistry;
-class OverworldGenerator;
-class ClientAssets;
-class GuiGraphics;
-class Hud;
-class CreativeTabs;
-class InventoryMenu;
-class Screen;
-struct ScreenContext;
 class Gallery;
-class Level;
-class WorldRenderer;
-class BlockOverlay;
-class ItemRegistry;
-class Language;
+class WorldSession;
 
-class Game {
+class Game final : public ScreenHost {
 public:
     static constexpr double kTickSeconds = 0.05; // 20 ticks per second
 
     explicit Game(CliOptions options);
-    ~Game();
+    ~Game() override;
 
     // Returns the process exit code.
     int run();
 
+    // ScreenHost
+    void setScreen(std::unique_ptr<Screen> screen) override;
+    void pushScreen(std::unique_ptr<Screen> screen) override;
+    void popScreen() override;
+    void startWorld(const WorldParams& params) override;
+    void leaveWorld() override;
+    void quitGame() override;
+    bool inWorld() const override { return world_ != nullptr && !worldLoading_; }
+    Options& options() override { return client_.options; }
+    void optionsChanged() override;
+    std::filesystem::path savesDir() const override;
+    const std::string& splash() const override { return splash_; }
+    WorldLoadStatus worldLoadStatus() const override;
+    Difficulty difficulty() const override;
+    void setDifficulty(Difficulty d) override;
+    void sendChat(const std::string& line) override;
+
 private:
     bool init();
-    bool initWorld();
+    bool loadRegistries();
     void shutdown();
-    void handleGlobalKeys();
-    void updateCamera(double dt);
-    void updateWorld();
+    void handleInput();
+    void handleScreenInput();
+    void applyPending(); // screen and world changes requested during callbacks
+    void applyScreenChanges();
+    void openTitle();
+    void loadSplash();
+    // The title panorama from <gameDir>/panorama, baked first if it is missing.
+    void loadPanorama();
+    // Renders the six panorama faces of a fixed world into `dir` (vanilla's own are
+    // pictures; the pack's are 1x1 placeholders).
+    bool bakePanorama(const std::filesystem::path& dir);
+    // One frame of `screen` over the panorama, for work that blocks the loop.
+    void presentScreen(Screen& screen);
     void tick();
     void render(float partialTick);
+    void renderWithoutWorld(glm::ivec2 fb, float partialTick);
+    void renderScreen(float partialTick);
     void afterFrame(); // harness: screenshot / exit when the run conditions are met
-    void runCommand(const std::string& line);
     void updateTitle();
-    void renderDebugOverlay(glm::ivec2 fb);
-    void renderHud(glm::ivec2 fb, float partialTick);
-    PlayerInput readPlayerInput();
-    // A key or button held down (with the cursor captured), or the harness's --hold action.
-    bool controlDown(int key, std::string_view action) const;
-    void tickInteraction();
-    void breakBlock(const BlockPos& p);
-    void spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face);
-    bool placeBlock(); // true when a block was placed
-    void updateTarget(float partialTick);
-    void setupCamera(float partialTick);
-    void saveWorld(bool wait);
-    // Screens: opening releases the mouse, closing captures it again.
-    void openScreen(std::unique_ptr<Screen> screen);
-    void closeScreen();
-    void handleScreenInput();
-    void openInventory();
-    glm::vec2 guiMouse() const; // the cursor in GUI pixels
-    ScreenContext screenContext() const;
+    void limitFramerate();
+    void updateGallery(double dt);
+    void openHarnessScreen(); // --screen
+    std::unique_ptr<Screen> makeScreen(const std::string& name);
+    ScreenContext screenContext();
 
-    CliOptions opts_;
-    Window window_;
-    std::unique_ptr<JobSystem> jobs_;
-    std::unique_ptr<ClientAssets> assets_;
-    std::unique_ptr<BlockRegistry> registry_;
-    std::unique_ptr<BiomeRegistry> biomes_;
-    std::unique_ptr<ItemRegistry> items_;
-    std::unique_ptr<Language> lang_;
-    std::shared_ptr<const OverworldGenerator> overworld_; // when the world type is "default"
+    Client client_;
+    std::unique_ptr<WorldSession> world_;
+    // Open screens, the top one active; changes queue up while screens run.
+    std::vector<std::unique_ptr<Screen>> screens_;
+    struct ScreenChange {
+        enum class Kind : uint8_t { Set, Push, Pop } kind;
+        std::unique_ptr<Screen> screen;
+    };
+    std::vector<ScreenChange> screenChanges_;
+    Screen* screen() const { return screens_.empty() ? nullptr : screens_.back().get(); }
+    bool leaveWorldPending_ = false;
+    long long leaveWorldFrame_ = 0; // the "Saving world" screen is drawn once before the save
+    bool worldLoading_ = false;     // a world opened from the menus waits behind the loading screen
+    std::unique_ptr<Panorama> panorama_;
+    float panoramaSpin_ = 0.0f; // degrees, 0.1 per tick of real time (vanilla PanoramaRenderer)
+    std::unique_ptr<WorldParams> pendingWorld_;
     std::unique_ptr<Gallery> gallery_;
-    std::unique_ptr<Level> level_;
-    std::unique_ptr<WorldRenderer> worldRenderer_;
-    std::unique_ptr<GuiGraphics> gui_;
-    std::unique_ptr<Hud> hud_;
-    std::unique_ptr<Screen> screen_;
-    std::unique_ptr<InventoryMenu> inventoryMenu_;
-    std::unique_ptr<CreativeTabs> creativeTabs_;
+    Camera galleryCamera_;
     glm::vec2 lastGuiMouse_{-1.0f};
     std::array<bool, 3> guiButtonsDown_{};
     glm::vec2 screenSize_{0.0f};
-    bool showDebug_ = false;
     double fps_ = 0.0;
-    Commands commands_;
-    Camera camera_;
-    // F5 cycles first person, third person from behind, third person from the front.
-    enum class Perspective : uint8_t { FirstPerson, ThirdPersonBack, ThirdPersonFront };
-    Perspective perspective_ = Perspective::FirstPerson;
-    float eyeHeight_ = 1.62f, oldEyeHeight_ = 1.62f; // the camera's eased eye height
-    std::unique_ptr<Player> player_;
-    ParticleSystem particles_;
-    std::unique_ptr<BlockOverlay> overlay_;
-    std::optional<BlockHit> target_; // the block under the crosshair
-    struct Breaking {
-        BlockPos pos;
-        float progress = 0.0f;
-        bool active = false;
-    } breaking_;
-    int destroyDelay_ = 0;  // ticks before the next block may break (vanilla destroyDelay)
-    int useDelay_ = 0;      // ticks before the next placement repeats while held
-    int jumpTapTimer_ = 0;  // double-tap jump window (vanilla jumpTriggerTime)
-    bool jumpWasDown_ = false;
-    int attackClicks_ = 0, useClicks_ = 0, pickClicks_ = 0; // presses since the last tick
-    std::filesystem::path worldDir_; // empty for an unsaved world
-    std::string worldType_;
-    int64_t worldSeed_ = 0;
+    std::string splash_;
+    double lastFrameEnd_ = 0.0;
 
     long long frameCount_ = 0;
     long long tickCount_ = 0;
     bool harnessDone_ = false;
-    bool execDone_ = false;
+    bool harnessStarted_ = false; // --exec and --screen ran
     bool screenshotRequested_ = false;
     bool toolOnly_ = false; // a --dump-* tool ran inside init()
     int exitCode_ = 0;

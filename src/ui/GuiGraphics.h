@@ -3,7 +3,9 @@
 // (container backgrounds) and text. Vanilla GuiGraphics.
 #pragma once
 
+#include <filesystem>
 #include <memory>
+#include <unordered_map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -11,6 +13,7 @@
 #include <glm/glm.hpp>
 
 #include "render/ItemRenderer.h"
+#include "render/MenuBlur.h"
 #include "ui/Font.h"
 #include "ui/GuiBatch.h"
 
@@ -29,6 +32,9 @@ public:
     void begin(glm::ivec2 framebuffer, int scale);
     void end();
     void flush() { batch_.flush(); }
+    // Blurs everything drawn so far, the GUI included (vanilla renderBlurredBackground);
+    // `radius` is the menu background blurriness option.
+    void blurBehind(int radius);
     glm::vec2 size() const { return batch_.size(); }
     int scale() const { return batch_.scale(); }
     GuiBatch& batch() { return batch_; }
@@ -55,6 +61,13 @@ public:
     }
     int textWidth(std::string_view text) const { return font_.width(text); }
 
+    // A PNG from disk (world icons), cached until forgetFileTextures(); null if unreadable.
+    const Texture* fileTexture(const std::filesystem::path& path);
+    void forgetFileTextures() { fileTextures_.clear(); }
+    void blitTexture(const Texture& texture, float x, float y, float w, float h) {
+        batch_.blit(texture, x, y, x + w, y + h, 0, 0, 1, 1);
+    }
+
     // Item icons (16x16 with the top-left at x, y), over everything drawn so far.
     void item(const ItemStack& stack, float x, float y);
     // The stack's count (when not 1, or `countText` instead) in the slot's bottom-right
@@ -62,7 +75,11 @@ public:
     void itemDecorations(const ItemStack& stack, float x, float y, const std::string* countText = nullptr);
     // Vanilla tooltip: lines (§ formatting allowed) in the nine-sliced tooltip frame
     // next to the mouse, kept on screen.
-    void tooltip(const std::vector<std::string>& lines, float mouseX, float mouseY);
+    void tooltip(const std::vector<std::string>& lines, float mouseX, float mouseY, uint32_t restColor = 0xFFA8A8A8);
+    // A widget's tooltip (vanilla Tooltip.create): the text wrapped at 170 pixels, all white.
+    void textTooltip(std::string_view text, float mouseX, float mouseY) {
+        tooltip(font_.split(text, 170.0f), mouseX, mouseY, 0xFFFFFFFF);
+    }
     // Clips drawing to a GUI rectangle (vanilla enableScissor; not nested).
     void enableScissor(float x0, float y0, float x1, float y1);
     void disableScissor();
@@ -87,8 +104,10 @@ private:
     GuiBatch batch_;
     Font font_;
     ItemRenderer items_;
+    MenuBlur blur_;
     ItemModelContext itemContext_;
     glm::ivec2 framebuffer_{0};
+    std::unordered_map<std::string, std::unique_ptr<Texture>> fileTextures_;
     std::unique_ptr<ModelDefinition> playerRest_, playerPosed_;
 };
 

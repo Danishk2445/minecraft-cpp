@@ -17,13 +17,36 @@ namespace mc {
 
 bool GuiGraphics::init(const ClientAssets& assets) {
     assets_ = &assets;
-    return batch_.init() && font_.load(assets.pack()) && items_.init(assets);
+    return batch_.init() && font_.load(assets.pack()) && items_.init(assets) && blur_.init();
+}
+
+void GuiGraphics::blurBehind(int radius) {
+    if (radius < 1) return;
+    batch_.flush();
+    blur_.apply(framebuffer_, radius);
+    batch_.restoreState();
 }
 
 void GuiGraphics::begin(glm::ivec2 framebuffer, int scale) {
     framebuffer_ = framebuffer;
     batch_.begin(framebuffer, scale);
     items_.beginGui();
+}
+
+const Texture* GuiGraphics::fileTexture(const std::filesystem::path& path) {
+    const std::string key = path.string();
+    auto it = fileTextures_.find(key);
+    if (it == fileTextures_.end()) {
+        std::unique_ptr<Texture> tex;
+        if (auto img = Image::loadPng(path)) {
+            tex = std::make_unique<Texture>();
+            tex->create(img->width, img->height, 1);
+            tex->upload(0, 0, 0, *img);
+            tex->setFilter(GL_LINEAR, GL_NEAREST);
+        }
+        it = fileTextures_.emplace(key, std::move(tex)).first;
+    }
+    return it->second.get();
 }
 
 void GuiGraphics::item(const ItemStack& stack, float x, float y) {
@@ -39,7 +62,7 @@ void GuiGraphics::itemDecorations(const ItemStack& stack, float x, float y, cons
     text(count, x + 19 - 2 - float(textWidth(count)), y + 6 + 3, 0xFFFFFFFF);
 }
 
-void GuiGraphics::tooltip(const std::vector<std::string>& lines, float mouseX, float mouseY) {
+void GuiGraphics::tooltip(const std::vector<std::string>& lines, float mouseX, float mouseY, uint32_t restColor) {
     if (lines.empty()) return;
     // ClientTextTooltip sizes: 10 per line, plus 2 under the title when there are more.
     float width = 0.0f;
@@ -54,7 +77,7 @@ void GuiGraphics::tooltip(const std::vector<std::string>& lines, float mouseX, f
     sprite("tooltip/frame", x - 3 - 9, y - 3 - 9, width + 6 + 18, height + 6 + 18);
     float ly = y;
     for (size_t i = 0; i < lines.size(); ++i) {
-        text(lines[i], x, ly, i == 0 ? 0xFFFFFFFF : 0xFFA8A8A8);
+        text(lines[i], x, ly, i == 0 ? 0xFFFFFFFF : restColor);
         ly += i == 0 ? 12.0f : 10.0f;
     }
 }

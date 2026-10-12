@@ -41,7 +41,8 @@ public:
     // Draws the sky behind everything (call first, after clearing to the fog color).
     void renderSky(const Camera& camera, float aspect, const EnvironmentState& env);
     // Draws clouds (call after the translucent terrain pass).
-    void renderClouds(const Camera& camera, float aspect, const EnvironmentState& env, double ticks);
+    // Fancy clouds are boxes; fast ones a flat layer at the cloud height.
+    void renderClouds(const Camera& camera, float aspect, const EnvironmentState& env, double ticks, bool fancy);
 
     static constexpr double kCloudHeight = 192.33;
     static constexpr double kCloudCell = 12.0;

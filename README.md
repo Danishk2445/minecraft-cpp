@@ -36,9 +36,11 @@ Binaries land in `build/<preset>/bin/`.
 ./build/release/bin/minecraft --help     # all options
 ```
 
-The game directory (saves, options, screenshots, logs) defaults to `./run`; change it with `--gamedir`.
+The game directory (saves, `options.json`, screenshots, logs, the title panorama) defaults to `./run`; change it with `--gamedir`.
 
-The game opens a world straight away; title screens come in M9. Choose the world with:
+The game starts at the title screen: Singleplayer leads to the world list (or straight to Create New World when there are none). The first start renders the title panorama, which takes a few seconds; `--bake-panorama` renders it again and exits.
+
+Any option about a world opens that world directly instead (the scripted tests use this). Choose it with:
 - `--world-type default|flat|debug`: `default` is the generated overworld; debug places every block state on a grid at y=70.
 - `--render-distance N`
 - `--seed N`
@@ -58,6 +60,7 @@ More options:
 Play options:
 - `--gamemode survival|creative|adventure|spectator` (default survival). Spectator flies through blocks, which the screenshot tests use.
 - `--world NAME`: play `<gamedir>/saves/NAME`, creating it if missing (an existing world keeps its seed and type). Without it the world is not saved. Worlds autosave every 5 minutes and on exit.
+- `--play NAME`: start at the title and open `<gamedir>/saves/NAME` the way the world list does, behind the loading screen.
 
 Controls:
 - Click: capture the mouse
@@ -67,15 +70,16 @@ Controls:
 - Left mouse: break (instant in creative); right mouse: place, or open doors, trapdoors and gates, flip levers, press buttons; middle mouse: pick block (creative)
 - 1–9 or the mouse wheel: hotbar slot; F: swap hands
 - E: inventory (creative: the creative inventory with tabs and search). In menus: click, right click (half / one), shift-click, drag to spread, double-click to collect, 1–9 and F to swap with the hotbar or off hand, Q to throw, middle click to copy (creative)
-- Esc: release the mouse, or quit
+- Esc: pause menu (Options, Save and Quit to Title); in menus, back
+- T: chat; /: chat with a command started. Enter sends, Up/Down recall sent lines, Page Up/Down scroll
 - F2: screenshot
 - F3: debug screen (with the targeted block)
 - F5: third person from behind, then from the front, then back to first person
 - F11: fullscreen
 
-Commands (`--exec "/cmd"`): `/tp`, `/setblock`, `/fill`, `/time`, `/gamemode`, `/give <item> [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
+Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule doDaylightCycle`, `/setblock`, `/fill`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
 
-`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen inventory` opens the (creative) inventory once the world is ready, for screenshots.
+`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen NAME` opens a screen for screenshots: in a world once it is ready (`inventory`, `pause`, `options`, `video`, `chat`), or over the title (`title`, `worlds`, `create`, `options`, `video`). `--splash TEXT` fixes the title's splash.
 
 World generation tools run without a window:
 - `--biome-map FILE [--map-size N] [--map-step N]` writes a shaded top-down biome map around `--pos` (default 0,0), then prints biome shares, the nearest location of each biome, and the highest point.
@@ -104,4 +108,5 @@ The GL tests need `xorg-server-xvfb` and Python with Pillow and NumPy. They rend
 | `src/app` | main loop, command-line harness and world tools |
 | `shaders/`, `data/` | GLSL sources and gameplay data |
 | `tests/unit` | GoogleTest unit tests (no GL) |
+| `tests/client` | client tests without a GL context: every menu laid out at GUI scales 1–4, screen behavior |
 | `tools/` | loader generator and screenshot checker |

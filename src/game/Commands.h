@@ -11,6 +11,8 @@
 
 #include <glm/glm.hpp>
 
+#include "game/WorldParams.h"
+
 namespace mc {
 
 class Level;
@@ -19,7 +21,16 @@ struct CommandSource {
     Level* level = nullptr;
     glm::dvec3 position{0.0};
     glm::vec2 rotation{0.0f}; // yaw, pitch
+    std::string name = "Player";
+    // Vanilla permission levels: 0 for anyone, 2+ for operators (a world with "Allow Commands").
+    int permission = 4;
+    int64_t seed = 0;
     std::function<void(const std::string&)> feedback;
+    std::function<Difficulty()> getDifficulty;
+    std::function<void(Difficulty)> setDifficulty;
+    // Removes up to `max` of `item` (any item when null) from the player; the number
+    // removed, or -1 for an unknown item.
+    std::function<int(const std::string* item, int max)> clear;
     // Moves the executing entity (camera/player); rotation optional.
     std::function<void(const glm::dvec3&, std::optional<glm::vec2>)> teleport;
     // Changes the executing player's game mode; false for an unknown mode.
@@ -35,19 +46,27 @@ public:
     using Args = std::span<const std::string>;
     using Handler = std::function<bool(CommandSource&, Args, std::string& error)>;
 
-    Commands(); // registers the built-in commands
+    // Command levels: anyone, or operators only (vanilla's level 2).
+    static constexpr int kAnyone = 0, kOperator = 2;
 
-    void add(std::string name, std::string usage, Handler handler);
+    Commands(); // registers the built-in commands
+    Commands(const Commands&) = delete; // /help reads the table it lives in
+    Commands& operator=(const Commands&) = delete;
+
+    void add(std::string name, std::string usage, Handler handler, int permission = kOperator);
     // `line` may start with '/'. Returns false and fills `error` on failure.
     bool execute(CommandSource& source, std::string_view line, std::string* error = nullptr);
-    std::vector<std::string> names() const;
+    // The commands a source with `permission` may run.
+    std::vector<std::string> names(int permission = 4) const;
     std::string usage(const std::string& name) const;
 
 private:
     struct Command {
         std::string usage;
         Handler handler;
+        int permission = kOperator;
     };
+    void addBasics(); // help, seed, difficulty, list, say, me, clear, gamerule
     std::map<std::string, Command> commands_;
 };
 
