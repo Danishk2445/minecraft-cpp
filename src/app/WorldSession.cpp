@@ -14,9 +14,18 @@
 #include "game/BlockEntities.h"
 #include "game/ContainerMenus.h"
 #include "game/ItemUse.h"
+#include "world/block/Tints.h"
+#include "world/sim/Fluids.h"
+#include "world/sim/Plants.h"
+#include "world/sim/Simulation.h"
+#include "world/sim/Weathering.h"
 #include "game/Loot.h"
 #include "game/Tools.h"
 #include "entity/ExperienceOrb.h"
+#include "entity/DisplayTicks.h"
+#include "entity/FallingBlockEntity.h"
+#include "entity/LightningBolt.h"
+#include "entity/PrimedTnt.h"
 #include "entity/ItemEntity.h"
 #include "entity/Physics.h"
 #include "gfx/Screenshot.h"
@@ -80,26 +89,31 @@ bool WorldSession::init() {
             log::info("Creating world '{}' in {}", params_.folder, worldDir_.string());
         }
     }
+    // World generation's features: the overworld decorates with them, and saplings and bone
+    // meal grow them in every world type.
+    decorator_ = std::make_shared<BiomeDecorator>();
+    if (!decorator_->load(cli.dataDir, registry, *client_.biomes, &err)) {
+        int shown = 0;
+        for (size_t start = 0; start < err.size() && shown < 30; ++shown) {
+            const size_t end = err.find('\n', start);
+            log::warn("features: {}", err.substr(start, end - start));
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+    }
     std::shared_ptr<const ChunkGenerator> generator;
     if (params_.type == "flat") {
-        generator = std::make_shared<FlatGenerator>(registry);
+        auto flat = std::make_shared<FlatGenerator>(registry);
+        flat->biome = client_.biomes->require("plains");
+        generator = flat;
     } else if (params_.type == "debug") {
         generator = std::make_shared<DebugGenerator>(registry);
     } else {
-        auto decorator = std::make_shared<BiomeDecorator>();
-        if (!decorator->load(cli.dataDir, registry, *client_.biomes, &err)) {
-            int shown = 0;
-            for (size_t start = 0; start < err.size() && shown < 30; ++shown) {
-                const size_t end = err.find('\n', start);
-                log::warn("features: {}", err.substr(start, end - start));
-                if (end == std::string::npos) break;
-                start = end + 1;
-            }
-        }
-        overworld_ = std::make_shared<OverworldGenerator>(registry, *client_.biomes, params_.seed, std::move(decorator));
+        overworld_ = std::make_shared<OverworldGenerator>(registry, *client_.biomes, params_.seed, decorator_);
         generator = overworld_;
     }
     level_ = std::make_unique<Level>(registry, generator, *client_.jobs, params_.seed);
+    level_->setWorldgen(decorator_.get(), client_.biomes.get());
     if (!worldDir_.empty()) {
         level_->attachStorage(std::make_shared<ChunkStorage>(worldDir_, registry, client_.biomes.get()));
         if (info) level_->loadData(info->level);
@@ -108,6 +122,11 @@ bool WorldSession::init() {
     if (params_.commandLine) {
         if (cli.time) level_->setDayTime(*cli.time);
         level_->daylightCycle = !cli.freezeTime;
+        if (!cli.weather.empty()) {
+            level_->setWeather(0, 1000000, cli.weather != "clear", cli.weather == "thunder");
+            level_->settleWeather();
+            level_->doWeatherCycle = false;
+        }
         showDebug = cli.debugOverlay;
     }
     worldRenderer_ = std::make_unique<WorldRenderer>(*client_.assets, registry,
@@ -119,6 +138,19 @@ bool WorldSession::init() {
     overlay_ = std::make_unique<BlockOverlay>();
     if (!overlay_->init(*client_.assets)) return false;
     hud_ = std::make_unique<Hud>();
+    // Particle sprites (particles/<type>.json), stitched into the block atlas.
+    const Atlas& atlas = client_.assets->blockAtlas();
+    for (size_t t = 0; t < size_t(ParticleType::Count); ++t) {
+        const std::string_view name = particleDefinition(ParticleType(t));
+        if (name.empty()) continue;
+        const ResourcePack& pack = client_.assets->pack();
+        std::vector<int> sprites;
+        if (const auto j = pack.json(pack.file("minecraft", std::format("particles/{}.json", name))))
+            for (const Json& tex : j->value("textures", Json::array()))
+                if (const int s = atlas.find(canonicalId(tex.get<std::string>())); s != atlas.missing) sprites.push_back(s);
+        if (sprites.empty()) log::warn("particles: no sprites for {}", name);
+        particles_.setSprites(ParticleType(t), std::move(sprites));
+    }
 
     // The player stands at the spawn point; --pos places the camera (the eye) instead.
     player_ = std::make_unique<Player>();
@@ -156,6 +188,7 @@ bool WorldSession::init() {
     level_->setItems(client_.items.get());
     level_->setLoot(client_.loot.get());
     level_->setRecipes(client_.recipes.get());
+    level_->difficulty = params_.difficulty;
     log::info("World: type {}, seed {}, render distance {}", generator->type(), params_.seed,
               client_.options.renderDistance);
     // Saved right away, so the world list shows it even if the game stops early.
@@ -410,6 +443,8 @@ void WorldSession::tick() {
         }
         if (player_->mode() != GameMode::Spectator)
             player_->survivalTick(*level_, params_.difficulty, level_->naturalRegeneration);
+        if (const auto landed = std::exchange(player_->landedOnFarmland, std::nullopt))
+            sim::trampleFarmland(*level_, landed->first, landed->second);
         if (player_->dead() && !deathHandled_) die();
         checkOpenMenu();
         particles_.tick(*level_);
@@ -430,7 +465,27 @@ void WorldSession::tick() {
     // Stacks thrown out of menus or with Q fly from the player's eyes.
     for (const ItemStack& thrown : std::exchange(player_->droppedItems, {}))
         ItemEntity::dropFromPlayer(*level_, *player_, thrown);
+    level_->difficulty = params_.difficulty;
     level_->tick();
+    // What happened in the world, shown (vanilla levelEvent).
+    for (const LevelEvent& e : level_->takeEvents()) {
+        switch (e.type) {
+        case LevelEventType::BlockBroken: spawnBlockParticles(e.pos, e.state, std::nullopt); break;
+        case LevelEventType::LavaFizz: // vanilla levelEvent 1501
+            for (int i = 0; i < 8; ++i) {
+                const double x = particles_.random().nextDouble(), z = particles_.random().nextDouble();
+                particles_.add(ParticleType::LargeSmoke, glm::dvec3(e.pos.x + x, e.pos.y + 1.2, e.pos.z + z));
+            }
+            break;
+        case LevelEventType::BoneMeal: spawnBoneMealParticles(e.pos, e.data); break;
+        case LevelEventType::Explosion:
+            // Vanilla ServerExplosion: power 2 and up throws an emitter of blasts, else one blast.
+            particles_.add(e.data >= 2 ? ParticleType::ExplosionEmitter : ParticleType::Explosion, e.point,
+                           glm::dvec3(1.0, 0.0, 0.0));
+            break;
+        }
+    }
+    tickClientParticles();
     // What the player picked up flies to it for 3 ticks (vanilla ItemPickupParticle).
     for (auto& pickup : pickups_) ++pickup.life;
     std::erase_if(pickups_, [](const PickupAnimation& a) { return a.life >= 3; });
@@ -488,11 +543,37 @@ void WorldSession::render(glm::ivec2 fb, float partialTick, const std::function<
     EntityRenderer& entities = worldRenderer_->entities();
     const glm::vec3 right = camera_.right();
     entities.begin(camera_.position, right, glm::cross(right, camera_.forward()));
-    const int skyDarken = skyDarkenLevel(level_->dayTime());
+    const int skyDarken = level_->skyDarken();
     if (perspective_ != Perspective::FirstPerson) entities.submitPlayer(*player_, *level_, partialTick, skyDarken);
     submitEntities(partialTick, skyDarken);
+    // Beyond the level: lightning's flash and the fluid around the camera (vanilla
+    // Camera.getFluidInCamera, LocalPlayer.getWaterVision).
+    WorldRenderer::View& view = worldRenderer_->view;
+    view.skyFlash = skyFlashTime_ > 0 ? float(skyFlashTime_) - partialTick : 0.0f;
+    view.fluid = EnvironmentInputs::CameraFluid::None;
+    const BlockPos camBlock = BlockPos::containing(camera_.position);
+    if (const FluidState f = level_->fluid(camBlock); !f.empty()) {
+        const double height = level_->fluid(camBlock.above()).kind == f.kind ? 1.0
+                                                                               : double(f.source() || f.falling ? 8 : 8 - f.level) / 9.0;
+        if (camera_.position.y < camBlock.y + height)
+            view.fluid = f.kind == FluidKind::Water ? EnvironmentInputs::CameraFluid::Water : EnvironmentInputs::CameraFluid::Lava;
+    }
+    const float t = float(waterVisionTime_);
+    view.waterVision = !player_->eyeInWater(*level_) ? 0.0f
+                       : t >= 600.0f               ? 1.0f
+                                                   : std::clamp(t / 100.0f, 0.0f, 1.0f) * 0.6f +
+                                       (t < 100.0f ? 0.0f : std::clamp((t - 100.0f) / 500.0f, 0.0f, 1.0f)) * 0.39999998f;
+    view.spectator = player_->mode() == GameMode::Spectator;
+    view.waterFogColor = 0x050533;
+    view.closerWaterFog = false;
+    if (client_.biomes) {
+        const Biome& biome = client_.biomes->get(level_->biomeAt(camBlock));
+        view.waterFogColor = biome.waterFogColor;
+        view.closerWaterFog = biome.id == "minecraft:swamp" || biome.id == "minecraft:mangrove_swamp";
+    }
     worldRenderer_->render(camera_, fb, client_.options.renderDistance, *level_, partialTick);
     worldRenderer_->renderParticles(particles_, *level_, camera_, fb, partialTick);
+    worldRenderer_->renderWeather(*level_, camera_, fb, tickCount_, partialTick);
     if (target_ && player_->mode() != GameMode::Spectator) {
         const int stage = breaking_.active && breaking_.pos == target_->pos ? int(breaking_.progress * 10.0f) - 1 : -1;
         overlay_->render(camera_, fb, target_->pos, client_.registry->outlineShape(level_->getBlock(target_->pos)), stage);
@@ -543,8 +624,8 @@ bool WorldSession::useBed(const BlockPos& pos, StateId state) {
         player_->respawnPos = head;
         message("block.minecraft.set_spawn");
     }
-    // Night (the sky darkened by 4 or more), or a thunderstorm (M11).
-    if (skyDarkenLevel(level_->dayTime()) < 4) {
+    // Night or a thunderstorm: the sky darkened by 4 or more (vanilla isDarkOutside).
+    if (level_->skyDarken() < 4) {
         message("block.minecraft.bed.no_sleep");
         return true;
     }
@@ -602,9 +683,8 @@ glm::dvec3 WorldSession::standUpPosition(const BlockPos& head) const {
 
 void WorldSession::tickSleep() {
     if (!player_->sleeping()) return;
-    // The bed must still be there, and the night still dark.
-    if (client_.registry->blockOf(level_->getBlock(*player_->sleepingPos)).className != "bed" ||
-        skyDarkenLevel(level_->dayTime()) < 4) {
+    // The bed must still be there, and the night (or the storm) still dark.
+    if (client_.registry->blockOf(level_->getBlock(*player_->sleepingPos)).className != "bed" || level_->skyDarken() < 4) {
         wakeUp();
         return;
     }
@@ -616,6 +696,8 @@ void WorldSession::tickSleep() {
         level_->setDayTime(t - t % Level::kDayLength);
     }
     wakeUp();
+    // Vanilla resetWeatherCycle: the rain is slept through too.
+    if (level_->doWeatherCycle && level_->isRaining()) level_->setWeather(0, 0, false, false);
 }
 
 bool WorldSession::eatCake(const BlockPos& pos, StateId state) {
@@ -630,11 +712,89 @@ bool WorldSession::eatCake(const BlockPos& pos, StateId state) {
     return true;
 }
 
+void WorldSession::spawnBoneMealParticles(const BlockPos& pos, int count) {
+    const BlockRegistry& reg = *client_.registry;
+    Xoroshiro& r = particles_.random();
+    // Vanilla ParticleUtils.spawnParticles: around a block, optionally only over ground.
+    auto spawn = [&](const BlockPos& at, int n, double xzSpread, double ySpread, bool inAir) {
+        for (int i = 0; i < n; ++i) {
+            const double vx = r.nextGaussian() * 0.02, vy = r.nextGaussian() * 0.02, vz = r.nextGaussian() * 0.02;
+            const double g = 0.5 - xzSpread;
+            const double x = at.x + g + r.nextDouble() * xzSpread * 2.0;
+            const double y = at.y + r.nextDouble() * ySpread;
+            const double z = at.z + g + r.nextDouble() * xzSpread * 2.0;
+            if (inAir || !(reg.info(level_->getBlock(BlockPos::containing({x, y, z}).below())).flags & kAir))
+                particles_.add(ParticleType::HappyVillager, {x, y, z}, {vx, vy, vz});
+        }
+    };
+    const StateId s = level_->getBlock(pos);
+    const std::string_view id = shortId(reg.blockOf(s).id);
+    if (id == "water") {
+        spawn(pos, count * 3, 3.0, 1.0, false);
+    } else if (id == "grass_block" || id == "moss_block") { // they spread their plants around
+        spawn(pos.above(), count * 3, 3.0, 1.0, false);
+    } else {
+        double height = 1.0;
+        if (!(reg.info(s).flags & kAir)) {
+            height = 0.0;
+            for (const AABB& b : reg.outlineShape(s)) height = std::max(height, b.max.y);
+        }
+        spawn(pos, count, 0.5, height, true);
+    }
+}
+
+void WorldSession::tickClientParticles() {
+    const BlockRegistry& reg = *client_.registry;
+    const BlockPos center = BlockPos::containing(camera_.position);
+    animateTick(*level_, center, particles_, [&](const BlockPos& p, StateId s) {
+        const BiomeColors colors = client_.biomes ? client_.biomes->colors(level_->biomeAt(p), p.x, p.z) : BiomeColors{};
+        return resolveTint(reg.blockOf(s).tint, 0, colors);
+    });
+    tickRainParticles(*level_, center, tickCount_, particles_);
+    // Lit TNT smokes from its top (vanilla PrimedTnt.tick on the client).
+    for (const auto& e : level_->entities())
+        if (!e->removed && dynamic_cast<const PrimedTnt*>(e.get()))
+            particles_.add(ParticleType::Smoke, e->pos + glm::dvec3(0.0, 0.5, 0.0));
+    // Vanilla Entity.doWaterSplashEffect: bubbles and a splash where the player falls in.
+    if (player_->inWater && !wasInWater_ && !player_->noPhysics) {
+        Xoroshiro& r = particles_.random();
+        const double w = double(player_->width), y = std::floor(player_->pos.y) + 1.0;
+        const glm::dvec3 v = player_->velocity;
+        const int n = int(1.0f + player_->width * 20.0f);
+        for (int i = 0; i < n; ++i) {
+            const double dx = (r.nextDouble() * 2.0 - 1.0) * w, dz = (r.nextDouble() * 2.0 - 1.0) * w;
+            particles_.add(ParticleType::Bubble, {player_->pos.x + dx, y, player_->pos.z + dz},
+                           {v.x, v.y - r.nextDouble() * 0.2, v.z});
+        }
+        for (int i = 0; i < n; ++i) {
+            const double dx = (r.nextDouble() * 2.0 - 1.0) * w, dz = (r.nextDouble() * 2.0 - 1.0) * w;
+            particles_.add(ParticleType::Splash, {player_->pos.x + dx, y, player_->pos.z + dz}, v);
+        }
+    }
+    wasInWater_ = player_->inWater;
+    // A bolt flashes the sky while it strikes; the flash fades the tick after.
+    if (skyFlashTime_ > 0) --skyFlashTime_;
+    for (const auto& e : level_->entities())
+        if (const auto* bolt = dynamic_cast<const LightningBolt*>(e.get()); bolt && !bolt->removed && bolt->life >= 0)
+            skyFlashTime_ = 2;
+    // Vanilla LocalPlayer: the eyes adjust under water over 30 seconds (spectators faster).
+    if (player_->eyeInWater(*level_))
+        waterVisionTime_ = std::min(waterVisionTime_ + (player_->mode() == GameMode::Spectator ? 10 : 1), 600);
+    else
+        waterVisionTime_ = std::max(waterVisionTime_ - 10, 0);
+}
+
 bool WorldSession::useHeldItemOn(const BlockPos& pos, Direction face) {
     ItemStack& held = player_->inventory.selectedStack();
+    if (!held.empty() && shortId(held.item->id) == "bone_meal") {
+        if (!sim::applyBoneMeal(*level_, pos, face)) return false;
+        if (player_->mode() != GameMode::Creative) held.shrink(1);
+        return true;
+    }
     const auto result = useItemOn(*level_, *client_.items, held, pos, face, horizontalFacing(player_->yaw));
     if (!result) return false;
     if (!level_->setBlockAndUpdate(result->pos, result->state)) return false;
+    if (result->primeTnt) PrimedTnt::prime(*level_, result->pos);
     for (const ItemStack& drop : result->drops) ItemEntity::popResource(*level_, result->pos.offset(face), drop);
     if (player_->mode() != GameMode::Creative) {
         const Item* item = held.item;
@@ -649,7 +809,7 @@ void WorldSession::startUsingItem() {
     for (const bool offhand : {false, true}) {
         ItemStack& stack = offhand ? player_->inventory.offhand : player_->inventory.selectedStack();
         if (stack.empty()) continue;
-        if (equipFromHand(stack)) {
+        if (equipFromHand(stack) || useBucket(stack)) {
             player_->swing(offhand);
             return;
         }
@@ -659,6 +819,77 @@ void WorldSession::startUsingItem() {
         player_->useOffhand = offhand;
         return;
     }
+}
+
+bool WorldSession::useBucket(ItemStack& stack) {
+    // Vanilla BucketItem.use: an empty bucket aims at fluid sources (and waterlogged blocks),
+    // a full one at blocks.
+    const std::string_view id = shortId(stack.item->id);
+    const FluidKind content = id == "water_bucket" ? FluidKind::Water : id == "lava_bucket" ? FluidKind::Lava : FluidKind::None;
+    if (id != "bucket" && content == FluidKind::None) return false;
+    if (player_->mode() == GameMode::Adventure || player_->mode() == GameMode::Spectator) return false;
+    const BlockRegistry& reg = *client_.registry;
+    const double reach = player_->mode() == GameMode::Creative ? 5.0 : 4.5;
+    const auto hit = raycastBlocks(*level_, player_->eyePos(), player_->viewVector(), reach,
+                                   content == FluidKind::None ? RayFluid::SourceOnly : RayFluid::None);
+    if (!hit) return false;
+    const StateId s = level_->getBlock(hit->pos);
+    const bool creative = player_->mode() == GameMode::Creative;
+    if (content == FluidKind::None) {
+        // BucketPickup: a source block, or the water a block holds.
+        const sim::Fluid f = sim::fluidOf(reg, s);
+        const Item* filled = nullptr;
+        if (reg.blockOf(s).className == "liquid" && f.source) {
+            level_->setBlockAndUpdate(hit->pos, BlockRegistry::kAirState);
+            filled = client_.items->find(f.kind == FluidKind::Lava ? "lava_bucket" : "water_bucket");
+        } else if (reg.boolValue(s, "waterlogged")) {
+            level_->setBlockAndUpdate(hit->pos, *reg.with(s, "waterlogged", "false"));
+            filled = client_.items->find("water_bucket");
+        }
+        if (!filled) return false;
+        // ItemUtils.createFilledResult: creative keeps the empty bucket and gets one filled
+        // bucket at most; otherwise one bucket fills.
+        ItemStack full{filled, 1};
+        if (creative) {
+            bool have = false;
+            for (int i = 0; i <= Inventory::kOffhandSlot; ++i) have |= player_->inventory.slot(i).item == filled;
+            if (!have) player_->inventory.add(full);
+        } else if (stack.count == 1) {
+            stack = full;
+        } else {
+            stack.shrink(1);
+            if (!player_->inventory.add(full)) player_->drop(full);
+        }
+        return true;
+    }
+    // Into a block that holds water, else beside the face that was hit.
+    const bool intoBlock = content == FluidKind::Water && !reg.value(s, "waterlogged").empty();
+    if (!emptyBucket(intoBlock ? hit->pos : hit->pos.offset(hit->face), content, &*hit)) return false;
+    if (!creative) stack = ItemStack{client_.items->find("bucket"), 1};
+    return true;
+}
+
+bool WorldSession::emptyBucket(const BlockPos& pos, FluidKind content, const BlockHit* hit) {
+    // Vanilla BucketItem.emptyContents: into air, a block the fluid replaces (anything not
+    // solid, washed away with its drops), or a block that holds water.
+    const BlockRegistry& reg = *client_.registry;
+    const StateId s = level_->getBlock(pos);
+    const StateInfo& info = reg.info(s);
+    const bool waterloggable = !reg.value(s, "waterlogged").empty();
+    const bool replaceable = (info.flags & kReplaceable) || !(info.flags & kBlocksMotion);
+    const bool canPlace = (info.flags & kAir) || replaceable ||
+                          (waterloggable && content == FluidKind::Water && !reg.boolValue(s, "waterlogged"));
+    if (!canPlace) return hit && emptyBucket(hit->pos.offset(hit->face), content, nullptr);
+    if (waterloggable && content == FluidKind::Water) {
+        if (reg.boolValue(s, "waterlogged")) return false;
+        level_->setBlockAndUpdate(pos, *reg.with(s, "waterlogged", "true"));
+        level_->scheduleFluidTick(pos, sim::fluidTickType(FluidKind::Water, true), sim::fluidTickDelay(FluidKind::Water));
+        return true;
+    }
+    if (replaceable && !(info.flags & kAir) && info.fluid.empty()) level_->destroyBlock(pos, true);
+    const StateId source = sim::liquidBlock(reg, content, 8, false);
+    if (level_->getBlock(pos) == source) return true;
+    return level_->setBlockAndUpdate(pos, source) || sim::fluidOf(reg, s).source;
 }
 
 bool WorldSession::equipFromHand(ItemStack& stack) {
@@ -984,6 +1215,12 @@ void WorldSession::submitEntities(float partialTick, int skyDarken) {
             out.submitGroundItem(*item, *level_, partialTick, skyDarken);
         else if (const auto* orb = dynamic_cast<const ExperienceOrb*>(e.get()); orb && near(*orb, 128.0))
             out.submitExperienceOrb(*orb, *level_, partialTick, skyDarken);
+        else if (const auto* block = dynamic_cast<const FallingBlockEntity*>(e.get()); block && near(*block, 160.0))
+            out.submitFallingBlock(*block, *level_, partialTick, skyDarken);
+        else if (const auto* tnt = dynamic_cast<const PrimedTnt*>(e.get()); tnt && near(*tnt, 160.0))
+            out.submitPrimedTnt(*tnt, *level_, partialTick, skyDarken);
+        else if (const auto* bolt = dynamic_cast<const LightningBolt*>(e.get())) // seen from anywhere
+            out.submitLightning(*bolt, partialTick);
     }
     // Pickups fly to the player's middle, easing in over 3 ticks (vanilla ItemPickupParticle).
     const glm::dvec3 target = glm::mix(player_->oldPos, player_->pos, double(partialTick)) + glm::dvec3(0.0, 0.5, 0.0);
@@ -1004,7 +1241,7 @@ void WorldSession::submitEntities(float partialTick, int skyDarken) {
 bool WorldSession::controlDown(int key, std::string_view action) const {
     if (!client_.screenOpen && client_.window.cursorCaptured() && client_.window.input().keyDown(key)) return true;
     const auto& hold = client_.cli.hold;
-    return params_.commandLine && std::find(hold.begin(), hold.end(), action) != hold.end();
+    return params_.commandLine && client_.harnessRunning && std::find(hold.begin(), hold.end(), action) != hold.end();
 }
 
 PlayerInput WorldSession::readPlayerInput() {

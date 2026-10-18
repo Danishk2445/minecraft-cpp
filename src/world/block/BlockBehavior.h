@@ -19,6 +19,14 @@ StateId withStairsShape(const BlockRegistry& reg, const BlockGetter& level, Stat
 StateId updateShape(const BlockRegistry& reg, const BlockGetter& level, StateId self, const BlockPos& pos, Direction dir,
                     StateId neighbor);
 
+// Fire (vanilla FireBlock/BaseFireBlock): whether a block burns (ignite odds, not
+// waterlogged); the fire for an empty cell (soul fire on soul sand or soil, else fire
+// clinging to the burnable sides around it); and whether fire can stay at `pos` (a
+// sturdy floor or something burnable beside it).
+bool canBurn(const BlockRegistry& reg, StateId s);
+StateId fireStateAt(const BlockRegistry& reg, const BlockGetter& level, const BlockPos& pos);
+bool fireCanSurvive(const BlockRegistry& reg, const BlockGetter& level, StateId fire, const BlockPos& pos);
+
 // The state after a scheduled tick (buttons spring back); `self` if nothing changes.
 StateId scheduledTickResult(const BlockRegistry& reg, const BlockGetter& level, StateId self, const BlockPos& pos);
 

@@ -35,7 +35,10 @@ constexpr uint64_t hashString(std::string_view s) {
 class JavaRandom {
 public:
     explicit JavaRandom(int64_t seed = 0) { setSeed(seed); }
-    void setSeed(int64_t seed) { state_ = (uint64_t(seed) ^ kMul) & kMask; }
+    void setSeed(int64_t seed) {
+        state_ = (uint64_t(seed) ^ kMul) & kMask;
+        haveGaussian_ = false;
+    }
 
     int32_t next(int bits) {
         state_ = (state_ * kMul + 0xB) & kMask;
@@ -55,11 +58,14 @@ public:
     bool nextBool() { return next(1) != 0; }
     float nextFloat() { return float(next(24)) / float(1 << 24); }
     double nextDouble() { return double((int64_t(next(26)) << 27) + next(27)) * 0x1.0p-53; }
+    double nextGaussian(); // Java's polar method, in pairs
 
 private:
     static constexpr uint64_t kMul = 0x5DEECE66Dull;
     static constexpr uint64_t kMask = (1ull << 48) - 1;
     uint64_t state_ = 0;
+    bool haveGaussian_ = false;
+    double nextGaussianValue_ = 0;
 };
 
 // Xoroshiro128++ seeded like vanilla's XoroshiroRandomSource. The general-purpose

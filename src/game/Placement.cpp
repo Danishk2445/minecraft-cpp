@@ -160,6 +160,18 @@ std::vector<std::pair<BlockPos, StateId>> placementStates(const BlockRegistry& r
     if (hasProp(reg, *block, "waterlogged")) s = set(reg, s, "waterlogged", level.isWaterSource(pos) ? "true" : "false");
     s = withConnections(reg, level, s, pos);
     s = withStairsShape(reg, level, s, pos);
+    if (cls == "leaves") {
+        // LeavesBlock.getStateForPlacement: placed leaves never decay; their distance to a log.
+        s = set(reg, s, "persistent", "true");
+        const TagId logs = reg.tag("logs").value_or(TagId(0));
+        int distance = 7;
+        for (Direction d : kDirections) {
+            const StateId n = level.getBlock(pos.offset(d));
+            const int nd = reg.hasTag(n, logs) ? 0 : reg.blockOf(n).className == "leaves" ? reg.intValue(n, "distance", 7) : 7;
+            distance = std::min(distance, nd + 1);
+        }
+        s = set(reg, s, "distance", std::to_string(distance));
+    }
     if (cls == "fence_gate") {
         const Direction side = rotateYClockwise(horizontal);
         const TagId walls = reg.tag("walls").value_or(TagId(0));

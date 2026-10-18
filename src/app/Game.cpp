@@ -586,6 +586,7 @@ int Game::run() {
             }
             if (!harnessStarted_ && client_.cli.worldRequested && world_->viewReady()) {
                 harnessStarted_ = true;
+                client_.harnessRunning = true;
                 harnessStartTick_ = tickCount_;
                 for (const auto& cmd : client_.cli.exec)
                     world_->runCommand(cmd, [](const std::string& msg) { log::info("[command] {}", msg); });

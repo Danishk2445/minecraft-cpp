@@ -76,6 +76,9 @@ struct MesherStats {
     size_t blocks = 0, quads = 0, culled = 0;
 };
 
+// Vanilla's directional block shading (getShade): up 1, down 0.5, north/south 0.8, east/west 0.6.
+float blockFaceShade(Direction d);
+
 // Reorders a translucent layer back to front as seen from `eye` (section-local).
 void sortTranslucentQuads(std::vector<TerrainVertex>& vertices, std::vector<glm::vec3>& centers, const glm::vec3& eye);
 

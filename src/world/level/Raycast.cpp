@@ -54,7 +54,7 @@ bool emptyVisualShape(const Block& b) {
 } // namespace
 
 std::optional<BlockHit> raycastBlocks(const BlockGetter& level, const glm::dvec3& from, const glm::dvec3& dir,
-                                      double length, bool fluids, RayShape shapeKind) {
+                                      double length, RayFluid fluids, RayShape shapeKind) {
     const BlockRegistry& reg = level.registry();
     // Amanatides-Woo traversal of the blocks the ray passes through.
     glm::ivec3 cell(int(std::floor(from.x)), int(std::floor(from.y)), int(std::floor(from.z)));
@@ -78,11 +78,12 @@ std::optional<BlockHit> raycastBlocks(const BlockGetter& level, const glm::dvec3
         if (!(info.flags & kAir)) {
             if (shapeKind == RayShape::Outline) {
                 for (const AABB& b : reg.outlineShape(s)) consider(b.moved(glm::dvec3(p.vec())));
-            } else if (const Shape& shape = reg.collisionShape(s); !shape.empty() && !emptyVisualShape(reg.blockOf(s))) {
+            } else if (const Shape& shape = reg.collisionShape(s);
+                       !shape.empty() && (shapeKind == RayShape::Collider || !emptyVisualShape(reg.blockOf(s)))) {
                 for (const AABB& b : shape) consider(b.moved(glm::dvec3(p.vec())));
             }
         }
-        if (fluids && !info.fluid.empty()) {
+        if (fluids != RayFluid::None && !info.fluid.empty() && (fluids == RayFluid::Any || info.fluid.source())) {
             const double h = level.fluid(p.above()).kind == info.fluid.kind
                                  ? 1.0
                                  : double(info.fluid.falling ? 8 : 8 - info.fluid.level) / 9.0;
@@ -105,7 +106,7 @@ double cameraDistance(const BlockGetter& level, const glm::dvec3& eye, const glm
         const glm::dvec3 corner((i & 1) * 2 - 1, (i >> 1 & 1) * 2 - 1, (i >> 2 & 1) * 2 - 1);
         const glm::dvec3 from = eye + corner * 0.1;
         // Each ray reaches as far as the zoom found so far; hits closer to the eye shorten it.
-        if (auto hit = raycastBlocks(level, from, -forward, zoom, false, RayShape::Visual)) {
+        if (auto hit = raycastBlocks(level, from, -forward, zoom, RayFluid::None, RayShape::Visual)) {
             const glm::dvec3 d = hit->point - eye;
             if (const double distSq = glm::dot(d, d); distSq < zoom * zoom) zoom = std::sqrt(distSq);
         }

@@ -129,6 +129,9 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - lava source + water → obsidian;
   - flowing lava + water → cobblestone;
   - lava flowing down onto water → stone.
+- **Ticks (`world/sim/Fluids`):** four fluid tick types (water, flowing water, lava, flowing lava), one pending tick per position and type; a tick runs only if the cell still holds that type. Fluids in freshly generated chunks that can flow out get a tick when the chunk starts ticking (vanilla post-processing).
+- **Currents:** entities in a fluid are pushed along its flow vector, scaled by `0.014` (water) or `0.0023333` (lava); the push is normalized except for players, and shrunk when shallower than 0.4.
+- **Buckets:** an empty bucket picks up a source (ray with SOURCE_ONLY) or a waterlogged block's water; a full one fills a waterloggable block or replaces what water washes away.
 
 ## Player and physics
 - **Ground movement:**
@@ -240,8 +243,10 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - impact = `(1 - d/(2P))·exposure`;
   - damage = `((i²+i)/2)·7·2P + 1`;
   - knockback scales with impact.
-- **Drops:** blocks drop with chance 1/P.
-- **Power:** TNT 4 with an 80-tick fuse; creeper 3, with a 30-tick fuse.
+- **Drops:** TNT drops everything (no decay since 1.21); other explosions would drop with chance 1/P. Loot merges into stacks of up to 16, popped at the first block. TNT caught in a blast is lit on a fuse of `rand(20) + 10` ticks.
+- **Exposure:** the share of points on the entity's box, a grid `1/(2·size+1)` apart, with a clear line (collision shapes) to the center.
+- **Power:** TNT 4 with an 80-tick fuse, exploding from 1/16 of its height; creeper 3, with a 30-tick fuse.
+- **Primed TNT:** hops `(−sin a·0.02, 0.2, −cos a·0.02)`; gravity 0.04, drag 0.98, ground bounce ×(0.7, −0.5, 0.7). It swells by `1 + g⁴·0.3` (`g = 1 − fuse/10`) over its last 10 ticks and flashes white when `⌊fuse⌋/5` is even.
 
 ## Survival (`entity/Player`, `game/FoodData`, `game/Damage`, `game/Tools`)
 - **Hunger** (FoodData):
@@ -314,13 +319,35 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - arrow speed 3p, gravity 0.05, drag 0.99;
   - damage `ceil(speed·2)`, plus a crit bonus.
 
-## Random ticks *(mem)*
-- **Rate:** 3 random blocks per section per tick.
-- **Grass:** spreads to dirt within (±1, −3..+1, ±1) when the light above is ≥ 9. It decays when the block above blocks light.
-- **Leaves:** `distance` 1–7. Non-persistent leaves at distance 7 decay.
-- **Saplings:** grow with light ≥ 9 and a 1/7 chance, going stage 0 → 1, then the tree.
-- **Crops:** chance depends on farmland moisture. Wheat, carrots and potatoes have ages 0–7; beetroot 0–3.
-- **Upward growth:** cactus and sugar cane reach at most 3 tall; age 0–15.
+## Simulation (`world/sim`)
+- **Updates:** `setBlockAndUpdate` = set, the new block's `onPlace`, `neighborChanged` for the six neighbors (W, E, D, U, N, S), then shape updates spreading out (budget 512). The level tick runs time, weather, scheduled block ticks then fluid ticks (65,536 each), chunk ticks (post-processing, lightning, precipitation, random ticks), entities, block entities.
+- **Random ticks:** per section, `randomTickSpeed` (3) positions from vanilla's LCG `r = r·3 + 1013904223`, using `r >> 2` for (x, z, y) = bits (0-3, 8-11, 16-19).
+- **Light checks:** "raw brightness" = max(sky − darken, block). Crops, stems, berries and bamboo use darken 0 (they grow at night under the sky); saplings and grass spreading use the current sky darkening.
+- **Crops:** need raw light ≥ 9 at the crop. Chance per random tick `1/(⌊25/f⌋ + 1)` with `f = 1 + Σ` over the 3×3 farmland below: 1 dry or 3 wet, a quarter for the eight around; f halves when the same crop stands on both axes, or diagonally. Beetroot and torchflower crops skip a third of their ticks. Bone meal adds `2..5` (beetroot `/3`, torchflower 1).
+- **Stems:** the crop rule; at age 7 a fruit on a random side (N, E, S, W) over farmland or dirt, and the stem attaches to it.
+- **Saplings:** raw light (with darkening) ≥ 9 above and 1/7: stage 0 → 1, then the tree. Bone meal: 45%. Trees come from vanilla's `TreeGrower` table (oak: 10% fancy; spruce: 2×2 mega spruce or 50% mega pine; jungle 2×2; dark oak 2×2 only; flower-side bee variants), placed through the same features as world generation (`LiveRegion`). The sapling makes way, and returns if the tree doesn't fit.
+- **Sugar cane, cactus:** grow while the block above is air and the plant is under 3 tall; age 15 → a new block (sugar cane) or, for cactus, a 10% (25% at 3 tall) flower at age 8.
+- **Kelp, cave vines:** 14% (10%) per random tick while age < 25, into a water source (air); the old head becomes body. Cave vines bear berries 11% of the time.
+- **Bamboo:** 1/3 per tick with air and light ≥ 9 above, up to 16 tall; leaves move up (small, then large with the one below small and the next none); `stage` becomes 1 past 11 tall (25%) or at 16.
+- **Vines:** 1/4 per tick, a random direction: spread sideways (around corners), up when supported, or hang down a random subset of their sides; at most 4 vines in the 9×3×9 around.
+- **Mushrooms:** 1/25 per tick, at most 4 more within 9×3×9, a 5-step random walk to a dark (raw light < 13) or mycelium spot.
+- **Grass, mycelium:** die (to dirt) when the block above blocks light; else, with light ≥ 9 above, 4 tries at `(±1, −3..+1, ±1)` turn dirt that light reaches (and no water above) into grass.
+- **Leaves:** a neighbor change schedules a check a tick later; distance = min over neighbors (logs 0, leaves their distance, else 7) + 1. Non-persistent leaves at 7 decay by random tick, dropping their loot.
+- **Farmland:** wet (7) with water within (±4, 0..1, ±4) or rain above; otherwise moisture drops by 1 per random tick, then dirt unless a crop keeps it. A fall onto it tramples it with chance `fall − 0.5`.
+- **Ice, snow:** ice melts at block light > 10, snow layers at > 11. Precipitation: per chunk tick, `randomTickSpeed` tries at 1/48; still water at the edge of open water freezes where cold enough with block light < 10, and rain in cold air lays snow up to `snowAccumulationHeight` layers. Cauldrons catch rain 1/20, snow 1/10.
+- **Copper:** 1/17.6 per random tick (0.05688889): stays if any copper within Manhattan 4 is less weathered; else ages with chance `((older+1)/(older+same+1))²`, ×0.75 when unaffected.
+- **Sponge:** breadth first from the sponge to depth 6, at most 65 cells (with itself): water sources and flowing water go, waterlogged blocks drain, kelp and seagrass drop; becomes wet if anything went.
+- **Falling blocks:** `onPlace` and shape changes schedule a check 2 ticks on; the block falls when the one below is air, fire, fluid or replaceable. The entity (0.98 cube) falls with gravity 0.04 and drag 0.98, and on landing places itself where the block is replaceable, the one below isn't free and it can stand; else it drops its item (`doEntityDrops`). Concrete powder sets in or beside water. Anvils deal `min(⌊(⌈fall⌉−1)·2⌋, 40)` and chip with chance `0.05 + 0.05·(⌈fall⌉−1)`.
+- **Fire:** ticks every 30-39; ages `+rand(3)/2`. Rain on it (or beside) puts it out with chance `0.2 + age·0.03`. Without fuel it dies on a bare floor past age 3. Neighbors burn by `rand(300 or 250 below/above) < burnOdds`; a burnt block becomes fire with `rand(age+10) < 5`, else air, and TNT lights. Spread to air in `(±1, −1..4, ±1)` with odds `(ignite + 40 + difficulty·7)/(age + 30)` against `rand(100 + 100·(dy−1 above 1))`.
+- **Weather:** clear time counts down first; otherwise thunder toggles after 3,600-15,600 ticks (on) or 12,000-180,000 (off), rain after 12,000-24,000 (on) or 12,000-180,000 (off). Levels move 0.01 a tick; raining above 0.2, thundering above 0.9. Sky darkening `(1 − c·(1 − 5r/16)·(1 − 5t/16))·11`.
+- **Lightning:** 1 in 100,000 chunk ticks while thundering, at the surface of a random column (or the player in the open within 3 blocks), only where it rains. Life 2, then 1-3 more strikes after up to 10 ticks each; fires on Normal and Hard (the spot plus 4 around); 5 damage and burning within 3 (9 up). The bolt: 8 segments of 16 blocks wandering ±5 (forks ±15), 4 nested layers, color (0.45, 0.45, 0.5, 0.3) added.
+
+## Weather rendering, particles and fog (`render/WeatherRenderer`, `entity/Particles`, `entity/DisplayTicks`)
+- **Rain and snow:** every column within 10 blocks with precipitation gets a camera-facing quad from `max(camY−10, top)` to `max(camY+10, top)`; v = y/4 + offset. Rain scrolls by `−(t + j)/32·(3 + rand)`, snow drifts with gaussian offsets. Alpha `lerp(min(d²/100, 1), 1 (rain) or 0.8 (snow), 0.5)·rain`. Snow's light is `(l·3 + 15)/4`.
+- **Rain splashes:** `100·rain²` tries per tick within ±10; rain particles on tops, smoke on lava, magma and lit campfires.
+- **Display ticks:** 667 random blocks within 16 and 667 within 32 per tick run their `animateTick`.
+- **Sky flash:** a bolt sets 2 ticks; the sky mixes toward (0.8, 0.8, 1) by `min(t, 1)·0.45` and the lightmap's sky factor is 1.
+- **Fog in fluids:** water: start −8, end `96·max(0.25, vision)` (×0.85 in swamps), color the biome's water fog brightened by vision; vision ramps up over 600 ticks under water (`0.6·min(t/100, 1) + 0.4·clamp((t−100)/500)`). Lava: 0.25 to 1 (spectators −8 to half the render distance), color (0.6, 0.1, 0); no sky.
 
 ## Worldgen (vanilla-like, not seed-compatible) *(mem)*
 - **Climate noises** (NormalNoise, `firstOctave` and `amplitudes`):

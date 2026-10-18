@@ -9,6 +9,17 @@
 #include "world/biome/Biome.h"
 
 namespace mc {
+
+float blockFaceShade(Direction d) {
+    switch (d) {
+    case Direction::Down: return 0.5f;
+    case Direction::Up: return 1.0f;
+    case Direction::North:
+    case Direction::South: return 0.8f;
+    default: return 0.6f;
+    }
+}
+
 namespace {
 
 // Block states and light of a section plus a two-cell border (smooth lighting
@@ -46,16 +57,6 @@ struct Cells {
             }
     }
 };
-
-float faceShade(Direction d) {
-    switch (d) {
-    case Direction::Down: return 0.5f;
-    case Direction::Up: return 1.0f;
-    case Direction::North:
-    case Direction::South: return 0.8f;
-    default: return 0.6f;
-    }
-}
 
 uint16_t packPos(float v) { return uint16_t(std::clamp(int(std::lround((v + 8.0f) * 2048.0f)), 0, 65535)); }
 uint16_t packUV(float v) { return uint16_t(std::clamp(int(std::lround(v * 65535.0f)), 0, 65535)); }
@@ -503,7 +504,7 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                             const uint32_t tint =
                                 q.tint < 0 ? 0xFFFFFFu : resolveTint(block.tint, q.tint, tints.at(x, y, z), power, age);
                             const glm::vec3 tintColor(float((tint >> 16) & 255), float((tint >> 8) & 255), float(tint & 255));
-                            const float shade = q.shade ? faceShade(q.face) : 1.0f;
+                            const float shade = q.shade ? blockFaceShade(q.face) : 1.0f;
 
                             float bright[4], skyL[4], blkL[4];
                             if (smooth) {

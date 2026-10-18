@@ -6,6 +6,8 @@
 #include <format>
 #include <limits>
 
+#include "entity/LightningBolt.h"
+#include "entity/PrimedTnt.h"
 #include "game/BlockEntities.h"
 #include "world/block/BlockRegistry.h"
 #include "world/level/Level.h"
@@ -286,7 +288,8 @@ Commands::Commands() {
         }
         const auto state = src.level->registry().parse(a[3].substr(0, brace), &err);
         if (!state) return false;
-        if (!src.level->setBlock(*pos, *state)) {
+        // Vanilla places with updates: the block's onPlace (fluids flow, sand falls) and its neighbors'.
+        if (!src.level->setBlockAndUpdate(*pos, *state)) {
             err = "that position is not loaded";
             return false;
         }
@@ -319,7 +322,7 @@ Commands::Commands() {
         for (int y = lo.y; y <= hi.y; ++y)
             for (int z = lo.z; z <= hi.z; ++z)
                 for (int x = lo.x; x <= hi.x; ++x)
-                    if (src.level->getBlock({x, y, z}) != *state && src.level->setBlock({x, y, z}, *state)) ++changed;
+                    if (src.level->getBlock({x, y, z}) != *state && src.level->setBlockAndUpdate({x, y, z}, *state)) ++changed;
         if (src.feedback) src.feedback(std::format("Successfully filled {} block(s)", changed));
         return true;
     });
@@ -351,6 +354,39 @@ Commands::Commands() {
             if (src.feedback) src.feedback(std::format("Set the time to {}", src.level->dayTime()));
             return true;
         });
+    // Vanilla WeatherCommand: a duration (ticks, or with t/s/d units), else the cycle's own.
+    add("weather", "/weather (clear|rain|thunder) [duration]", [](CommandSource& src, Args a, std::string& err) {
+        if (!src.level || a.empty() || a.size() > 2 || (a[0] != "clear" && a[0] != "rain" && a[0] != "thunder")) {
+            err = "usage: /weather clear|rain|thunder [duration]";
+            return false;
+        }
+        Level& level = *src.level;
+        long long ticks = -1;
+        if (a.size() == 2) {
+            std::string_view v = a[1];
+            long long unit = 1;
+            if (v.ends_with('d')) unit = 24000;
+            else if (v.ends_with('s')) unit = 20;
+            if (v.ends_with('d') || v.ends_with('s') || v.ends_with('t')) v.remove_suffix(1);
+            if (!parseLong(std::string(v), ticks) || ticks < 0) {
+                err = "bad duration";
+                return false;
+            }
+            ticks *= unit;
+        }
+        Xoroshiro& r = level.random();
+        if (a[0] == "clear") {
+            level.setWeather(ticks >= 0 ? int(ticks) : r.nextIntBetween(12000, 180000), 0, false, false);
+            if (src.feedback) src.feedback("Set the weather to clear");
+        } else if (a[0] == "rain") {
+            level.setWeather(0, ticks >= 0 ? int(ticks) : r.nextIntBetween(12000, 24000), true, false);
+            if (src.feedback) src.feedback("Set the weather to rain");
+        } else {
+            level.setWeather(0, ticks >= 0 ? int(ticks) : r.nextIntBetween(3600, 15600), true, true);
+            if (src.feedback) src.feedback("Set the weather to rain & thunder");
+        }
+        return true;
+    });
 }
 
 void Commands::addBasics() {
@@ -489,6 +525,14 @@ void Commands::addBasics() {
         }
         std::string type = a[0];
         if (type.starts_with("minecraft:")) type.erase(0, 10);
+        if (src.level && (type == "lightning_bolt" || type == "tnt")) { // the level's own entities
+            Entity& e = type == "tnt" ? static_cast<Entity&>(PrimedTnt::prime(*src.level, BlockPos::containing(at)))
+                                      : LightningBolt::strike(*src.level, BlockPos::containing(at), false);
+            e.pos = e.oldPos = at;
+            if (auto* tnt = dynamic_cast<PrimedTnt*>(&e)) tnt->fuse = data.value("fuse", PrimedTnt::kFuse);
+            if (src.feedback) src.feedback("Summoned new " + type);
+            return true;
+        }
         if (!src.summon || !src.summon(type, at, data, err)) {
             if (err.empty()) err = "can't summon " + a[0];
             return false;
@@ -565,17 +609,43 @@ void Commands::addBasics() {
     add("experience", "/experience (add|set|query) <targets> <amount> [points|levels]", experience);
     add("xp", "/xp (add|set|query) <targets> <amount> [points|levels]", experience);
 
-    // The rules that exist so far, with vanilla's names.
-    add("gamerule", "/gamerule <doDaylightCycle|keepInventory|naturalRegeneration> [true|false]",
+    // The rules that exist so far, with vanilla's names: switches, and randomTickSpeed.
+    add("gamerule",
+        "/gamerule <doDaylightCycle|keepInventory|naturalRegeneration|doFireTick|waterSourceConversion|"
+        "lavaSourceConversion|doTileDrops|doEntityDrops|doVinesSpread|doWeatherCycle|randomTickSpeed|"
+        "snowAccumulationHeight> [value]",
         [](CommandSource& src, Args a, std::string& err) {
             if (!src.level || a.empty() || a.size() > 2) {
                 err = "expected a rule and an optional value";
                 return false;
             }
-            bool* rule = a[0] == "doDaylightCycle"       ? &src.level->daylightCycle
-                         : a[0] == "keepInventory"       ? &src.level->keepInventory
-                         : a[0] == "naturalRegeneration" ? &src.level->naturalRegeneration
-                                                         : nullptr;
+            Level& level = *src.level;
+            if (a[0] == "randomTickSpeed" || a[0] == "snowAccumulationHeight") {
+                int& rule = a[0] == "randomTickSpeed" ? level.randomTickSpeed : level.snowAccumulationHeight;
+                if (a.size() == 1) {
+                    if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], rule));
+                    return true;
+                }
+                long long v = 0;
+                if (!parseLong(a[1], v) || v < 0) {
+                    err = "expected a whole number of at least 0";
+                    return false;
+                }
+                rule = int(std::min<long long>(v, a[0] == "randomTickSpeed" ? 4096 : 8));
+                if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], rule));
+                return true;
+            }
+            bool* rule = a[0] == "doDaylightCycle"         ? &level.daylightCycle
+                         : a[0] == "keepInventory"         ? &level.keepInventory
+                         : a[0] == "naturalRegeneration"   ? &level.naturalRegeneration
+                         : a[0] == "doFireTick"            ? &level.doFireTick
+                         : a[0] == "waterSourceConversion" ? &level.waterSourceConversion
+                         : a[0] == "lavaSourceConversion"  ? &level.lavaSourceConversion
+                         : a[0] == "doTileDrops"           ? &level.doTileDrops
+                         : a[0] == "doEntityDrops"         ? &level.doEntityDrops
+                         : a[0] == "doVinesSpread"         ? &level.doVinesSpread
+                         : a[0] == "doWeatherCycle"        ? &level.doWeatherCycle
+                                                           : nullptr;
             if (!rule) {
                 err = "unknown game rule " + a[0];
                 return false;

@@ -21,6 +21,7 @@ struct EnvironmentState {
     bool sunrise = false;
     glm::vec4 sunriseColor{0.0f};
     float rain = 0, thunder = 0;
+    bool skyFlash = false; // the lightmap's sky at full strength
     // Fog distances (blocks).
     float fogEnvStart = 1e9f, fogEnvEnd = 1e9f + 1;
     float fogRdStart = 0, fogRdEnd = 0;
@@ -36,6 +37,14 @@ struct EnvironmentInputs {
     uint32_t biomeSky = 0x78A7FF;
     uint32_t biomeFog = 0xC0D8FF;
     float rain = 0, thunder = 0;
+    // Lightning's flash (vanilla skyFlashTime less the partial tick; >0 while it lights).
+    float skyFlash = 0;
+    // The fluid the camera is in (vanilla FogType): water and lava close the fog in.
+    enum class CameraFluid : uint8_t { None, Water, Lava } cameraFluid = CameraFluid::None;
+    uint32_t waterFogColor = 0x050533; // the biome's
+    float waterVision = 0;             // 0..1: eyes adjusting under water (vanilla getWaterVision)
+    bool closerWaterFog = false;       // swamps (vanilla #has_closer_water_fog)
+    bool spectator = false;            // spectators see far in lava
 };
 
 float celestialAngle(int64_t dayTime, float partialTick);

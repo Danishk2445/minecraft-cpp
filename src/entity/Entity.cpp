@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "entity/Physics.h"
+#include "world/sim/Fluids.h"
 
 namespace mc {
 
@@ -104,25 +105,44 @@ void Entity::move(const BlockGetter& level, glm::dvec3 delta) {
 }
 
 void Entity::updateFluidState(const BlockGetter& level) {
+    // Vanilla updateFluidHeightAndDoFluidPushing, once for water and once for lava: the
+    // depth, and the cells' currents (each weakened while the depth is under 0.4).
     const AABB b = box().inflated(-0.001, -0.001, -0.001);
-    double water = 0.0, lava = 0.0;
-    for (int y = int(std::floor(b.min.y)); y <= int(std::floor(b.max.y)); ++y)
-        for (int z = int(std::floor(b.min.z)); z <= int(std::floor(b.max.z)); ++z)
-            for (int x = int(std::floor(b.min.x)); x <= int(std::floor(b.max.x)); ++x) {
-                const FluidState f = level.fluid({x, y, z});
-                if (f.empty()) continue;
-                // Fluid surface: full under the same fluid, else (8 - level) / 9 of the block.
-                const FluidState above = level.fluid({x, y + 1, z});
-                const double top = y + (above.kind == f.kind ? 1.0 : double(f.falling ? 8 : 8 - f.level) / 9.0);
-                if (top < b.min.y) continue;
-                const double depth = top - b.min.y;
-                if (f.kind == FluidKind::Water) water = std::max(water, depth);
-                else lava = std::max(lava, depth);
-            }
-    waterHeight = water;
-    lavaHeight = lava;
-    inWater = water > 0.0;
-    inLava = lava > 0.0;
+    const bool push = pushedByFluid();
+    for (const FluidKind kind : {FluidKind::Water, FluidKind::Lava}) {
+        double depth = 0.0;
+        glm::dvec3 current(0.0);
+        int cells = 0;
+        for (int x = int(std::floor(b.min.x)); x <= int(std::floor(b.max.x)); ++x)
+            for (int y = int(std::floor(b.min.y)); y <= int(std::floor(b.max.y)); ++y)
+                for (int z = int(std::floor(b.min.z)); z <= int(std::floor(b.max.z)); ++z) {
+                    const FluidState f = level.fluid({x, y, z});
+                    if (f.kind != kind) continue;
+                    // Fluid surface: full under the same fluid, else (8 - level) / 9 of the block.
+                    const FluidState above = level.fluid({x, y + 1, z});
+                    const double top = y + (above.kind == f.kind ? 1.0 : double(f.falling ? 8 : 8 - f.level) / 9.0);
+                    if (top < b.min.y) continue;
+                    depth = std::max(depth, top - b.min.y);
+                    if (!push) continue;
+                    glm::dvec3 flow = sim::fluidFlow(level, {x, y, z});
+                    if (depth < 0.4) flow *= depth;
+                    current += flow;
+                    ++cells;
+                }
+        if (glm::length(current) > 0.0) {
+            current /= double(cells);
+            // Only players feel the current's strength; everything else gets its direction.
+            if (!isPlayer()) current = glm::normalize(current);
+            current *= kind == FluidKind::Water ? 0.014 : 0.0023333333333333335;
+            if (std::abs(velocity.x) < 0.003 && std::abs(velocity.z) < 0.003 && glm::length(current) < 0.0045000000000000005)
+                current = glm::normalize(current) * 0.0045000000000000005;
+            velocity += current;
+        }
+        if (kind == FluidKind::Water) waterHeight = depth;
+        else lavaHeight = depth;
+    }
+    inWater = waterHeight > 0.0;
+    inLava = lavaHeight > 0.0;
     if (inWater) fallDistance = 0.0;
 }
 

@@ -60,6 +60,14 @@ void ItemEntity::tick(Level& level) {
     if (health <= 0 || age >= kLifetime || pos.y < double(kWorldMinY - 64)) removed = true;
 }
 
+bool ItemEntity::hurtServer(Level&, DamageType type, float amount) {
+    // Netherite and the like don't burn.
+    if (damageInfo(type).fire && fireResistant(*stack.item)) return false;
+    health = int(float(health) - amount);
+    if (health <= 0) removed = true;
+    return true;
+}
+
 bool ItemEntity::mergeable() const {
     return !removed && pickupDelay != kNeverPickUp && age != -32768 && age < kLifetime && stack.count < stack.maxStack();
 }

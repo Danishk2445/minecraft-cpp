@@ -17,6 +17,7 @@ struct ItemUseResult {
     std::vector<ItemStack> drops; // popped out from the face (pumpkin seeds, hanging roots)
     int wear = 0;          // durability used
     bool consume = false;  // one of the stack is used up (honeycomb)
+    bool primeTnt = false; // the block was TNT, lit (it becomes a primed TNT entity)
 };
 
 // The block with `from`'s property values where `to` shares them (stairs keep their facing

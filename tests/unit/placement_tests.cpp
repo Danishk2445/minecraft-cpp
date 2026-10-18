@@ -147,6 +147,8 @@ TEST_F(PlacementFixture, FencesPanesAndWallsConnect) {
     EXPECT_EQ(value(0, Y, 0, "south"), "true"); // solid blocks join too
     ASSERT_TRUE(place("oak_leaves", {0, Y, -1}));
     EXPECT_EQ(value(0, Y, 0, "north"), "false"); // but not leaves
+    EXPECT_EQ(value(0, Y, -1, "persistent"), "true"); // placed leaves never decay
+    EXPECT_EQ(value(0, Y, -1, "distance"), "7");
     ASSERT_TRUE(place("nether_brick_fence", {-1, Y, 0}));
     EXPECT_EQ(value(0, Y, 0, "west"), "false"); // wooden and nether brick fences stay apart
     // Breaking a neighbor disconnects.

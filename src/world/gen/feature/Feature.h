@@ -42,6 +42,12 @@ class Feature {
 public:
     virtual ~Feature() = default;
     virtual bool place(FeatureContext& ctx) const = 0;
+    // The features this one may place (selector options, a patch's single block), for
+    // vanilla's ConfiguredFeature.getFeatures walk.
+    virtual void nested(std::vector<const Feature*>& out) const { (void)out; }
+    // A "flower" patch: the single flower that bone meal on grass places (vanilla
+    // getFlowerFeatures); null for every other feature.
+    virtual const PlacedFeature* bonemealFlower() const { return nullptr; }
 };
 
 class PlacementModifier {

@@ -13,7 +13,8 @@ bool ClientAssets::load(const std::filesystem::path& packRoot) {
     AtlasStats stats;
     // Block textures plus the entity textures block entities draw with.
     blockEntityModels_ = std::make_unique<BlockEntityModels>();
-    static constexpr std::string_view kAtlases[] = {"blocks", "chests", "beds", "signs", "shulker_boxes", "decorated_pot"};
+    static constexpr std::string_view kAtlases[] = {"blocks", "chests", "beds", "signs", "shulker_boxes", "decorated_pot",
+                                                    "particles"};
     auto atlas = buildAtlas(*pack_, kAtlases, blockEntityModels_->textures(), kBlockMipLevels, &stats);
     for (const auto& e : stats.errors) log::warn("atlas: {}", e);
     if (!atlas) {

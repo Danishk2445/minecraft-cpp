@@ -44,6 +44,7 @@ struct CliOptions {
     bool gallery = false;          // show the M1 block gallery instead of a world
     std::optional<long long> time; // --time: initial time of day (ticks)
     bool freezeTime = false;       // stop the daylight cycle (deterministic screenshots)
+    std::string weather;           // clear, rain or thunder from the start (and no weather cycle)
     bool debugOverlay = false;     // show the F3 screen from the start
     std::optional<bool> smoothLighting; // overrides the option
 

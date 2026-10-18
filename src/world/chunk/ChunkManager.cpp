@@ -205,6 +205,7 @@ void ChunkManager::submitMerge(Entry& e) {
         [this](Entry& en, Merged m) {
             en.chunk = std::move(m.chunk);
             en.savedVersion = en.chunk->blockVersion;
+            en.generated = !m.fromDisk;
             en.stage = ChunkStage::Final;
             readyDirty_ = true;
             if (m.fromDisk && loadedExtra_ && !m.extra.is_null()) loadedExtra_(en.pos, m.extra);
@@ -310,6 +311,10 @@ void ChunkManager::refreshMeshReady() {
                            neighborsAtLeast(*e, ChunkStage::Lit);
         if (ready && !e->meshReady) {
             e->meshReady = true;
+            if (!e->startedTicking) {
+                e->startedTicking = true;
+                newlyTicking_.push_back({e->pos, e->generated});
+            }
             e->meshDirty = 0;
             for (int i = 0; i < kSectionCount; ++i)
                 if (e->chunk->sections[size_t(i)].blocks) e->meshDirty |= 1u << i;
@@ -334,6 +339,13 @@ const Chunk* ChunkManager::chunk(ChunkPos p) const {
 ChunkStage ChunkManager::stage(ChunkPos p) const {
     const Entry* e = find(p);
     return e ? e->stage : ChunkStage::Empty;
+}
+
+std::vector<ChunkPos> ChunkManager::tickingChunks() const {
+    std::vector<ChunkPos> out;
+    for (const Entry* e : ordered_)
+        if (e->meshReady) out.push_back(e->pos);
+    return out;
 }
 
 bool ChunkManager::isReady(ChunkPos p) const {

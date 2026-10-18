@@ -11,19 +11,10 @@
 #include "core/Json.h"
 #include "core/Log.h"
 #include "gfx/GL.h"
+#include "world/mesh/ChunkMesher.h"
 
 namespace mc {
 namespace {
-
-float faceShade(Direction d) {
-    switch (d) {
-    case Direction::Down: return 0.5f;
-    case Direction::Up: return 1.0f;
-    case Direction::North:
-    case Direction::South: return 0.8f;
-    default: return 0.6f;
-    }
-}
 
 uint32_t packColor(const glm::vec3& c, float a = 1.0f) {
     auto ch = [](float v) { return uint32_t(std::clamp(int(v * 255.0f + 0.5f), 0, 255)); };
@@ -141,7 +132,7 @@ void appendStateQuads(const VisualState& state, const BlockPos& seedPos, const g
         for (const BakedQuad& q : m->quads) {
             SimpleMesh& mesh = atlas.sprite(q.sprite).translucent ? translucent : opaque;
             const uint32_t tint = resolveTint(rule, q.tint, biome, power, age);
-            const float shade = q.shade ? faceShade(q.face) : 1.0f;
+            const float shade = q.shade ? blockFaceShade(q.face) : 1.0f;
             const glm::vec3 color =
                 glm::vec3(float((tint >> 16) & 255), float((tint >> 8) & 255), float(tint & 255)) / 255.0f * shade;
             const uint32_t packed = packColor(color);

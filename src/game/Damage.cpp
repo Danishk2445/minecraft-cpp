@@ -7,8 +7,8 @@ namespace mc {
 
 const DamageInfo& damageInfo(DamageType type) {
     // Vanilla damage_type data: message ids, exhaustion; tags bypasses_armor,
-    // bypasses_invulnerability, is_fire, bypasses_cooldown.
-    static const std::array<DamageInfo, 15> kInfo = {{
+    // bypasses_invulnerability, is_fire, bypasses_cooldown, damages_helmet; scaling.
+    static const std::array<DamageInfo, 19> kInfo = {{
         {"death.attack.generic", 0.0f, true},
         {"death.attack.genericKill", 0.0f, true, true},
         {"death.attack.fall", 0.0f, true},
@@ -24,6 +24,10 @@ const DamageInfo& damageInfo(DamageType type) {
         {"death.attack.sweetBerryBush", 0.1f},
         {"death.attack.starve", 0.0f, true},
         {"death.attack.outOfWorld", 0.0f, true, true},
+        {"death.attack.anvil", 0.1f, false, false, false, false, true},
+        {"death.attack.fallingBlock", 0.1f, false, false, false, false, true},
+        {"death.attack.explosion", 0.1f, false, false, false, false, false, true},
+        {"death.attack.lightningBolt", 0.1f},
     }};
     return kInfo[size_t(type)];
 }

@@ -1,0 +1,260 @@
+{
+  "_comment": "Vanilla TreeFeatures that only saplings grow (TreeGrower): the same trees as in trees.json without the world-generation extras (leaf litter, vines, rarer beehives), and the flower-side beehive variants.",
+  "birch": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "birch_log",
+      "trunk_placer": {
+        "type": "straight_trunk_placer",
+        "base_height": 5,
+        "height_rand_a": 2,
+        "height_rand_b": 0
+      },
+      "foliage_provider": "birch_leaves",
+      "foliage_placer": {
+        "type": "blob_foliage_placer",
+        "radius": 2,
+        "offset": 0,
+        "height": 3
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "two_layers_feature_size",
+        "limit": 1,
+        "lower_size": 0,
+        "upper_size": 1
+      },
+      "decorators": [],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  },
+  "birch_bees_005": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "birch_log",
+      "trunk_placer": {
+        "type": "straight_trunk_placer",
+        "base_height": 5,
+        "height_rand_a": 2,
+        "height_rand_b": 0
+      },
+      "foliage_provider": "birch_leaves",
+      "foliage_placer": {
+        "type": "blob_foliage_placer",
+        "radius": 2,
+        "offset": 0,
+        "height": 3
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "two_layers_feature_size",
+        "limit": 1,
+        "lower_size": 0,
+        "upper_size": 1
+      },
+      "decorators": [
+        {
+          "type": "beehive",
+          "probability": 0.05
+        }
+      ],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  },
+  "dark_oak": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "dark_oak_log",
+      "trunk_placer": {
+        "type": "dark_oak_trunk_placer",
+        "base_height": 6,
+        "height_rand_a": 2,
+        "height_rand_b": 1
+      },
+      "foliage_provider": "dark_oak_leaves",
+      "foliage_placer": {
+        "type": "dark_oak_foliage_placer",
+        "radius": 0,
+        "offset": 0
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "three_layers_feature_size",
+        "limit": 1,
+        "upper_limit": 1,
+        "lower_size": 0,
+        "middle_size": 1,
+        "upper_size": 2
+      },
+      "decorators": [],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  },
+  "jungle_tree_no_vine": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "jungle_log",
+      "trunk_placer": {
+        "type": "straight_trunk_placer",
+        "base_height": 4,
+        "height_rand_a": 8,
+        "height_rand_b": 0
+      },
+      "foliage_provider": "jungle_leaves",
+      "foliage_placer": {
+        "type": "blob_foliage_placer",
+        "radius": 2,
+        "offset": 0,
+        "height": 3
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "two_layers_feature_size",
+        "limit": 1,
+        "lower_size": 0,
+        "upper_size": 1
+      },
+      "decorators": [],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  },
+  "cherry": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "cherry_log",
+      "trunk_placer": {
+        "type": "cherry_trunk_placer",
+        "base_height": 7,
+        "height_rand_a": 1,
+        "height_rand_b": 0,
+        "branch_count": {
+          "type": "weighted_list",
+          "distribution": [
+            {
+              "data": 1,
+              "weight": 1
+            },
+            {
+              "data": 2,
+              "weight": 1
+            },
+            {
+              "data": 3,
+              "weight": 1
+            }
+          ]
+        },
+        "branch_horizontal_length": {
+          "type": "uniform",
+          "min_inclusive": 2,
+          "max_inclusive": 4
+        },
+        "branch_start_offset_from_top": {
+          "type": "uniform",
+          "min_inclusive": -4,
+          "max_inclusive": -3
+        },
+        "branch_end_offset_from_top": {
+          "type": "uniform",
+          "min_inclusive": -1,
+          "max_inclusive": 0
+        }
+      },
+      "foliage_provider": "cherry_leaves",
+      "foliage_placer": {
+        "type": "cherry_foliage_placer",
+        "radius": 4,
+        "offset": 0,
+        "height": 5,
+        "wide_bottom_layer_hole_chance": 0.25,
+        "corner_hole_chance": 0.5,
+        "hanging_leaves_chance": 0.16666667,
+        "hanging_leaves_extension_chance": 0.33333334
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "two_layers_feature_size",
+        "limit": 1,
+        "lower_size": 0,
+        "upper_size": 2
+      },
+      "decorators": [],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  },
+  "cherry_bees_005": {
+    "type": "tree",
+    "config": {
+      "trunk_provider": "cherry_log",
+      "trunk_placer": {
+        "type": "cherry_trunk_placer",
+        "base_height": 7,
+        "height_rand_a": 1,
+        "height_rand_b": 0,
+        "branch_count": {
+          "type": "weighted_list",
+          "distribution": [
+            {
+              "data": 1,
+              "weight": 1
+            },
+            {
+              "data": 2,
+              "weight": 1
+            },
+            {
+              "data": 3,
+              "weight": 1
+            }
+          ]
+        },
+        "branch_horizontal_length": {
+          "type": "uniform",
+          "min_inclusive": 2,
+          "max_inclusive": 4
+        },
+        "branch_start_offset_from_top": {
+          "type": "uniform",
+          "min_inclusive": -4,
+          "max_inclusive": -3
+        },
+        "branch_end_offset_from_top": {
+          "type": "uniform",
+          "min_inclusive": -1,
+          "max_inclusive": 0
+        }
+      },
+      "foliage_provider": "cherry_leaves",
+      "foliage_placer": {
+        "type": "cherry_foliage_placer",
+        "radius": 4,
+        "offset": 0,
+        "height": 5,
+        "wide_bottom_layer_hole_chance": 0.25,
+        "corner_hole_chance": 0.5,
+        "hanging_leaves_chance": 0.16666667,
+        "hanging_leaves_extension_chance": 0.33333334
+      },
+      "dirt_provider": "dirt",
+      "minimum_size": {
+        "type": "two_layers_feature_size",
+        "limit": 1,
+        "lower_size": 0,
+        "upper_size": 2
+      },
+      "decorators": [
+        {
+          "type": "beehive",
+          "probability": 0.05
+        }
+      ],
+      "ignore_vines": true,
+      "force_dirt": false
+    }
+  }
+}

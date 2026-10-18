@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "core/JobSystem.h"
@@ -99,6 +100,17 @@ public:
     // Chunks that stopped being mesh-ready since the last call (unloaded).
     std::vector<ChunkPos> takeDropped();
 
+    // Chunks that tick (random ticks, weather): the mesh-ready ones, within the render
+    // distance with every neighbor lit.
+    std::vector<ChunkPos> tickingChunks() const;
+    // Chunks that started ticking since the last call, the first time only; `generated`
+    // when they came from the generator rather than a save (vanilla post-processing).
+    struct NewlyTicking {
+        ChunkPos pos;
+        bool generated = false;
+    };
+    std::vector<NewlyTicking> takeNewlyTicking() { return std::exchange(newlyTicking_, {}); }
+
     // Every chunk within the render distance is mesh-ready (meshes may still be dirty).
     bool viewReady() const;
     // viewReady() and no section waits for (re)meshing.
@@ -124,6 +136,8 @@ private:
         std::shared_ptr<const DecorationResult> decoration;
         std::unique_ptr<Chunk> chunk;
         uint32_t savedVersion = 0; // chunk->blockVersion when last loaded or saved
+        bool generated = false;    // from the generator (not a save)
+        bool startedTicking = false;
         bool dirty() const { return chunk && chunk->blockVersion != savedVersion; }
     };
     void submitSave(Entry& e, bool unloading);
@@ -158,6 +172,7 @@ private:
     int inFlight_ = 0;
     std::vector<ChunkPos> dropped_;
     std::shared_ptr<const ChunkStorage> storage_;
+    std::vector<NewlyTicking> newlyTicking_;
     std::function<Json(ChunkPos, bool)> saveExtra_;
     std::function<void(ChunkPos, const Json&)> loadedExtra_;
     std::function<bool(ChunkPos)> extraDirty_;

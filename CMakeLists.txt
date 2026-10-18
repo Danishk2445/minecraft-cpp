@@ -341,6 +341,58 @@ if(XVFB_RUN AND Python3_FOUND)
         --exec "/setblock 0 -60 0 lava" --hold use --ticks 200 --screenshot ${MC_TEST_RUN}/death_chest.png --exit)
     mc_py_test(gl_death_with_chest_open_check gl_death_with_chest_open check_image.py ${MC_TEST_RUN}/death_chest.png
         --no-magenta --region 350,404,420,446 --mean-rgb 111,111,111 --tol 6)
+
+    # M11: the live world. Blocks falling (sand as bright as the placed sand below them,
+    # red concrete powder).
+    set(MC_SIM_SCENE --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
+        --gamemode spectator --wait-chunks)
+    mc_gl_test(gl_falling_blocks ${MC_SIM_SCENE} --pos 0.5,-57,-4 --look 0,-5
+        --exec "/setblock 0 -59 3 stone" --exec "/setblock 0 -58 3 sand" --exec "/setblock -2 -52 3 sand"
+        --exec "/setblock 2 -52 3 red_concrete_powder" --exec "/setblock 4 -52 3 anvil"
+        --exec "/setblock -4 -52 3 gravel" --ticks 10 --screenshot ${MC_TEST_RUN}/falling_blocks.png --exit)
+    mc_py_test(gl_falling_blocks_sand gl_falling_blocks check_image.py ${MC_TEST_RUN}/falling_blocks.png
+        --no-magenta --region 745,90,805,140 --mean-rgb 172,162,127 --tol 6)
+    mc_py_test(gl_falling_blocks_powder gl_falling_blocks check_image.py ${MC_TEST_RUN}/falling_blocks.png
+        --region 470,90,540,140 --mean-rgb 130,42,40 --tol 8)
+    # Weather: the sky greyed by rain at noon (clear is about 148,186,255), and nearly black
+    # at midnight in the rain.
+    mc_gl_test(gl_weather_rain ${MC_SIM_SCENE} --time 6000 --weather rain --pos 0.5,-58,0.5 --look 0,-30 --ticks 40
+        --screenshot ${MC_TEST_RUN}/weather_rain.png --exit)
+    mc_py_test(gl_weather_rain_sky gl_weather_rain check_image.py ${MC_TEST_RUN}/weather_rain.png
+        --no-magenta --region 0,0,1280,200 --mean-rgb 92,104,139 --tol 10)
+    mc_gl_test(gl_weather_night_rain ${MC_SIM_SCENE} --time 18000 --weather rain --pos 0.5,-58,0.5 --look 0,-30
+        --ticks 40 --screenshot ${MC_TEST_RUN}/weather_night_rain.png --exit)
+    mc_py_test(gl_weather_night_rain_sky gl_weather_night_rain check_image.py ${MC_TEST_RUN}/weather_night_rain.png
+        --region 0,0,1280,200 --mean-rgb 4,5,12 --tol 6)
+    # A lightning bolt in a night thunderstorm: its pale glow up the middle.
+    mc_gl_test(gl_lightning ${MC_SIM_SCENE} --time 18000 --weather thunder --pos 0.5,-58,-20 --look 0,-20
+        --exec "/summon lightning_bolt 0.5 -60 0.5" --ticks 1 --screenshot ${MC_TEST_RUN}/lightning.png --exit)
+    mc_py_test(gl_lightning_bolt gl_lightning check_image.py ${MC_TEST_RUN}/lightning.png
+        --region 300,0,1000,560 --count-rgb 160,160,180 --tol 50 --min-count 100)
+    # Lit TNT 10 ticks from going off: flashing white.
+    mc_gl_test(gl_tnt_flash ${MC_SIM_SCENE} --time 6000 --pos 0.5,-58.4,-3 --look 0,15
+        --exec "/summon tnt 0.5 -60 0.5" --ticks 70 --screenshot ${MC_TEST_RUN}/tnt_flash.png --exit)
+    mc_py_test(gl_tnt_flash_white gl_tnt_flash check_image.py ${MC_TEST_RUN}/tnt_flash.png
+        --region 590,300,700,440 --mean-rgb 216,202,198 --tol 25)
+    # Water from one source, 3 seconds on, seen from above: the 7-block diamond (its tip
+    # blue, past it grass).
+    mc_gl_test(gl_flowing_water ${MC_SIM_SCENE} --pos 0.5,-48,0.5 --look 0,90 --exec "/setblock 0 -60 0 water"
+        --ticks 60 --screenshot ${MC_TEST_RUN}/flowing_water.png --exit)
+    mc_py_test(gl_flowing_water_tip gl_flowing_water check_image.py ${MC_TEST_RUN}/flowing_water.png
+        --no-magenta --region 322,345,355,380 --mean-rgb 51,84,120 --tol 12)
+    mc_py_test(gl_flowing_water_dry gl_flowing_water check_image.py ${MC_TEST_RUN}/flowing_water.png
+        --region 100,320,180,400 --mean-rgb 82,107,50 --tol 12)
+    # A water bucket used on the ground in survival: a source where the player looks.
+    mc_gl_test(gl_bucket_water --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
+        --gamemode survival --pos 0.5,-58.38,0.5 --look 0,50 --wait-chunks --exec "/give water_bucket" --hold use
+        --ticks 2 --screenshot ${MC_TEST_RUN}/bucket_water.png --exit)
+    mc_py_test(gl_bucket_water_placed gl_bucket_water check_image.py ${MC_TEST_RUN}/bucket_water.png
+        --no-magenta --region 520,400,760,520 --mean-rgb 50,80,109 --tol 12)
+    # Under water: the water's dark blue fog closes in.
+    mc_gl_test(gl_underwater_fog ${MC_SIM_SCENE} --time 6000 --pos 0.5,-59.5,0.5 --look 0,0
+        --exec "/fill -20 -60 -20 20 -58 20 water" --ticks 5 --screenshot ${MC_TEST_RUN}/underwater.png --exit)
+    mc_py_test(gl_underwater_fog_color gl_underwater_fog check_image.py ${MC_TEST_RUN}/underwater.png
+        --region 0,0,1280,250 --mean-rgb 26,42,138 --tol 20)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

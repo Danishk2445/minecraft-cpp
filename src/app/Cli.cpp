@@ -125,6 +125,12 @@ const std::vector<Option>& options() {
          }},
         {"--freeze-time", "", "stop the daylight cycle",
          [](CliOptions& o, std::string_view) { return o.freezeTime = true, true; }},
+        {"--weather", "clear|rain|thunder", "start in this weather at full strength, and keep it",
+         [](CliOptions& o, std::string_view v) {
+             if (v != "clear" && v != "rain" && v != "thunder") return false;
+             o.weather = std::string(v);
+             return true;
+         }},
         {"--debug-overlay", "", "show the F3 debug screen",
          [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
         {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
@@ -278,7 +284,7 @@ std::optional<CliOptions> parseCli(int argc, char** argv, std::string& error) {
         // Options about a world open it directly instead of the title screen.
         static constexpr std::string_view kWorldOptions[] = {
             "--world", "--world-type", "--seed", "--pos", "--look", "--gamemode", "--exec", "--time",
-            "--freeze-time", "--perspective", "--hold", "--wait-chunks", "--debug-overlay"};
+            "--freeze-time", "--weather", "--perspective", "--hold", "--wait-chunks", "--debug-overlay"};
         if (std::find(std::begin(kWorldOptions), std::end(kWorldOptions), arg) != std::end(kWorldOptions))
             out.worldRequested = true;
     }

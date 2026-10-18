@@ -15,6 +15,7 @@
 #include "render/Environment.h"
 #include "render/ParticleRenderer.h"
 #include "render/SkyRenderer.h"
+#include "render/WeatherRenderer.h"
 #include "world/chunk/ChunkManager.h"
 #include "world/mesh/BlockEntityMeshes.h"
 #include "world/mesh/ChunkMesher.h"
@@ -47,8 +48,20 @@ public:
     // Particles over the world just drawn (uses its lightmap and camera).
     void renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera, glm::ivec2 viewport,
                          float partialTick);
+    // Rain and snow (after particles, as vanilla's weather pass).
+    void renderWeather(const Level& level, const Camera& camera, glm::ivec2 viewport, int64_t ticks, float partialTick);
     float gamma = 0.5f; // the Brightness option (0 = Moody, 1 = Bright)
     CloudMode clouds = CloudMode::Fancy;
+    // What the camera sees beyond the level itself this frame: lightning's flash, the
+    // fluid around the camera and the eyes' adjustment to water (set before render()).
+    struct View {
+        float skyFlash = 0.0f;
+        EnvironmentInputs::CameraFluid fluid = EnvironmentInputs::CameraFluid::None;
+        uint32_t waterFogColor = 0x050533;
+        float waterVision = 0.0f;
+        bool closerWaterFog = false;
+        bool spectator = false;
+    } view;
 
     // No mesh jobs running.
     bool idle() const { return inFlight_ == 0; }
@@ -66,6 +79,7 @@ private:
     glm::dvec3 cameraPos_{0.0};
     SkyRenderer sky_;
     ParticleRenderer particles_;
+    WeatherRenderer weather_;
     EntityRenderer entities_;
     FirstPersonRenderer hands_;
     Lightmap lightmap_;

@@ -4,8 +4,13 @@
 #include <cmath>
 #include <cstddef>
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "core/Log.h"
 #include "entity/ExperienceOrb.h"
+#include "entity/FallingBlockEntity.h"
+#include "entity/LightningBolt.h"
+#include "entity/PrimedTnt.h"
 #include "entity/ItemEntity.h"
 #include "entity/Player.h"
 #include "entity/model/EntityModels.h"
@@ -13,9 +18,12 @@
 #include "gfx/GL.h"
 #include "entity/model/ItemGeometry.h"
 #include "render/ClientAssets.h"
+#include "resources/BlockModels.h"
 #include "resources/ResourcePack.h"
+#include "world/block/Tints.h"
 #include "world/level/Level.h"
 #include "world/mesh/BlockEntityMeshes.h"
+#include "world/mesh/ChunkMesher.h"
 
 namespace mc {
 namespace {
@@ -38,6 +46,8 @@ constexpr float kViewOffsetZ = 0.99975586f;
 EntityRenderer::~EntityRenderer() {
     if (vao_) glDeleteVertexArrays(1, &vao_);
     if (vbo_) glDeleteBuffers(1, &vbo_);
+    if (glowVao_) glDeleteVertexArrays(1, &glowVao_);
+    if (glowVbo_) glDeleteBuffers(1, &glowVbo_);
 }
 
 bool EntityRenderer::init(const ClientAssets& assets) {
@@ -58,10 +68,19 @@ bool EntityRenderer::init(const ClientAssets& assets) {
     glVertexArrayAttribFormat(vao_, 3, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, light));
     glVertexArrayAttribBinding(vao_, 3, 0);
     glEnableVertexArrayAttrib(vao_, 4);
-    glVertexArrayAttribFormat(vao_, 4, 1, GL_FLOAT, GL_FALSE, offsetof(Vertex, overlay));
+    glVertexArrayAttribFormat(vao_, 4, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(Vertex, overlay));
     glVertexArrayAttribBinding(vao_, 4, 0);
     playerRest_ = playerModel(false);
     playerPosed_ = playerRest_;
+    if (!glowShader_.load("lightning.vert", "lightning.frag")) return false;
+    glCreateVertexArrays(1, &glowVao_);
+    glCreateBuffers(1, &glowVbo_);
+    glEnableVertexArrayAttrib(glowVao_, 0);
+    glVertexArrayAttribFormat(glowVao_, 0, 3, GL_FLOAT, GL_FALSE, offsetof(GlowVertex, pos));
+    glVertexArrayAttribBinding(glowVao_, 0, 0);
+    glEnableVertexArrayAttrib(glowVao_, 1);
+    glVertexArrayAttribFormat(glowVao_, 1, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(GlowVertex, color));
+    glVertexArrayAttribBinding(glowVao_, 1, 0);
     return true;
 }
 
@@ -73,6 +92,7 @@ void EntityRenderer::begin(const glm::dvec3& cameraPos, const glm::vec3& cameraR
     cameraUp_ = cameraUp;
     vertices_.clear();
     batches_.clear();
+    glow_.clear();
 }
 
 void EntityRenderer::addBatch(const Texture* tex, size_t first, Pass pass) {
@@ -88,9 +108,7 @@ void EntityRenderer::addBatch(const Texture* tex, size_t first, Pass pass) {
 
 void EntityRenderer::submitModel(const ModelPart& root, int texWidth, int texHeight, std::string_view textureId,
                                  const glm::dvec3& origin, const glm::mat4& transform, glm::vec2 light,
-                                 uint32_t tint, float alpha, bool hurt) {
-    // OverlayTexture's red rows: (255, 0, 0) at alpha 178, mixed over the shaded texture.
-    const float overlay = hurt ? 1.0f - 178.0f / 255.0f : 0.0f;
+                                 uint32_t tint, float alpha, uint32_t overlay) {
     const Texture& tex = texture(textureId);
     quads_.clear();
     bakeModel(root, transform, texWidth, texHeight, quads_);
@@ -105,6 +123,112 @@ void EntityRenderer::submitModel(const ModelPart& root, int texWidth, int texHei
         for (int i : {0, 1, 2, 0, 2, 3}) vertices_.push_back(v[i]);
     }
     addBatch(&tex, first, alpha < 1.0f ? Pass::Translucent : Pass::Cutout);
+}
+
+void EntityRenderer::submitBlock(const BlockRegistry& registry, StateId state, const BlockPos& variantPos,
+                                 const glm::dvec3& origin, const glm::mat4& transform, glm::vec2 light, uint32_t overlay) {
+    const StateInfo& info = registry.info(state);
+    if ((info.flags & kAir) || !(info.flags & kHasGeometry) || info.layer == RenderLayer::Invisible) return;
+    blockModels_.clear();
+    BlockModels::collect(registry.modelChoices(state), variantPos, blockModels_);
+    const Block& block = registry.blockOf(state);
+    const int power = block.tint.source == TintSource::Redstone ? registry.intValue(state, "power") : 0;
+    const int age = block.tint.source == TintSource::Stem ? registry.intValue(state, "age") : 0;
+    const size_t first = vertices_.size();
+    const glm::vec3 base(origin - cameraPos_);
+    for (const BakedModel* m : blockModels_)
+        for (const BakedQuad& q : m->quads) {
+            const uint32_t tint = q.tint < 0 ? 0xFFFFFFu : resolveTint(block.tint, q.tint, BiomeColors{}, power, age);
+            const glm::vec3 rgb = unpackRgb(tint) * (q.shade ? blockFaceShade(q.face) : 1.0f);
+            const uint32_t color = packColor(rgb, 1.0f);
+            const glm::vec2 l = glm::max(light, glm::vec2(float(std::max<int>(info.emission, q.emission)), 0.0f));
+            Vertex v[4];
+            for (size_t k = 0; k < 4; ++k)
+                v[k] = {base + glm::vec3(transform * glm::vec4(q.pos[k], 1.0f)), q.uv[k], color, l, overlay};
+            for (int i : {0, 1, 2, 0, 2, 3}) vertices_.push_back(v[i]);
+        }
+    addBatch(&assets_->blockAtlasTexture(), first, info.layer == RenderLayer::Translucent ? Pass::Translucent : Pass::Cutout);
+}
+
+void EntityRenderer::submitFallingBlock(const FallingBlockEntity& block, const Level& level, float partialTick,
+                                        int skyDarken) {
+    const glm::dvec3 feet = glm::mix(block.oldPos, block.pos, double(partialTick));
+    const uint8_t l = level.lightAt(BlockPos::containing({feet.x, feet.y + double(block.height), feet.z}));
+    submitBlock(level.registry(), block.state, block.startPos, feet, glm::translate(glm::mat4(1.0f), {-0.5f, 0.0f, -0.5f}),
+                glm::vec2(float(l & 15), float(l >> 4)));
+    submitShadow(level, feet, 0.5f, skyDarken);
+}
+
+void EntityRenderer::submitPrimedTnt(const PrimedTnt& tnt, const Level& level, float partialTick, int skyDarken) {
+    const glm::dvec3 feet = glm::mix(tnt.oldPos, tnt.pos, double(partialTick));
+    const float fuse = float(tnt.fuse) - partialTick + 1.0f;
+    glm::mat4 m = glm::translate(glm::mat4(1.0f), {0.0f, 0.5f, 0.0f});
+    if (fuse < 10.0f) {
+        float g = std::clamp(1.0f - fuse / 10.0f, 0.0f, 1.0f);
+        g *= g;
+        g *= g;
+        m = glm::scale(m, glm::vec3(1.0f + g * 0.3f));
+    }
+    m = glm::rotate(m, glm::radians(-90.0f), {0.0f, 1.0f, 0.0f});
+    m = glm::translate(m, {-0.5f, -0.5f, 0.5f});
+    m = glm::rotate(m, glm::radians(90.0f), {0.0f, 1.0f, 0.0f});
+    const uint8_t l = level.lightAt(BlockPos::containing(feet + glm::dvec3(0.0, 0.5, 0.0)));
+    const bool white = int(fuse) / 5 % 2 == 0;
+    submitBlock(level.registry(), level.registry().defaultState("tnt"), BlockPos::containing(feet), feet, m,
+                glm::vec2(float(l & 15), float(l >> 4)), white ? kWhiteOverlay : 0u);
+    submitShadow(level, feet, 0.5f, skyDarken);
+}
+
+void EntityRenderer::submitLightning(const LightningBolt& bolt, float partialTick) {
+    const glm::vec3 base(glm::mix(bolt.oldPos, bolt.pos, double(partialTick)) - cameraPos_);
+    // The trunk's wander, from the top (index 7) down.
+    float fx[8], fz[8];
+    float x = 0.0f, z = 0.0f;
+    JavaRandom trunk(bolt.seed);
+    for (int i = 7; i >= 0; --i) {
+        fx[i] = x;
+        fz[i] = z;
+        x += float(trunk.nextInt(11) - 5);
+        z += float(trunk.nextInt(11) - 5);
+    }
+    const uint32_t color = uint32_t(0.45f * 255.0f + 0.5f) | (uint32_t(0.45f * 255.0f + 0.5f) << 8) |
+                           (uint32_t(0.5f * 255.0f + 0.5f) << 16) | (uint32_t(0.3f * 255.0f + 0.5f) << 24);
+    auto quad = [&](float x1, float z1, int index, float x2, float z2, float off2, float off1, bool ox1, bool oz1, bool ox2,
+                    bool oz2) {
+        const GlowVertex v[4] = {
+            {base + glm::vec3(x1 + (ox1 ? off1 : -off1), float(index * 16), z1 + (oz1 ? off1 : -off1)), color},
+            {base + glm::vec3(x2 + (ox1 ? off2 : -off2), float((index + 1) * 16), z2 + (oz1 ? off2 : -off2)), color},
+            {base + glm::vec3(x2 + (ox2 ? off2 : -off2), float((index + 1) * 16), z2 + (oz2 ? off2 : -off2)), color},
+            {base + glm::vec3(x1 + (ox2 ? off1 : -off1), float(index * 16), z1 + (oz2 ? off1 : -off1)), color}};
+        for (int i : {0, 1, 2, 0, 2, 3}) glow_.push_back(v[i]);
+    };
+    // Four nested layers of the trunk and two forks, each a box of four quads.
+    for (int j = 0; j < 4; ++j) {
+        JavaRandom r(bolt.seed);
+        for (int k = 0; k < 3; ++k) {
+            const int top = k > 0 ? 7 - k : 7;
+            const int bottom = k > 0 ? top - 2 : 0;
+            float h = fx[top] - x, n = fz[top] - z;
+            for (int o = top; o >= bottom; --o) {
+                const float p = h, q = n;
+                if (k == 0) {
+                    h += float(r.nextInt(11) - 5);
+                    n += float(r.nextInt(11) - 5);
+                } else {
+                    h += float(r.nextInt(31) - 15);
+                    n += float(r.nextInt(31) - 15);
+                }
+                float v = 0.1f + float(j) * 0.2f;
+                if (k == 0) v *= float(o) * 0.1f + 1.0f;
+                float w = 0.1f + float(j) * 0.2f;
+                if (k == 0) w *= (float(o) - 1.0f) * 0.1f + 1.0f;
+                quad(h, n, o, p, q, v, w, false, false, true, false);
+                quad(h, n, o, p, q, v, w, true, false, true, true);
+                quad(h, n, o, p, q, v, w, true, true, false, true);
+                quad(h, n, o, p, q, v, w, false, true, false, false);
+            }
+        }
+    }
 }
 
 void EntityRenderer::submitShadow(const Level& level, const glm::dvec3& feet, float radius, int skyDarken,
@@ -298,7 +422,8 @@ void EntityRenderer::submitPlayer(const Player& player, const Level& level, floa
     // Spectators are invisible: their own view shows them at 15% opacity and without a shadow.
     const glm::vec2 light(float(l & 15), float(l >> 4));
     submitModel(playerPosed_.root, playerRest_.texWidth, playerRest_.texHeight, "minecraft:entity/player/wide/steve",
-                feet, m, light, 0xFFFFFF, spectator ? 38.0f / 255.0f : 1.0f, player.hurtTime > 0 || player.deathTime > 0);
+                feet, m, light, 0xFFFFFF, spectator ? 38.0f / 255.0f : 1.0f,
+                (player.hurtTime > 0 || player.deathTime > 0) ? kHurtOverlay : 0u);
     if (spectator) return;
     // ItemInHandLayer: each held item hangs from its arm.
     for (const bool left : {false, true}) {
@@ -325,7 +450,7 @@ void EntityRenderer::submitPlayer(const Player& player, const Level& level, floa
 }
 
 void EntityRenderer::render(const glm::mat4& viewProj, const ChunkRenderer::Fog& fog) {
-    if (batches_.empty()) return;
+    if (batches_.empty() && glow_.empty()) return;
     glNamedBufferData(vbo_, GLsizeiptr(vertices_.size() * sizeof(Vertex)), vertices_.data(), GL_STREAM_DRAW);
     glVertexArrayVertexBuffer(vao_, 0, vbo_, 0, sizeof(Vertex));
     glBindVertexArray(vao_);
@@ -356,6 +481,20 @@ void EntityRenderer::render(const glm::mat4& viewProj, const ChunkRenderer::Fog&
     }
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+    if (!glow_.empty()) {
+        // Vanilla RenderType.lightning: additive (src alpha, one), depth tested, writing depth.
+        glNamedBufferData(glowVbo_, GLsizeiptr(glow_.size() * sizeof(GlowVertex)), glow_.data(), GL_STREAM_DRAW);
+        glVertexArrayVertexBuffer(glowVao_, 0, glowVbo_, 0, sizeof(GlowVertex));
+        glBindVertexArray(glowVao_);
+        glowShader_.use();
+        glowShader_.set("uViewProj", viewProj);
+        glowShader_.set("uFog", fog.distances);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glDrawArrays(GL_TRIANGLES, 0, GLsizei(glow_.size()));
+        glDisable(GL_BLEND);
+    }
 }
 
 } // namespace mc

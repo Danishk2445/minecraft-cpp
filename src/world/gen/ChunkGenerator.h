@@ -85,6 +85,9 @@ public:
     std::string_view type() const override { return "flat"; }
     void generateTerrain(Chunk& chunk) const override;
     glm::dvec3 spawnPoint() const override;
+    // The one biome everywhere (vanilla's flat world is plains; ids are the biome
+    // registry's, which sorts badlands first).
+    uint8_t biome = 0;
 
 private:
     std::vector<Layer> layers_;

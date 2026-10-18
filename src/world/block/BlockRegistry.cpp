@@ -531,6 +531,12 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         if (const Json* f = firstField(propRules, name, "jump_factor"); f && f->is_number()) b.jumpFactor = f->get<float>();
         if (const Json* f = firstField(propRules, name, "hardness"); f && f->is_number()) b.hardness = f->get<float>();
         if (const Json* f = firstField(propRules, name, "requires_tool"); f && f->is_boolean()) b.requiresTool = f->get<bool>();
+        b.resistance = b.hardness < 0.0f ? 3600000.0f : b.hardness;
+        if (const Json* f = firstField(propRules, name, "resistance"); f && f->is_number()) b.resistance = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "ignite_odds"); f && f->is_number())
+            b.igniteOdds = uint8_t(std::clamp(f->get<int>(), 0, 255));
+        if (const Json* f = firstField(propRules, name, "burn_odds"); f && f->is_number())
+            b.burnOdds = uint8_t(std::clamp(f->get<int>(), 0, 255));
         const Json* solidJ = firstField(propRules, name, "solid");
         const bool liquid = b.className == "liquid";
         const bool waterPlant = b.className == "water_plant" || b.className == "tall_water_plant" ||

@@ -22,6 +22,10 @@ enum class DamageType : uint8_t {
     SweetBerryBush,
     Starve,
     OutOfWorld,   // the void
+    Anvil,        // a falling anvil
+    FallingBlock, // other falling blocks that hurt (stalactites)
+    Explosion,    // TNT
+    LightningBolt,
 };
 
 struct DamageInfo {
@@ -31,6 +35,8 @@ struct DamageInfo {
     bool bypassesInvulnerability = false; // even creative players take it
     bool fire = false;                    // DamageTypeTags.IS_FIRE (fire-resistant items survive)
     bool bypassesCooldown = false;        // ignores the 10-tick invulnerability window
+    bool damagesHelmet = false;           // DamageTypeTags.DAMAGES_HELMET: a helmet takes a quarter off
+    bool scalesWithDifficulty = false;    // scaling "always": easy halves (+1), hard x1.5, peaceful 0
 };
 const DamageInfo& damageInfo(DamageType type);
 

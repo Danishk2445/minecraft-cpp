@@ -50,6 +50,8 @@ public:
     int deathTime = 0;                    // ticks since dying
     DamageType lastDamage = DamageType::Generic;
     float lastFallDistance = 0.0f; // of the last fall that hurt, for the death message
+    // A landing on farmland this tick (the block and the fall), for the level to trample.
+    std::optional<std::pair<BlockPos, double>> landedOnFarmland;
     float armorToughness = 0.0f;
     // Creative and spectator players take only damage that bypasses invulnerability.
     bool invulnerable() const { return mode_ == GameMode::Creative || mode_ == GameMode::Spectator; }
@@ -119,11 +121,19 @@ public:
     void tick(const BlockGetter& level, const PlayerInput& input);
     using Entity::tick;
     float eyeHeight() const { return crouching ? 1.27f : 1.62f; }
+    bool pushedByFluid() const override { return !flying; }
+    bool isPlayer() const override { return true; }
+    bool hurtServer(Level& level, DamageType type, float amount) override {
+        (void)level;
+        return hurt(type, amount);
+    }
     glm::dvec3 eyePos() const { return pos + glm::dvec3(0.0, eyeHeight(), 0.0); }
     bool onClimbable(const BlockGetter& level) const;
 
-private:
+    // Vanilla isEyeInFluid(WATER): the eyes under the water's surface.
     bool eyeInWater(const BlockGetter& level) const;
+
+private:
     bool inWall(const BlockGetter& level) const;
     void updateArmor();
     void travel(const BlockGetter& level, glm::vec3 input, bool jumping);
@@ -131,6 +141,7 @@ private:
     glm::dvec3 backOffFromEdge(const BlockGetter& level, glm::dvec3 delta) const;
 
     GameMode mode_ = GameMode::Survival;
+    Difficulty difficulty_ = Difficulty::Normal; // the world's, as of the last survival tick
     int jumpDelay_ = 0;
     const Item* lastMainHandItem_ = nullptr; // a different item resets the attack strength
 };

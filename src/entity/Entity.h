@@ -9,6 +9,7 @@
 
 #include "core/Json.h"
 #include "core/Math.h"
+#include "game/Damage.h"
 #include "world/block/BlockGetter.h"
 
 namespace mc {
@@ -60,8 +61,17 @@ public:
     // Vanilla Entity.move(SELF): collide, step, set collision flags, zero blocked
     // velocity components and apply the speed factor of the block underneath.
     void move(const BlockGetter& level, glm::dvec3 delta);
-    // Vanilla updateInWaterStateAndDoFluidPushing (without pushing): fluid heights.
+    // Vanilla updateInWaterStateAndDoFluidPushing: fluid heights, and the current's push.
     void updateFluidState(const BlockGetter& level);
+    // Currents push it (vanilla isPushedByFluid; flying players aren't).
+    virtual bool pushedByFluid() const { return true; }
+    // Vanilla hurtServer: damage from the world (explosions, lightning); false when it
+    // didn't take it. Items and orbs lose health; blocks and TNT don't care.
+    virtual bool hurtServer(Level& level, DamageType type, float amount) {
+        (void)level, (void)type, (void)amount;
+        return false;
+    }
+    virtual bool isPlayer() const { return false; }
     // The block that decides friction/speed: just below the feet (vanilla 0.500001 down).
     BlockPos blockBelow() const;
     // Vanilla stuck-in-block slowdown (cobweb, berry bushes, powder snow), consumed by move().

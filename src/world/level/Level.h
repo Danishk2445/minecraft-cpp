@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core/Json.h"
+#include "world/biome/Biome.h"
 #include "world/block/BlockGetter.h"
 
 #include <cstdint>
@@ -12,6 +13,7 @@
 
 #include "core/Rng.h"
 #include "entity/Entity.h"
+#include "game/WorldParams.h"
 #include "world/chunk/ChunkManager.h"
 
 namespace mc {
@@ -19,9 +21,27 @@ namespace mc {
 class BlockEntity;
 class BlockLoot;
 class ChunkStorage;
+class BiomeRegistry;
+class BiomeDecorator;
 class ItemRegistry;
 class Player;
 class RecipeBook;
+
+// Things that happen in the level for the client to show (vanilla levelEvent): particles
+// for now, sounds one day.
+enum class LevelEventType : uint8_t {
+    BlockBroken, // `state` broke at `pos` (its break particles)
+    LavaFizz,    // lava met water or burned something (smoke)
+    BoneMeal,    // bone meal used at `pos` (happy-villager sparkles, `data` of them)
+    Explosion,   // at `point`, of power `data` (its particles)
+};
+struct LevelEvent {
+    LevelEventType type;
+    BlockPos pos;
+    StateId state = 0;
+    int data = 0;
+    glm::dvec3 point{0.0};
+};
 
 class Level final : public BlockGetter {
 public:
@@ -42,9 +62,17 @@ public:
     // False when the target chunk is not loaded and ready. A different block there drops
     // the old block's block entity (its contents are the caller's business).
     bool setBlock(const BlockPos& p, StateId state);
-    // setBlock, then the neighbors react (vanilla updateShape: connections, halves,
-    // support), cascading up to vanilla's 512 updates.
+    // setBlock as vanilla's setBlock with flags 3: the new block's onPlace, the six
+    // neighbors' neighborChanged, then shape updates (connections, halves, support)
+    // cascading up to vanilla's 512.
     bool setBlockAndUpdate(const BlockPos& p, StateId state);
+    // The updates of setBlockAndUpdate for a block already set at `p` (was `old`).
+    void updateAround(const BlockPos& p, StateId old, StateId state);
+    // Vanilla destroyBlock: the block's drops (when `drop`, and the doTileDrops rule) and
+    // break particles, leaving its water if it was waterlogged.
+    bool destroyBlock(const BlockPos& p, bool drop);
+    // Vanilla dropResources without a player: the block's loot pops out at `p`.
+    void dropResources(const BlockPos& p, StateId state);
 
     void tick();
 
@@ -55,10 +83,21 @@ public:
     Json saveData() const;
     void loadData(const Json& j);
 
-    // Vanilla scheduled block ticks: `block` at `p` gets ticked after `delay` game
-    // ticks (if it is still there then).
+    // Vanilla scheduled ticks: `block` at `p` gets ticked after `delay` game ticks (if it
+    // is still there then); fluid ticks likewise by fluid type (sim::fluidTickType). One
+    // pending tick per position and type: scheduling again while one waits does nothing.
     void scheduleTick(const BlockPos& p, uint16_t block, int delay);
-    size_t pendingTicks() const { return scheduled_.size(); }
+    void scheduleFluidTick(const BlockPos& p, uint16_t fluidType, int delay);
+    bool hasScheduledTick(const BlockPos& p, uint16_t block) const;
+    size_t pendingTicks() const { return blockTicks_.size(); }
+    size_t pendingFluidTicks() const { return fluidTicks_.size(); }
+
+    // What happened for the client to show since the last call.
+    void levelEvent(LevelEventType type, const BlockPos& p, StateId state = 0, int data = 0,
+                    const glm::dvec3& point = glm::dvec3(0.0)) {
+        events_.push_back({type, p, state, data, point});
+    }
+    std::vector<LevelEvent> takeEvents() { return std::exchange(events_, {}); }
 
     // Entities (dropped items, experience orbs; later mobs): owned here, ticked while
     // their chunk is ticking, saved and loaded with their chunks.
@@ -75,6 +114,7 @@ public:
     // half) drop theirs, as vanilla's destroyBlock does.
     void setLoot(const BlockLoot* loot) { loot_ = loot; }
     const ItemRegistry* itemRegistry() const { return items_; }
+    const BlockLoot* loot() const { return loot_; }
     // Recipes, for furnaces.
     void setRecipes(const RecipeBook* recipes) { recipes_ = recipes; }
 
@@ -97,30 +137,120 @@ public:
     int64_t gameTime() const { return gameTime_; }
     int64_t dayTime() const { return dayTime_; }
     void setDayTime(int64_t t) { dayTime_ = t; }
-    // Game rules (vanilla names in /gamerule): doDaylightCycle, keepInventory, naturalRegeneration.
+    // Game rules (vanilla names in /gamerule): doDaylightCycle, keepInventory,
+    // naturalRegeneration, randomTickSpeed, doFireTick, waterSourceConversion,
+    // lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread.
     bool daylightCycle = true;
     bool keepInventory = false;
     bool naturalRegeneration = true;
+    int randomTickSpeed = 3;
+    bool doFireTick = true;
+    bool waterSourceConversion = true;
+    bool lavaSourceConversion = false;
+    bool doTileDrops = true;
+    bool doEntityDrops = true; // entities leave items (falling blocks that can't land)
+    bool doVinesSpread = true;
+    // The world's difficulty (fire spreads faster on harder ones).
+    Difficulty difficulty = Difficulty::Normal;
+
+    // World generation's features and biomes, for saplings and bone meal (without them
+    // saplings don't grow into trees).
+    void setWorldgen(const BiomeDecorator* decorator, const BiomeRegistry* biomes) {
+        decorator_ = decorator;
+        biomes_ = biomes;
+    }
+    const BiomeDecorator* decorator() const { return decorator_; }
+    const BiomeRegistry* biomes() const { return biomes_; }
+    BiomeId biomeAt(const BlockPos& p) const;
+    // Vanilla skyDarken: sky light lost to night and weather (0 by day .. 11 at night).
+    int skyDarken() const;
+
+    // Weather (vanilla ServerLevelData's weather times and ServerLevel.advanceWeatherCycle):
+    // clear for clearWeatherTime ticks, else rain and thunder each toggle when their timer
+    // runs out; the levels fade 0.01 a tick toward the state.
+    bool doWeatherCycle = true;
+    int snowAccumulationHeight = 1; // layers snowfall builds up to
+    int clearWeatherTime = 0, rainTime = 0, thunderTime = 0;
+    bool raining = false, thundering = false;
+    float rainLevel(float partialTick) const;
+    float thunderLevel(float partialTick) const; // includes the rain level
+    bool isRaining() const { return rainLevel(1.0f) > 0.2f; }
+    bool isThundering() const { return thunderLevel(1.0f) > 0.9f; }
+    // Vanilla setWeatherParameters (/weather clear|rain|thunder).
+    void setWeather(int clearTime, int weatherTime, bool rain, bool thunder);
+    // The rain and thunder levels at once (as a world loaded in the rain starts).
+    void settleWeather() {
+        rain_ = oRain_ = raining ? 1.0f : 0.0f;
+        thunder_ = oThunder_ = raining && thundering ? 1.0f : 0.0f;
+    }
+    enum class Precipitation : uint8_t { None, Rain, Snow };
+    // Vanilla Biome.getPrecipitationAt: none in dry biomes, snow where it's cold enough.
+    Precipitation precipitationAt(const BlockPos& p) const;
+    // Rain falling on `p`: raining, open to the sky, and a rainy (not snowy) biome there.
+    bool isRainingAt(const BlockPos& p) const;
+    // One above the highest block that blocks motion or holds fluid (vanilla MOTION_BLOCKING).
+    int motionBlockingHeight(int x, int z) const;
+    // Vanilla findLightningTargetAround and the strike: on the surface of the column, or on
+    // the player if under the open sky within 3 blocks of it; only where rain falls.
+    void spawnLightning(const BlockPos& column, bool visualOnly);
+    // Vanilla getRawBrightness: the brighter of block light and sky light less `darken`.
+    int rawBrightness(const BlockPos& p, int darken) const;
 
 private:
     const BlockRegistry& registry_;
     ChunkManager chunks_;
     int64_t seed_;
-    struct ScheduledTick {
-        int64_t time;
-        uint64_t seq;
-        BlockPos pos;
-        uint16_t block;
-        bool operator>(const ScheduledTick& o) const { return time != o.time ? time > o.time : seq > o.seq; }
+    // Vanilla LevelTicks: due ticks by (time, order scheduled), one per position and type.
+    class TickQueue {
+    public:
+        struct Tick {
+            int64_t time;
+            uint64_t seq;
+            BlockPos pos;
+            uint16_t type;
+            bool operator>(const Tick& o) const { return time != o.time ? time > o.time : seq > o.seq; }
+        };
+        bool schedule(const BlockPos& p, uint16_t type, int64_t time);
+        bool contains(const BlockPos& p, uint16_t type) const { return pending_.contains(Key{p, type}); }
+        bool due(int64_t now) const { return !heap_.empty() && heap_.front().time <= now; }
+        Tick pop();
+        size_t size() const { return heap_.size(); }
+        // Those in chunk `c`, in order; `remove` takes them out (the chunk unloads).
+        std::vector<Tick> inChunk(ChunkPos c, bool remove);
+        bool anyInChunk(ChunkPos c) const { return perChunk_.contains(c); }
+
+    private:
+        struct Key {
+            BlockPos pos;
+            uint16_t type;
+            bool operator==(const Key& o) const { return pos == o.pos && type == o.type; }
+        };
+        struct KeyHash {
+            size_t operator()(const Key& k) const { return std::hash<BlockPos>()(k.pos) * 31u + k.type; }
+        };
+        void counted(const BlockPos& p, int delta);
+        std::vector<Tick> heap_; // min-heap
+        std::unordered_set<Key, KeyHash> pending_;
+        std::unordered_map<ChunkPos, int> perChunk_; // pending ticks per chunk (for saving)
+        uint64_t seq_ = 0;
     };
     void runScheduledTicks();
+    // Random ticks in every ticking chunk (vanilla tickChunk), and post-processing of chunks
+    // that just started ticking.
+    void tickChunks();
     void tickEntities();
     // Vanilla Player.aiStep touch: items and orbs within the player's box grown by (1, 0.5, 1).
     void touchPlayer();
 
-    std::vector<ScheduledTick> scheduled_; // min-heap by (time, seq)
-    uint64_t tickSeq_ = 0;
+    TickQueue blockTicks_, fluidTicks_;
     int64_t gameTime_ = 0;
+    int32_t randValue_ = 0x2D4E62F1; // vanilla ServerLevel.randValue: the random tick positions
+    float rain_ = 0.0f, oRain_ = 0.0f, thunder_ = 0.0f, oThunder_ = 0.0f;
+    void advanceWeather();
+    // Vanilla ServerLevel.tickPrecipitation: water freezing, snow piling up, cauldrons filling.
+    void tickPrecipitation(const BlockPos& column);
+    BlockPos randomPosIn(ChunkPos c, int y);
+    std::vector<LevelEvent> events_;
     int64_t dayTime_ = 6000; // noon
 
     std::vector<std::unique_ptr<Entity>> entities_;
@@ -131,6 +261,8 @@ private:
     std::unordered_set<ChunkPos> savedEntityChunks_; // chunks whose save file lists entities
     Player* player_ = nullptr;
     const ItemRegistry* items_ = nullptr;
+    const BiomeDecorator* decorator_ = nullptr;
+    const BiomeRegistry* biomes_ = nullptr;
     const BlockLoot* loot_ = nullptr;
     Xoroshiro random_;
     std::vector<Pickup> pickups_;

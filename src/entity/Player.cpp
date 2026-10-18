@@ -311,6 +311,19 @@ void Player::updateArmor() {
 bool Player::hurt(DamageType type, float amount) {
     const DamageInfo& info = damageInfo(type);
     if (dead() || (invulnerable() && !info.bypassesInvulnerability)) return false;
+    // Vanilla Player.hurtServer: difficulty scales some damage.
+    if (info.scalesWithDifficulty) {
+        if (difficulty_ == Difficulty::Peaceful) amount = 0.0f;
+        else if (difficulty_ == Difficulty::Easy) amount = std::min(amount / 2.0f + 1.0f, amount);
+        else if (difficulty_ == Difficulty::Hard) amount = amount * 3.0f / 2.0f;
+        if (amount == 0.0f) return false;
+    }
+    // LivingEntity.hurtServer: a helmet takes falling blocks for a quarter of the damage.
+    if (ItemStack& helmet = inventory.armor[3]; info.damagesHelmet && !helmet.empty()) {
+        helmet.hurt(std::max(1, int(amount / 4.0f)));
+        updateArmor();
+        amount *= 0.75f;
+    }
     amount = std::max(amount, 0.0f);
     // Within the second half of the invulnerability window only a harder hit counts, and
     // only by what it adds.
@@ -378,6 +391,7 @@ bool Player::inWall(const BlockGetter& level) const {
 }
 
 void Player::survivalTick(const BlockGetter& level, Difficulty difficulty, bool naturalRegeneration) {
+    difficulty_ = difficulty;
     if (dead()) {
         ++deathTime;
         return;
@@ -394,6 +408,7 @@ void Player::survivalTick(const BlockGetter& level, Difficulty difficulty, bool 
         double fall = landedFall;
         landedFall = 0.0;
         const std::string_view on = blockId(landedOn);
+        if (on == "farmland") landedOnFarmland = std::pair(landedOn, fall);
         float multiplier = 1.0f;
         DamageType type = DamageType::Fall;
         // The blocks' fallOn: hay and honey take 80% off, slime all of it (unless sneaking),

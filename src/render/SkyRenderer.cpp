@@ -268,7 +268,8 @@ void SkyRenderer::renderClouds(const Camera& camera, float aspect, const Environ
     shader_.set("uTextured", 0);
     shader_.set("uColor", glm::vec4(1.0f));
     shader_.set("uFogColor", glm::vec4(env.fogColor, 1.0f));
-    shader_.set("uFog", glm::vec4(float(radius) * 12.0f * 0.6f, float(radius) * 12.0f, 1e9f, 1e9f + 1));
+    const float cloudFog = std::min(float(radius) * 12.0f, env.fogCloudsEnd);
+    shader_.set("uFog", glm::vec4(cloudFog * 0.6f, cloudFog, 1e9f, 1e9f + 1));
     white_.bind(0);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);

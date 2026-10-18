@@ -96,6 +96,9 @@ struct Block {
     float speedFactor = 1.0f; // walking on it (soul sand 0.4)
     float jumpFactor = 1.0f;  // jumping from it (honey 0.5)
     float hardness = 1.0f;    // vanilla destroyTime; negative = unbreakable
+    float resistance = 1.0f;  // vanilla explosionResistance (the hardness unless listed)
+    uint8_t igniteOdds = 0;   // fire: how readily it catches from a neighboring fire
+    uint8_t burnOdds = 0;     // fire: how fast it burns away
     bool requiresTool = false; // vanilla requiresCorrectToolForDrops: slow to break and no drops by hand
 
     StateId stateAt(uint32_t local) const { return StateId(first + local); }

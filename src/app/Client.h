@@ -42,6 +42,7 @@ struct Client {
     std::unique_ptr<Chat> chat;
     Commands commands;
     bool screenOpen = false; // input goes to the screen, not the world
+    bool harnessRunning = false; // the CLI harness has set up the world (--exec ran): --hold applies
     bool chatOpen = false;   // the chat screen is up: the log shows in full
     long long chatTicks = 0; // client ticks, for chat message ages
 

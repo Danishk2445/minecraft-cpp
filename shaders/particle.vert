@@ -9,10 +9,14 @@ uniform mat4 uViewProj;
 out vec2 vUV;
 out vec4 vColor;
 out vec2 vLightUV;
+out float vSpherical;
+out float vCylindrical;
 
 void main() {
     gl_Position = uViewProj * vec4(aPos, 1.0);
     vUV = aUV;
     vColor = aColor;
     vLightUV = (aLight + 0.5) / 16.0;
+    vSpherical = length(aPos);
+    vCylindrical = max(length(aPos.xz), abs(aPos.y));
 }

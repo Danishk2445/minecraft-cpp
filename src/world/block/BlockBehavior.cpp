@@ -116,6 +116,34 @@ StateId withStairsShape(const BlockRegistry& reg, const BlockGetter& level, Stat
     return set(reg, self, "shape", "straight");
 }
 
+bool canBurn(const BlockRegistry& reg, StateId s) { return reg.blockOf(s).igniteOdds > 0 && !reg.boolValue(s, "waterlogged"); }
+
+namespace {
+bool soulFireBase(const BlockRegistry& reg, StateId s) {
+    const std::string_view id = shortId(reg.blockOf(s).id);
+    return id == "soul_sand" || id == "soul_soil";
+}
+} // namespace
+
+StateId fireStateAt(const BlockRegistry& reg, const BlockGetter& level, const BlockPos& pos) {
+    const StateId below = level.getBlock(pos.below());
+    if (soulFireBase(reg, below)) return reg.defaultState("soul_fire");
+    const StateId fire = reg.defaultState("fire");
+    if (canBurn(reg, below) || level.sturdy(pos.below(), Direction::Up)) return fire;
+    StateId s = fire;
+    for (Direction d : kDirections)
+        if (d != Direction::Down) s = set(reg, s, directionName(d), canBurn(reg, level.getBlock(pos.offset(d))) ? "true" : "false");
+    return s;
+}
+
+bool fireCanSurvive(const BlockRegistry& reg, const BlockGetter& level, StateId fire, const BlockPos& pos) {
+    if (shortId(reg.blockOf(fire).id) == "soul_fire") return soulFireBase(reg, level.getBlock(pos.below()));
+    if (level.sturdy(pos.below(), Direction::Up)) return true;
+    for (Direction d : kDirections)
+        if (canBurn(reg, level.getBlock(pos.offset(d)))) return true;
+    return false;
+}
+
 StateId updateShape(const BlockRegistry& reg, const BlockGetter& level, StateId self, const BlockPos& pos, Direction dir,
                     StateId neighbor) {
     const Block& block = reg.blockOf(self);
@@ -140,9 +168,16 @@ StateId updateShape(const BlockRegistry& reg, const BlockGetter& level, StateId 
             return BlockRegistry::kAirState;
         return self;
     }
+    if (cls == "fire" || shortId(block.id) == "soul_fire") {
+        // FireBlock.updateShape: out without support, else re-attached (keeping its age).
+        if (!fireCanSurvive(reg, level, self, pos)) return BlockRegistry::kAirState;
+        const StateId fresh = fireStateAt(reg, level, pos);
+        return reg.info(fresh).block == block.index && cls == "fire" ? set(reg, fresh, "age", reg.value(self, "age")) : fresh;
+    }
     // Losing support pops the block (plants, torches, ladders, signs, carpets, ...).
     if (!reg.rules().canSurvive(level, self, pos)) {
-        const bool waterlogged = reg.boolValue(self, "waterlogged") || block.className == "water_plant";
+        const bool waterlogged =
+            reg.boolValue(self, "waterlogged") || block.className == "water_plant" || block.className == "kelp";
         return waterlogged ? reg.defaultState("water") : BlockRegistry::kAirState;
     }
     if (cls == "fence" || cls == "pane" || cls == "wall") {
@@ -150,6 +185,17 @@ StateId updateShape(const BlockRegistry& reg, const BlockGetter& level, StateId 
         return withConnections(reg, level, self, pos);
     }
     if (cls == "stairs" && axisOf(dir) != Axis::Y) return withStairsShape(reg, level, self, pos);
+    if (cls == "attached_stem" && dir == facingOf(reg, self)) {
+        // AttachedStemBlock: its fruit gone, a ripe stem again.
+        const bool pumpkin = shortId(block.id) == "attached_pumpkin_stem";
+        if (shortId(reg.blockOf(neighbor).id) != (pumpkin ? "pumpkin" : "melon"))
+            return set(reg, reg.defaultState(pumpkin ? "pumpkin_stem" : "melon_stem"), "age", "7");
+    }
+    if (dir == Direction::Up && shortId(reg.blockOf(neighbor).id) == "bamboo") {
+        // A bamboo shoot grows into a stalk; a stalk thickens under an older one.
+        if (shortId(block.id) == "bamboo_sapling") return reg.defaultState("bamboo");
+        if (cls == "bamboo" && reg.intValue(neighbor, "age") > reg.intValue(self, "age")) return set(reg, self, "age", "1");
+    }
     if (cls == "snowy" && dir == Direction::Up) {
         const std::string_view n = shortId(reg.blockOf(neighbor).id);
         return set(reg, self, "snowy", n == "snow" || n == "snow_block" ? "true" : "false");

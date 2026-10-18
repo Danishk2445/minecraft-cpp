@@ -19,15 +19,19 @@ struct BlockHit {
 std::optional<std::pair<double, Direction>> clipBox(const AABB& box, const glm::dvec3& from, const glm::dvec3& dir,
                                                      double maxT);
 
-// Which shapes a ray stops at: OUTLINE targets (what the crosshair selects) or
+// Which shapes a ray stops at: OUTLINE targets (what the crosshair selects),
 // VISUAL ones (what blocks the camera: collision shapes, except that glass and
-// panes let it through).
-enum class RayShape : uint8_t { Outline, Visual };
+// panes let it through), or COLLIDER ones (every collision shape: explosions).
+enum class RayShape : uint8_t { Outline, Visual, Collider };
 
-// The first block shape along from -> from + dir * length (dir normalized).
-// With `fluids`, fluid sources and flows count as full blocks of their height.
+// Which fluids a ray stops at (vanilla ClipContext.Fluid): none, sources only (buckets),
+// or any; a fluid counts as a box of its height.
+enum class RayFluid : uint8_t { None, SourceOnly, Any };
+
+// The first block shape (or fluid) along from -> from + dir * length (dir normalized).
 std::optional<BlockHit> raycastBlocks(const BlockGetter& level, const glm::dvec3& from, const glm::dvec3& dir,
-                                      double length, bool fluids = false, RayShape shape = RayShape::Outline);
+                                      double length, RayFluid fluids = RayFluid::None,
+                                      RayShape shape = RayShape::Outline);
 
 // Vanilla Camera.getMaxZoom: how far (at most `maxZoom`) a third-person camera can
 // back away from `eye` against `forward` before one of 8 rays from the corners of a

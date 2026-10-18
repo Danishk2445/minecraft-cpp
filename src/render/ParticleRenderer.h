@@ -24,7 +24,8 @@ public:
     using LightFn = std::function<glm::vec2(const BlockPos&)>;
     // The lightmap must be bound to texture unit 1.
     void render(const ParticleSystem& particles, const LightFn& lightAt, const Camera& camera, const glm::mat4& viewProj,
-                const Atlas& atlas, const Texture& atlasTexture, float partialTick);
+                const Atlas& atlas, const Texture& atlasTexture, float partialTick, const glm::vec4& fogColor,
+                const glm::vec4& fogDistances);
 
 private:
     struct Vertex {

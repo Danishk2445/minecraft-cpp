@@ -33,6 +33,9 @@ public:
     size_t stepCount() const { return steps_.size(); }
     const std::vector<const PlacedFeature*>& order(size_t step) const { return order_[step]; }
     std::optional<size_t> stepIndex(std::string_view name) const;
+    // Vanilla BiomeGenerationSettings.getFlowerFeatures: the single flowers of the biome's
+    // "flower" patches, in decoration order (what bone meal on grass may place).
+    const std::vector<const PlacedFeature*>& flowerFeatures(BiomeId biome) const;
 
 private:
     FeatureSet features_;
@@ -40,6 +43,7 @@ private:
     std::vector<std::vector<const PlacedFeature*>> order_; // per step, by global index
     std::vector<size_t> stepBase_;                         // bit offset of each step in a membership row
     std::vector<std::vector<uint64_t>> membership_;        // per biome: bit per (step, feature)
+    std::vector<std::vector<const PlacedFeature*>> flowers_; // per biome
 };
 
 } // namespace mc

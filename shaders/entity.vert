@@ -3,7 +3,7 @@ layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec2 aUV;
 layout(location = 2) in vec4 aColor; // tint * entity shading, alpha
 layout(location = 3) in vec2 aLight; // block, sky levels 0..15
-layout(location = 4) in float aOverlay; // toward red, for the hurt
+layout(location = 4) in vec4 aOverlay; // a color mixed in by its alpha (hurt red, TNT white)
 
 uniform mat4 uViewProj;
 
@@ -12,7 +12,7 @@ out vec4 vColor;
 out vec2 vLightUV;
 out float vSpherical;
 out float vCylindrical;
-out float vOverlay;
+out vec4 vOverlay;
 
 void main() {
     gl_Position = uViewProj * vec4(aPos, 1.0);

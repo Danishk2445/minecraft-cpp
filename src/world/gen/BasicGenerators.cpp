@@ -11,6 +11,7 @@ FlatGenerator::FlatGenerator(const BlockRegistry& r)
 FlatGenerator::FlatGenerator(const BlockRegistry&, std::vector<Layer> layers) : layers_(std::move(layers)) {}
 
 void FlatGenerator::generateTerrain(Chunk& chunk) const {
+    for (Section& s : chunk.sections) s.biomes.fill(biome);
     int y = kWorldMinY;
     for (const Layer& l : layers_)
         for (int i = 0; i < l.count && y <= kWorldMaxY; ++i, ++y)

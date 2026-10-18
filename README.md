@@ -49,11 +49,12 @@ Any option about a world opens that world directly instead (the scripted tests u
 
 `--gallery` shows the M1 block gallery instead.
 
-`--exec "/setblock 0 -60 0 stone"` runs commands once the spawn area is loaded. `--hold forward,sprint,attack` holds controls down for the whole run (forward, back, left, right, jump, sneak, sprint, attack, use), for scripted screenshots.
+`--exec "/setblock 0 -60 0 stone"` runs commands once the spawn area is loaded. `--hold forward,sprint,attack` holds controls down from then on (forward, back, left, right, jump, sneak, sprint, attack, use), for scripted screenshots.
 
 More options:
 - `--time T` (0 = sunrise, 6000 = noon, 18000 = midnight)
 - `--freeze-time`
+- `--weather clear|rain|thunder` (at full strength from the start, with the weather cycle off)
 - `--debug-overlay` (F3)
 - `--smooth-lighting off`
 
@@ -68,7 +69,7 @@ Controls:
 - WASD: walk; Space: jump (double-tap in creative to fly, then Space/Shift to rise/sink)
 - Shift: sneak (never walks off ledges); Ctrl: sprint
 - Left mouse: break (instant in creative, otherwise at the held tool's speed); middle mouse: pick block (creative)
-- Right mouse: place; open doors, trapdoors and gates, flip levers, press buttons; open crafting tables, chests, barrels, ender chests and furnaces; sleep in a bed at night (it also sets the respawn point); write on a sign (dyes, glow ink sacs, ink sacs and honeycomb change it instead); eat and drink (hold); till with a hoe, make paths with a shovel, strip and scrape with an axe, carve pumpkins with shears, wax copper, light fires with flint and steel; put on armor. Sneak to place against a block instead of using it
+- Right mouse: place; open doors, trapdoors and gates, flip levers, press buttons; open crafting tables, chests, barrels, ender chests and furnaces; sleep in a bed at night (it also sets the respawn point); write on a sign (dyes, glow ink sacs, ink sacs and honeycomb change it instead); eat and drink (hold); fill and empty buckets; bone meal plants and grass; till with a hoe, make paths with a shovel, strip and scrape with an axe, carve pumpkins with shears, wax copper, light fires and TNT with flint and steel; put on armor. Sneak to place against a block instead of using it
 - 1–9 or the mouse wheel: hotbar slot; F: swap hands; Q: drop one of the held item (Ctrl+Q: the stack)
 - E: inventory (creative: the creative inventory with tabs and search). In menus: click, right click (half / one), shift-click, drag to spread, double-click to collect, 1–9 and F to swap with the hotbar or off hand, Q to throw, middle click to copy (creative)
 - Esc: pause menu (Options, Save and Quit to Title); in menus, back
@@ -78,9 +79,11 @@ Controls:
 - F5: third person from behind, then from the front, then back to first person
 - F11: fullscreen
 
-Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule doDaylightCycle|keepInventory|naturalRegeneration [value]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb [x y z] [nbt]`, `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill`, `/item replace block x y z container.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
+Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule <rule> [value]` (doDaylightCycle, keepInventory, naturalRegeneration, doFireTick, waterSourceConversion, lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread, doWeatherCycle, randomTickSpeed, snowAccumulationHeight), `/weather clear|rain|thunder [duration]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb|tnt|lightning_bolt [x y z] [nbt]`, `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill`, `/item replace block x y z container.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
 
 Survival: health, hunger and saturation, air, fall and fire damage, armor, death (the inventory and experience drop; Respawn or Title Screen) and respawning at the last bed. Tools mine at their tier's speed and only the right tier drops ores; tools and armor wear out. Drops and thrown items lie on the ground until picked up; experience orbs fly to the player. Crafting works in the inventory's 2×2 grid and at crafting tables (1,063 recipes), furnaces, smokers and blast furnaces smelt with fuel, and two worn tools of a kind repair each other. The Attack Indicator option (Video Settings) shows the attack cooldown under the crosshair or beside the hotbar.
+
+The world lives: water and lava flow (two water sources make a third), sand and gravel fall, crops, saplings, cane, cactus, kelp, bamboo, vines and berries grow (bone meal hurries them), grass spreads, leaves decay without logs, farmland dries and gets trampled, ice and snow melt by torches and form in the cold, copper weathers, fire spreads and burns things away, TNT blows up (and lights other TNT), and the weather turns: rain, snow in cold biomes, and thunderstorms with lightning. Particles show smoke, flames, splashes, drips, falling leaves and explosions; under water and in lava the fog closes in.
 
 `--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen NAME` opens a screen for screenshots: in a world once it is ready (`inventory`, `pause`, `options`, `video`, `chat`), or over the title (`title`, `worlds`, `create`, `options`, `video`). `--splash TEXT` fixes the title's splash.
 

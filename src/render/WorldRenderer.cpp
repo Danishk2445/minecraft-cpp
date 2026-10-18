@@ -31,6 +31,7 @@ bool WorldRenderer::init() {
     blockEntities_.build(registry_, assets_.blockEntityModels(), assets_.blockAtlas());
     options_.blockEntities = &blockEntities_;
     if (!particles_.init()) return false;
+    if (!weather_.init(assets_.pack())) return false;
     if (!entities_.init(assets_)) return false;
     if (!chunks_.init()) return false;
     if (!sky_.init(assets_.pack())) return false;
@@ -99,13 +100,22 @@ void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int render
     in.partialTick = partialTick;
     in.lookDir = camera.forward();
     in.renderDistance = renderDistance;
+    in.rain = level.rainLevel(partialTick);
+    in.thunder = level.thunderLevel(partialTick);
+    in.skyFlash = view.skyFlash;
+    in.cameraFluid = view.fluid;
+    in.waterFogColor = view.waterFogColor;
+    in.waterVision = view.waterVision;
+    in.closerWaterFog = view.closerWaterFog;
+    in.spectator = view.spectator;
     env_ = computeEnvironment(in);
     lightmap_.update(env_, gamma, flicker_.value());
 
     glViewport(0, 0, viewport.x, viewport.y);
     glClearColor(env_.fogColor.r, env_.fogColor.g, env_.fogColor.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    sky_.renderSky(camera, aspect, env_);
+    // In lava there is no sky to see (vanilla skips the sky pass).
+    if (view.fluid != EnvironmentInputs::CameraFluid::Lava) sky_.renderSky(camera, aspect, env_);
 
     const glm::mat4 viewProj = camera.projection(aspect) * camera.view();
     ChunkRenderer::Fog fog;
@@ -135,7 +145,17 @@ void WorldRenderer::renderParticles(const ParticleSystem& particles, const Level
         return glm::vec2(float(l & 15), float(l >> 4));
     };
     lightmap_.bind(1);
-    particles_.render(particles, lightAt, camera, viewProj, assets_.blockAtlas(), assets_.blockAtlasTexture(), partialTick);
+    particles_.render(particles, lightAt, camera, viewProj, assets_.blockAtlas(), assets_.blockAtlasTexture(), partialTick,
+                      glm::vec4(env_.fogColor, 1.0f),
+                      glm::vec4(env_.fogEnvStart, env_.fogEnvEnd, env_.fogRdStart, env_.fogRdEnd));
+}
+
+void WorldRenderer::renderWeather(const Level& level, const Camera& camera, glm::ivec2 viewport, int64_t ticks,
+                                  float partialTick) {
+    const float aspect = float(viewport.x) / float(std::max(viewport.y, 1));
+    lightmap_.bind(1);
+    weather_.render(level, camera, camera.projection(aspect) * camera.view(), ticks, partialTick, glm::vec4(env_.fogColor, 1.0f),
+                    glm::vec4(env_.fogEnvStart, env_.fogEnvEnd, env_.fogRdStart, env_.fogRdEnd));
 }
 
 } // namespace mc

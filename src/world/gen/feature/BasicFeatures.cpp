@@ -231,6 +231,10 @@ class RandomPatchFeature final : public Feature {
 public:
     int tries = 128, xzSpread = 7, ySpread = 3;
     const PlacedFeature* feature = nullptr;
+    bool flower = false; // the "flower" type: bone meal on grass may place `feature`
+
+    void nested(std::vector<const Feature*>& out) const override { out.push_back(feature->feature); }
+    const PlacedFeature* bonemealFlower() const override { return flower ? feature : nullptr; }
 
     bool place(FeatureContext& ctx) const override {
         Xoroshiro& r = ctx.random;
@@ -262,6 +266,12 @@ std::unique_ptr<Feature> makeRandomPatch(const Json& c, FeatureLoader& l) {
     return f;
 }
 
+std::unique_ptr<Feature> makeFlower(const Json& c, FeatureLoader& l) {
+    auto f = makeRandomPatch(c, l);
+    if (f) static_cast<RandomPatchFeature&>(*f).flower = true;
+    return f;
+}
+
 // ---------------------------------------------------------------- selectors
 
 class RandomSelectorFeature final : public Feature {
@@ -269,6 +279,10 @@ public:
     std::vector<std::pair<const PlacedFeature*, float>> features;
     const PlacedFeature* fallback = nullptr;
 
+    void nested(std::vector<const Feature*>& out) const override {
+        for (const auto& [f, chance] : features) out.push_back(f->feature);
+        out.push_back(fallback->feature);
+    }
     bool place(FeatureContext& ctx) const override {
         PlacementContext nested{ctx.level};
         for (const auto& [f, chance] : features)
@@ -293,6 +307,9 @@ class SimpleRandomSelectorFeature final : public Feature {
 public:
     std::vector<const PlacedFeature*> features;
 
+    void nested(std::vector<const Feature*>& out) const override {
+        for (const PlacedFeature* f : features) out.push_back(f->feature);
+    }
     bool place(FeatureContext& ctx) const override {
         PlacementContext nested{ctx.level};
         const PlacedFeature* f = features[size_t(ctx.random.nextInt(int(features.size())))];
@@ -385,7 +402,7 @@ void registerBasicFeatures(FeatureSet& set) {
     set.registerFeature("disk", makeDisk);
     set.registerFeature("simple_block", makeSimpleBlock);
     set.registerFeature("random_patch", makeRandomPatch);
-    set.registerFeature("flower", makeRandomPatch);
+    set.registerFeature("flower", makeFlower);
     set.registerFeature("no_bonemeal_flower", makeRandomPatch);
     set.registerFeature("random_selector", makeRandomSelector);
     set.registerFeature("simple_random_selector", makeSimpleRandomSelector);

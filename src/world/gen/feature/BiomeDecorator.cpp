@@ -138,11 +138,36 @@ bool BiomeDecorator::load(const std::filesystem::path& dataDir, const BlockRegis
             }
     }
 
+    // Each biome's flowers: its own lists in step order, walking nested features depth first.
+    flowers_.assign(biomes.size(), {});
+    for (size_t b = 0; b < biomes.size(); ++b) {
+        if (!biomeLists[b]) continue;
+        std::vector<const Feature*> stack;
+        for (size_t s = 0; s < steps_.size(); ++s)
+            for (const PlacedFeature* f : (*biomeLists[b])[s]) {
+                stack.assign(1, f->feature);
+                while (!stack.empty()) {
+                    const Feature* g = stack.back();
+                    stack.pop_back();
+                    if (!g) continue;
+                    if (const PlacedFeature* flower = g->bonemealFlower()) flowers_[b].push_back(flower);
+                    const size_t at = stack.size();
+                    g->nested(stack);
+                    std::reverse(stack.begin() + std::ptrdiff_t(at), stack.end()); // first option first
+                }
+            }
+    }
+
     if (errors) {
         errors->clear();
         for (const auto& p : problems) *errors += p + "\n";
     }
     return problems.empty();
+}
+
+const std::vector<const PlacedFeature*>& BiomeDecorator::flowerFeatures(BiomeId biome) const {
+    static const std::vector<const PlacedFeature*> none;
+    return biome < flowers_.size() ? flowers_[biome] : none;
 }
 
 std::optional<size_t> BiomeDecorator::stepIndex(std::string_view name) const {

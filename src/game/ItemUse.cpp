@@ -3,6 +3,7 @@
 #include <string>
 
 #include "resources/ResourcePack.h"
+#include "world/block/BlockBehavior.h"
 
 namespace mc {
 namespace {
@@ -132,14 +133,14 @@ std::optional<ItemUseResult> useItemOn(const BlockGetter& level, const ItemRegis
                                 id.ends_with("candle_cake")) &&
                                reg.value(state, "lit") == "false" && !reg.boolValue(state, "waterlogged");
         if (lightable) return ItemUseResult{pos, *reg.with(state, "lit", "true"), {}, 1, false};
+        // TntBlock.useItemOn: lit TNT.
+        if (id == "tnt") return ItemUseResult{pos, BlockRegistry::kAirState, {}, 1, false, true};
+        // BaseFireBlock.canBePlacedAt: air where fire can stay (a sturdy floor or fuel beside).
         const BlockPos firePos = pos.offset(face);
         if (!(reg.info(level.getBlock(firePos)).flags & kAir)) return std::nullopt;
-        const StateId below = level.getBlock(firePos.offset(0, -1, 0));
-        if (!(reg.info(below).sturdyFaces & (1u << int(Direction::Up)))) return std::nullopt;
-        const std::string_view belowId = shortId(reg.blockOf(below).id);
-        const Block* fire = reg.find(belowId == "soul_soil" || belowId == "soul_sand" ? "soul_fire" : "fire");
-        if (!fire) return std::nullopt;
-        return ItemUseResult{firePos, fire->defaultState, {}, 1, false};
+        const StateId fire = fireStateAt(reg, level, firePos);
+        if (!fireCanSurvive(reg, level, fire, firePos)) return std::nullopt;
+        return ItemUseResult{firePos, fire, {}, 1, false};
     }
     return std::nullopt;
 }

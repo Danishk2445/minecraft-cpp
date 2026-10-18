@@ -61,6 +61,11 @@ EnvironmentState computeEnvironment(const EnvironmentInputs& in) {
         const float m = 1.0f - in.thunder * 0.75f;
         sky = sky * m + glm::vec3(grey) * (1.0f - m);
     }
+    if (in.skyFlash > 0) {
+        const float h = std::min(in.skyFlash, 1.0f) * 0.45f;
+        sky = sky * (1.0f - h) + glm::vec3(0.8f, 0.8f, 1.0f) * h;
+        s.skyFlash = true;
+    }
     s.skyColor = sky;
 
     // Sunrise / sunset (DimensionSpecialEffects)
@@ -98,6 +103,24 @@ EnvironmentState computeEnvironment(const EnvironmentInputs& in) {
         s.fogEnvStart = glm::mix(1e4f, rd * 0.25f, in.rain);
         s.fogEnvEnd = glm::mix(1e4f + 1, rd, in.rain);
     }
+    // Vanilla WaterFogEnvironment and LavaFogEnvironment: the camera in a fluid.
+    if (in.cameraFluid == EnvironmentInputs::CameraFluid::Water) {
+        s.fogEnvStart = -8.0f;
+        s.fogEnvEnd = 96.0f * std::max(0.25f, in.waterVision) * (in.closerWaterFog ? 0.85f : 1.0f);
+        s.fogSkyEnd = s.fogCloudsEnd = s.fogEnvEnd;
+        glm::vec3 c = rgb(in.waterFogColor);
+        // As the eyes adjust, the water's color brightens to its full hue.
+        if (c.r > 0 && c.g > 0 && c.b > 0) {
+            const float x = std::min(1.0f / c.r, std::min(1.0f / c.g, 1.0f / c.b));
+            c = c * (1.0f - in.waterVision) + c * x * in.waterVision;
+        }
+        s.fogColor = c;
+    } else if (in.cameraFluid == EnvironmentInputs::CameraFluid::Lava) {
+        s.fogEnvStart = in.spectator ? -8.0f : 0.25f;
+        s.fogEnvEnd = in.spectator ? rd * 0.5f : 1.0f;
+        s.fogSkyEnd = s.fogCloudsEnd = s.fogEnvEnd;
+        s.fogColor = {0.6f, 0.1f, 0.0f};
+    }
     return s;
 }
 
@@ -105,7 +128,7 @@ LightmapTexels computeLightmap(const EnvironmentState& env, float gamma, float b
     LightmapTexels texels{};
     // Uniform values as computed by vanilla LightTexture.updateLightTexture.
     const float ambient = 0.0f; // overworld
-    const float skyFactor = env.skyDarken * 0.95f + 0.05f;
+    const float skyFactor = env.skyFlash ? 1.0f : env.skyDarken * 0.95f + 0.05f;
     const float blockFactor = blockFlicker + 1.5f;
     const glm::vec3 skyLightColor = glm::mix(glm::vec3(env.skyDarken, env.skyDarken, 1.0f), glm::vec3(1.0f), 0.35f);
     auto brightness = [&](float level) {

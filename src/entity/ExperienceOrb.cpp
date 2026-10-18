@@ -100,16 +100,24 @@ void ExperienceOrb::playerTouch(Level& level, Player& player) {
     if (--count <= 0) removed = true;
 }
 
+bool ExperienceOrb::hurtServer(Level&, DamageType, float amount) {
+    health = int(float(health) - amount);
+    if (health <= 0) removed = true;
+    return true;
+}
+
 void ExperienceOrb::saveExtra(Json& out) const {
     out["value"] = value;
     out["count"] = count;
     out["age"] = age;
+    out["health"] = health;
 }
 
 void ExperienceOrb::loadExtra(const Json& in, const ItemRegistry&) {
     value = std::max(1, in.value("value", 1));
     count = std::max(1, in.value("count", 1));
     age = in.value("age", 0);
+    health = in.value("health", 5);
 }
 
 } // namespace mc

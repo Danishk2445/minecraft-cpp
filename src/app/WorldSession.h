@@ -27,6 +27,7 @@ class GuiGraphics;
 class Hud;
 class InventoryMenu;
 class Level;
+class BiomeDecorator;
 class OverworldGenerator;
 class WorldRenderer;
 
@@ -110,6 +111,9 @@ private:
     void message(const std::string& key);
     // Right-click with armor in hand: it swaps with what is worn in its slot.
     bool equipFromHand(ItemStack& stack);
+    // Buckets: fill from a source (or a waterlogged block), pour where aimed.
+    bool useBucket(ItemStack& stack);
+    bool emptyBucket(const BlockPos& pos, FluidKind content, const BlockHit* hit);
     // Breaking blocks and swinging at nothing (the attack button), once a tick.
     void tickAttack(bool attackHeld);
     // Signs: dyes, glow ink and wax by hand; otherwise the facing side opens for editing.
@@ -134,6 +138,12 @@ private:
     // A tool wearing out: its pieces fly (vanilla breakItem particles).
     void spawnItemBreak(const Item& item);
     void spawnBlockParticles(const BlockPos& p, StateId s, std::optional<Direction> face);
+    // Vanilla BoneMealItem.addGrowthParticles: sparkles in the block, or spread around
+    // grass, moss and water.
+    void spawnBoneMealParticles(const BlockPos& p, int count);
+    // The client's per-tick particles: the world's ambient ones, rain splashes, lit TNT
+    // smoking, the player splashing into water.
+    void tickClientParticles();
     bool placeBlock();
     void renderHud(glm::ivec2 fb, float partialTick, const std::function<void()>& renderGui);
     // Items, orbs and pickup animations for the entity renderer.
@@ -147,6 +157,7 @@ private:
     WorldParams params_;
     std::filesystem::path worldDir_; // empty for an unsaved world
     std::shared_ptr<const OverworldGenerator> overworld_; // when the world type is "default"
+    std::shared_ptr<BiomeDecorator> decorator_;            // features (trees, flowers) for every world type
     std::unique_ptr<Level> level_;
     std::unique_ptr<WorldRenderer> worldRenderer_;
     std::unique_ptr<BlockOverlay> overlay_;
@@ -154,6 +165,9 @@ private:
     std::unique_ptr<InventoryMenu> inventoryMenu_;
     std::unique_ptr<Hud> hud_;
     ParticleSystem particles_;
+    bool wasInWater_ = true; // no splash on the first tick
+    int skyFlashTime_ = 0;    // lightning lights the sky (vanilla ClientLevel.skyFlashTime)
+    int waterVisionTime_ = 0; // ticks the eyes have spent under water (vanilla, up to 600)
     Camera camera_;
     Perspective perspective_ = Perspective::FirstPerson;
     float eyeHeight_ = 1.62f, oldEyeHeight_ = 1.62f; // the camera's eased eye height

@@ -16,6 +16,7 @@ public:
     ExperienceOrb();
     std::string_view type() const override { return "minecraft:experience_orb"; }
     void tick(Level& level) override;
+    bool hurtServer(Level& level, DamageType type, float amount) override;
     void saveExtra(Json& out) const override;
     void loadExtra(const Json& in, const ItemRegistry& items) override;
     std::unique_ptr<Entity> clone() const override { return std::make_unique<ExperienceOrb>(*this); }
@@ -24,6 +25,7 @@ public:
     int value = 1; // points per orb
     int count = 1; // merged orbs of this value
     int age = 0;
+    int health = 5;
 
     // Which of the 11 orb sprites (vanilla getIcon), by value.
     int icon() const;
