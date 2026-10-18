@@ -1,6 +1,6 @@
 # Status
 
-The plan is `~/.claude/plans/make-minecraft-in-c-sparkling-ladybug.md`, covering the core game in milestones M0–M13. Each milestone ends runnable with its tests passing, and gets a local commit.
+The game was built to a plan covering the core game in milestones M0–M13. Each milestone ends runnable with its tests passing, and is one commit.
 
 ## Milestones
 - [x] M0 Skeleton: CMake/presets, GL loader, window/input, fixed-tick loop, jobs, PNG, screenshots, CLI harness
@@ -101,6 +101,8 @@ Recorded per milestone.
   - Creative inventory: tab contents are vanilla's order as written from memory (`data/creative_tabs.json`). There is no Saved Hotbars tab, and the Operator Utilities tab stays hidden. Search matches names and ids, not tags or tooltips.
   - There is no recipe book (out of scope).
   - First-person hands bob with the view since M13.
+  - The player in the survival inventory is drawn bare: without the worn armor and the held items that vanilla shows on it.
+  - F1 hides the HUD, the hand, the chat and the camera overlays (vanilla `hideGui`), and `--hide-gui` starts that way. The in-wall, underwater and fire overlays still draw, as in vanilla.
 - **M9:**
   - The pack's panorama is six 1×1 placeholders, so the game bakes its own into `<gamedir>/panorama` on first start (a few seconds): our seed 42 from (−60, 79, −250) at time 2500. `--bake-panorama` re-bakes it; with `--seed`, `--pos`, `--look` and `--time` it bakes another view. The pack's `panorama_overlay` is transparent, so nothing tints it.
   - Title screen: no fade-in. The version line names this game, and the corner where vanilla shows its copyright line reads "Not an official Minecraft product." Multiplayer, Realms, Language (en_us only) and Accessibility are disabled.

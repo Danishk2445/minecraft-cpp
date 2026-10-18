@@ -139,6 +139,7 @@ bool WorldSession::init() {
             level_->doWeatherCycle = false;
         }
         showDebug = cli.debugOverlay;
+        hideGui = cli.hideGui;
     }
     worldRenderer_ = std::make_unique<WorldRenderer>(*client_.assets, registry,
                                                      params_.type == "default" ? client_.biomes.get() : nullptr);
@@ -358,6 +359,7 @@ std::string WorldSession::handleInput() {
     const KeyBindings& keys = client_.options.keys;
     const auto pressed = [&](KeyAction a) { return in.pressed(keys[a]); };
     if (pressed(KeyAction::TogglePerspective)) perspective_ = Perspective((int(perspective_) + 1) % 3);
+    if (in.keyPressed(GLFW_KEY_F1)) hideGui = !hideGui;
     if (in.keyPressed(GLFW_KEY_F3)) showDebug = !showDebug;
     if (in.keyPressed(GLFW_KEY_ESCAPE)) return "pause";
     if (pressed(KeyAction::Inventory) && player_->mode() != GameMode::Spectator) return "inventory";
@@ -704,7 +706,7 @@ void WorldSession::render(glm::ivec2 fb, float partialTick, const std::function<
         for (AABB& b : shape) b = b.moved(offset);
         overlay_->render(camera_, fb, target_->pos, shape, stage);
     }
-    if (perspective_ == Perspective::FirstPerson && !player_->sleeping())
+    if (perspective_ == Perspective::FirstPerson && !player_->sleeping() && !hideGui)
         worldRenderer_->renderHands(*player_, *level_, fb, partialTick,
                                     glm::rotate(glm::mat4(1.0f), glm::radians(camera_.roll), glm::vec3(0, 0, 1)) * camera_.bob);
     captureIcon(fb);
@@ -1921,18 +1923,20 @@ void WorldSession::renderHud(glm::ivec2 fb, float, const std::function<void()>& 
                 overlays.fire = &client_.assets->blockAtlas().sprite("minecraft:block/fire_1");
         }
         const ItemStack& head = player_->inventory.armor[3];
-        overlays.pumpkin = !head.empty() && head.item->id == "minecraft:carved_pumpkin";
+        overlays.pumpkin = !head.empty() && head.item->id == "minecraft:carved_pumpkin" && !hideGui;
     }
-    if (client_.options.fancyGraphics()) overlays.vignette = vignette_;
+    if (client_.options.fancyGraphics() && !hideGui) overlays.vignette = vignette_;
     renderScreenOverlays(gui, overlays, client_.assets->blockAtlasTexture());
-    hud_->render(gui, *player_, perspective_ == Perspective::FirstPerson && !client_.screenOpen, eyeInWater,
-                 [&gui](const ItemStack& stack, float x, float y) {
-                     gui.item(stack, x, y);
-                     gui.itemDecorations(stack, x, y);
-                 });
-    // Vanilla Gui.render: the debug screen under the chat, and both under any screen.
-    if (showDebug) renderDebugOverlay(gui);
-    client_.chat->render(gui, client_.options, client_.chatTicks, client_.chatOpen);
+    if (!hideGui) {
+        hud_->render(gui, *player_, perspective_ == Perspective::FirstPerson && !client_.screenOpen, eyeInWater,
+                     [&gui](const ItemStack& stack, float x, float y) {
+                         gui.item(stack, x, y);
+                         gui.itemDecorations(stack, x, y);
+                     });
+        // Vanilla Gui.render: the debug screen under the chat, and both under any screen.
+        if (showDebug) renderDebugOverlay(gui);
+    }
+    if (!hideGui || client_.chatOpen) client_.chat->render(gui, client_.options, client_.chatTicks, client_.chatOpen);
     if (renderGui) renderGui();
     gui.end();
 }

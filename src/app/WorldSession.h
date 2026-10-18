@@ -98,6 +98,7 @@ public:
     Difficulty difficulty() const { return params_.difficulty; }
     void setDifficulty(Difficulty d) { params_.difficulty = d; }
     bool showDebug = false;
+    bool hideGui = false; // F1: no HUD, hand, chat or camera overlays (vanilla options.hideGui)
     double fps = 0.0;
     std::string statusLine() const; // for the window title
     // An /assertblock check failed (the harness exits with an error).

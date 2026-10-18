@@ -49,6 +49,7 @@ struct CliOptions {
     std::optional<bool> viewBobbing; // harness runs: off unless given
     std::vector<std::pair<std::string, std::string>> gameRules; // set before any chunk generates
     bool debugOverlay = false;     // show the F3 screen from the start
+    bool hideGui = false;          // start with the GUI hidden (F1)
     std::optional<bool> smoothLighting; // overrides the option
     std::optional<int> graphics;        // overrides the option: 0 fast, 1 fancy, 2 fabulous
     bool caveCulling = true;            // the occlusion search (off: every section in the frustum)

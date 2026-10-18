@@ -165,6 +165,8 @@ const std::vector<Option>& options() {
          }},
         {"--debug-overlay", "", "show the F3 debug screen",
          [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
+        {"--hide-gui", "", "hide the HUD and the hand (F1), for clean screenshots",
+         [](CliOptions& o, std::string_view) { return o.hideGui = true, true; }},
         {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
          [](CliOptions& o, std::string_view v) {
              bool on = true;
