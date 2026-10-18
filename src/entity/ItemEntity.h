@@ -21,7 +21,7 @@ public:
     void saveExtra(Json& out) const override;
     void loadExtra(const Json& in, const ItemRegistry& items) override;
     std::unique_ptr<Entity> clone() const override { return std::make_unique<ItemEntity>(*this); }
-    bool hurtServer(Level& level, DamageType type, float amount) override;
+    bool hurtServer(Level& level, const DamageSource& source, float amount) override;
     // Vanilla playerTouch: into the inventory once the pickup delay is over.
     void playerTouch(Level& level, Player& player);
 

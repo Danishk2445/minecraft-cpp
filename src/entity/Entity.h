@@ -65,17 +65,27 @@ public:
     void updateFluidState(const BlockGetter& level);
     // Currents push it (vanilla isPushedByFluid; flying players aren't).
     virtual bool pushedByFluid() const { return true; }
-    // Vanilla hurtServer: damage from the world (explosions, lightning); false when it
-    // didn't take it. Items and orbs lose health; blocks and TNT don't care.
-    virtual bool hurtServer(Level& level, DamageType type, float amount) {
-        (void)level, (void)type, (void)amount;
+    // Vanilla hurtServer: damage from the world (explosions, lightning) or an attacker; false
+    // when it didn't take it. Items and orbs lose health; blocks and TNT don't care.
+    virtual bool hurtServer(Level& level, const DamageSource& source, float amount) {
+        (void)level, (void)source, (void)amount;
         return false;
     }
     virtual bool isPlayer() const { return false; }
+    // Vanilla isPickable: the crosshair (and arrows) can hit it: living things.
+    virtual bool isPickable() const { return false; }
+    // Vanilla isPushable: other entities shove it aside (living things, not spectators).
+    virtual bool isPushable() const { return false; }
+    // Rain falls on it (at its feet or its top), set each tick by whoever ticks it: it puts
+    // fires out.
+    bool inRain = false;
     // The block that decides friction/speed: just below the feet (vanilla 0.500001 down).
     BlockPos blockBelow() const;
     // Vanilla stuck-in-block slowdown (cobweb, berry bushes, powder snow), consumed by move().
-    void makeStuckInBlock(const glm::dvec3& multiplier) { stuck_ = multiplier; }
+    void makeStuckInBlock(const glm::dvec3& multiplier) {
+        stuck_ = multiplier;
+        fallDistance = 0.0;
+    }
     // Vanilla moveTowardsClosestSpace: when inside a solid block, a push toward the nearest
     // open neighbor (up when tied), for items and orbs stuck in walls.
     void moveTowardsClosestSpace(const BlockGetter& level, float random01);
@@ -85,5 +95,9 @@ public:
 protected:
     glm::dvec3 stuck_{0.0};
 };
+
+// Vanilla Entity.push(Entity): two overlapping entities shove each other apart (each that
+// is pushable), harder the closer their centers.
+void pushApart(Entity& a, Entity& b);
 
 } // namespace mc

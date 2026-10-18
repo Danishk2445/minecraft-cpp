@@ -27,6 +27,7 @@ class GuiGraphics;
 class Hud;
 class InventoryMenu;
 class Level;
+struct LevelEvent;
 class BiomeDecorator;
 class OverworldGenerator;
 class WorldRenderer;
@@ -141,6 +142,12 @@ private:
     // Vanilla BoneMealItem.addGrowthParticles: sparkles in the block, or spread around
     // grass, moss and water.
     void spawnBoneMealParticles(const BlockPos& p, int count);
+    // Mobs (M12): the right click on one (feeding, shearing, spawn eggs), the bow's arrows
+    // and release, and the particles of entity events (poof, hearts, crits, sweeps).
+    bool useOnEntity(Entity& e);
+    ItemStack* findArrows();
+    void releaseBow(ItemStack& bow);
+    void spawnEntityParticles(const LevelEvent& e);
     // The client's per-tick particles: the world's ambient ones, rain splashes, lit TNT
     // smoking, the player splashing into water.
     void tickClientParticles();
@@ -171,7 +178,15 @@ private:
     Camera camera_;
     Perspective perspective_ = Perspective::FirstPerson;
     float eyeHeight_ = 1.62f, oldEyeHeight_ = 1.62f; // the camera's eased eye height
+    float fovModifier_ = 1.0f, oldFovModifier_ = 1.0f; // vanilla GameRenderer.fovModifier
     std::optional<BlockHit> target_;                  // the block under the crosshair
+    uint32_t entityTarget_ = 0;                       // or the entity (vanilla crosshairPickEntity)
+    struct CritEmitter {
+        glm::dvec3 pos;
+        glm::dvec2 size; // the target's width and height
+        int life = 0;
+    };
+    std::vector<CritEmitter> critEmitters_;
     struct Breaking {
         BlockPos pos;
         float progress = 0.0f;

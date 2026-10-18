@@ -55,6 +55,8 @@ More options:
 - `--time T` (0 = sunrise, 6000 = noon, 18000 = midnight)
 - `--freeze-time`
 - `--weather clear|rain|thunder` (at full strength from the start, with the weather cycle off)
+- `--gamerule NAME=VALUE[,...]` (set as the world opens, before chunks generate: `doMobSpawning=false` keeps a scene free of animals and monsters)
+- `--fov-effects S` (scripted runs keep the FOV still unless asked: 0..1)
 - `--debug-overlay` (F3)
 - `--smooth-lighting off`
 
@@ -68,20 +70,22 @@ Controls:
 - Mouse: look
 - WASD: walk; Space: jump (double-tap in creative to fly, then Space/Shift to rise/sink)
 - Shift: sneak (never walks off ledges); Ctrl: sprint
-- Left mouse: break (instant in creative, otherwise at the held tool's speed); middle mouse: pick block (creative)
-- Right mouse: place; open doors, trapdoors and gates, flip levers, press buttons; open crafting tables, chests, barrels, ender chests and furnaces; sleep in a bed at night (it also sets the respawn point); write on a sign (dyes, glow ink sacs, ink sacs and honeycomb change it instead); eat and drink (hold); fill and empty buckets; bone meal plants and grass; till with a hoe, make paths with a shovel, strip and scrape with an axe, carve pumpkins with shears, wax copper, light fires and TNT with flint and steel; put on armor. Sneak to place against a block instead of using it
+- Left mouse: break (instant in creative, otherwise at the held tool's speed), or attack the mob under the crosshair (within 3 blocks; falling for a critical hit, sprinting to knock it back, a sword sweeps); middle mouse: pick block (creative)
+- Right mouse: place; open doors, trapdoors and gates, flip levers, press buttons; open crafting tables, chests, barrels, ender chests and furnaces; sleep in a bed at night (it also sets the respawn point); write on a sign (dyes, glow ink sacs, ink sacs and honeycomb change it instead); eat and drink (hold); fill and empty buckets; bone meal plants and grass; till with a hoe, make paths with a shovel, strip and scrape with an axe, carve pumpkins with shears, wax copper, light fires and TNT with flint and steel; put on armor; draw a bow (hold, then let go to shoot; arrows from the inventory); on a mob: feed animals to breed them (and their young to grow), shear and dye sheep, milk cows, light creepers with flint and steel; spawn eggs place their mob (or a baby when used on one of its kind). Sneak to place against a block instead of using it
 - 1–9 or the mouse wheel: hotbar slot; F: swap hands; Q: drop one of the held item (Ctrl+Q: the stack)
 - E: inventory (creative: the creative inventory with tabs and search). In menus: click, right click (half / one), shift-click, drag to spread, double-click to collect, 1–9 and F to swap with the hotbar or off hand, Q to throw, middle click to copy (creative)
 - Esc: pause menu (Options, Save and Quit to Title); in menus, back
 - T: chat; /: chat with a command started. Enter sends, Up/Down recall sent lines, Page Up/Down scroll
 - F2: screenshot
-- F3: debug screen (with the targeted block)
+- F3: debug screen (with the targeted block or entity, the entity count and the mob caps)
 - F5: third person from behind, then from the front, then back to first person
 - F11: fullscreen
 
-Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule <rule> [value]` (doDaylightCycle, keepInventory, naturalRegeneration, doFireTick, waterSourceConversion, lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread, doWeatherCycle, randomTickSpeed, snowAccumulationHeight), `/weather clear|rain|thunder [duration]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb|tnt|lightning_bolt [x y z] [nbt]`, `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill`, `/item replace block x y z container.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
+Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule <rule> [value]` (doDaylightCycle, keepInventory, naturalRegeneration, doFireTick, waterSourceConversion, lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread, doWeatherCycle, doMobSpawning, doMobLoot, mobGriefing, randomTickSpeed, snowAccumulationHeight), `/weather clear|rain|thunder [duration]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb|tnt|lightning_bolt|pig|cow|sheep|chicken|zombie|skeleton|creeper|spider [x y z] [nbt]` (mobs take vanilla keys such as `{NoAI:1b,Age:-24000,IsBaby:1b,Color:14,powered:1b,equipment:{mainhand:{id:"minecraft:bow"}}}`), `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill [@s|@e|@e[type=zombie]|@e[type=!player]]`, `/item replace block x y z container.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
 
 Survival: health, hunger and saturation, air, fall and fire damage, armor, death (the inventory and experience drop; Respawn or Title Screen) and respawning at the last bed. Tools mine at their tier's speed and only the right tier drops ores; tools and armor wear out. Drops and thrown items lie on the ground until picked up; experience orbs fly to the player. Crafting works in the inventory's 2×2 grid and at crafting tables (1,063 recipes), furnaces, smokers and blast furnaces smelt with fuel, and two worn tools of a kind repair each other. The Attack Indicator option (Video Settings) shows the attack cooldown under the crosshair or beside the hotbar.
+
+Mobs: pigs, cows, sheep and chickens wander the grass, follow food, breed and grow up; zombies, skeletons, creepers and spiders come out in the dark (and on Peaceful never), hunt the player with vanilla's path finding, burn in the sun (the undead), shoot (skeletons), hiss and blow up (creepers) and climb walls (spiders). Mobs drop their loot and experience, wear and hold equipment, and despawn far away. Monsters nearby keep the player from sleeping.
 
 The world lives: water and lava flow (two water sources make a third), sand and gravel fall, crops, saplings, cane, cactus, kelp, bamboo, vines and berries grow (bone meal hurries them), grass spreads, leaves decay without logs, farmland dries and gets trampled, ice and snow melt by torches and form in the cold, copper weathers, fire spreads and burns things away, TNT blows up (and lights other TNT), and the weather turns: rain, snow in cold biomes, and thunderstorms with lightning. Particles show smoke, flames, splashes, drips, falling leaves and explosions; under water and in lava the fog closes in.
 
@@ -109,7 +113,7 @@ The GL tests need `xorg-server-xvfb` and Python with Pillow and NumPy. They rend
 | `src/gfx` | OpenGL loader (generated by `tools/gen_gl.py`), shaders, screenshots |
 | `src/resources` | resource pack, atlases, models, baking |
 | `src/world` | blocks, tags, shapes, chunks, pipeline, light, meshing, biomes, world generation, saves |
-| `src/entity`, `src/game` | player physics and animation, particles, entity models (block entities, the player); items, inventory, placement rules, commands |
+| `src/entity`, `src/game` | living entities, the player, mobs (`mob/`), their AI (`ai/`) and path finding (`path/`), arrows, particles, entity models; items, inventory, placement rules, combat, commands |
 | `src/render`, `src/ui` | world, sky and entity rendering, GUI batching and fonts |
 | `src/app` | main loop, command-line harness and world tools |
 | `shaders/`, `data/` | GLSL sources and gameplay data |

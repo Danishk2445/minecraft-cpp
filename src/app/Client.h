@@ -20,6 +20,7 @@ class Chat;
 class ClientAssets;
 class CreativeTabs;
 class BlockLoot;
+class EntityTypes;
 class RecipeBook;
 class GuiGraphics;
 class ItemRegistry;
@@ -38,6 +39,7 @@ struct Client {
     std::unique_ptr<CreativeTabs> creativeTabs;
     std::unique_ptr<RecipeBook> recipes;
     std::unique_ptr<BlockLoot> loot;
+    std::unique_ptr<EntityTypes> entityTypes; // mobs: sizes, spawns, loot (data/entities.json)
     std::unique_ptr<GuiGraphics> gui;
     std::unique_ptr<Chat> chat;
     Commands commands;

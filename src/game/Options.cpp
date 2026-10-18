@@ -20,6 +20,7 @@ std::string Options::toJson() const {
     const Json j = {
         {"version", 1},
         {"fov", fov},
+        {"fovEffectScale", fovEffectScale},
         {"renderDistance", renderDistance},
         {"guiScale", guiScale},
         {"maxFps", maxFps},
@@ -52,6 +53,7 @@ Options Options::fromJson(std::string_view text, std::string* error) {
     }
     try {
         o.fov = std::clamp(j.value("fov", o.fov), 30, 110);
+        o.fovEffectScale = std::clamp(j.value("fovEffectScale", o.fovEffectScale), 0.0f, 1.0f);
         o.renderDistance = std::clamp(j.value("renderDistance", o.renderDistance), 2, 32);
         o.guiScale = std::max(0, j.value("guiScale", o.guiScale));
         o.maxFps = std::clamp(j.value("maxFps", o.maxFps), 10, 260);

@@ -46,6 +46,7 @@ struct ItemModelContext {
     DisplayContext display = DisplayContext::Gui;
     int count = 1, maxStack = 64;
     bool usingItem = false;
+    int useDuration = 0; // ticks the holder has been using it (a bow's draw)
     bool overworld = true;
     float timeOfDay = 0.0f; // celestial angle, for clocks
     // Compasses point from the holder toward the world spawn; without a holder they spin.

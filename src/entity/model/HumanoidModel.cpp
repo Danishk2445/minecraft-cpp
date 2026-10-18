@@ -69,6 +69,13 @@ void animateHumanoid(ModelPart& root, const HumanoidPose& s) {
     leftLeg.pose.rotation.z = -0.005f;
     poseArm(rightArm, s.rightArmItem);
     poseArm(leftArm, s.leftArmItem);
+    if (s.bowDrawn) {
+        // poseRightArm BOW_AND_ARROW (two-handed: it poses both arms).
+        rightArm.pose.rotation.y = -0.1f + head.pose.rotation.y;
+        leftArm.pose.rotation.y = 0.1f + head.pose.rotation.y + 0.4f;
+        rightArm.pose.rotation.x = -kPi / 2.0f + head.pose.rotation.x;
+        leftArm.pose.rotation.x = -kPi / 2.0f + head.pose.rotation.x;
+    }
 
     // setupAttackAnimation: the body twists and the swinging arm chops down.
     if (s.attackTime > 0.0f) {

@@ -345,7 +345,7 @@ if(XVFB_RUN AND Python3_FOUND)
     # M11: the live world. Blocks falling (sand as bright as the placed sand below them,
     # red concrete powder).
     set(MC_SIM_SCENE --world-type flat --render-distance 4 --size 1280x720 --time 6000 --freeze-time
-        --gamemode spectator --wait-chunks)
+        --gamemode spectator --wait-chunks --gamerule doMobSpawning=false)
     mc_gl_test(gl_falling_blocks ${MC_SIM_SCENE} --pos 0.5,-57,-4 --look 0,-5
         --exec "/setblock 0 -59 3 stone" --exec "/setblock 0 -58 3 sand" --exec "/setblock -2 -52 3 sand"
         --exec "/setblock 2 -52 3 red_concrete_powder" --exec "/setblock 4 -52 3 anvil"
@@ -393,6 +393,36 @@ if(XVFB_RUN AND Python3_FOUND)
         --exec "/fill -20 -60 -20 20 -58 20 water" --ticks 5 --screenshot ${MC_TEST_RUN}/underwater.png --exit)
     mc_py_test(gl_underwater_fog_color gl_underwater_fog check_image.py ${MC_TEST_RUN}/underwater.png
         --region 0,0,1280,250 --mean-rgb 26,42,138 --tol 20)
+
+    # M12: the eight mobs in the noon sun, facing the camera (the undead under a slab of stone,
+    # out of the sun that would set them alight): spider, pig, cow, sheep, chicken, zombie,
+    # skeleton, creeper.
+    mc_gl_test(gl_mobs ${MC_SIM_SCENE} --pos 0.5,-58.4,8 --look 180,12 --exec [=[/fill 2 -57 0 5 -57 1 stone$<SEMICOLON>/summon spider -7.5 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon pig -4.5 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon cow -2.5 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon sheep -0.5 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon chicken 1.2 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon zombie 2.7 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon skeleton 4.4 -60 0.5 {NoAI:1b}$<SEMICOLON>/summon creeper 6 -60 0.5 {NoAI:1b}]=]
+        --ticks 3 --screenshot ${MC_TEST_RUN}/mobs.png --exit)
+    mc_py_test(gl_mobs_pig gl_mobs check_image.py ${MC_TEST_RUN}/mobs.png --no-magenta
+        --region 255,305,315,345 --mean-rgb 135,80,77 --tol 25)
+    mc_py_test(gl_mobs_sheep gl_mobs check_image.py ${MC_TEST_RUN}/mobs.png --region 545,290,590,340 --mean-rgb 156,153,153 --tol 20)
+    mc_py_test(gl_mobs_zombie gl_mobs check_image.py ${MC_TEST_RUN}/mobs.png --region 780,250,815,350 --mean-rgb 34,73,86 --tol 25)
+    mc_py_test(gl_mobs_creeper gl_mobs check_image.py ${MC_TEST_RUN}/mobs.png --region 990,260,1040,350 --mean-rgb 61,111,55 --tol 25)
+    mc_py_test(gl_mobs_spider_eyes gl_mobs check_image.py ${MC_TEST_RUN}/mobs.png
+        --region 10,300,80,340 --count-rgb 220,20,20 --tol 70 --min-count 100)
+    # An ignited creeper 15 ticks into its fuse, flashing white and swollen; a cow just killed,
+    # fallen on its side and red.
+    mc_gl_test(gl_creeper_flash ${MC_SIM_SCENE} --pos 0.5,-58.4,-3 --look 0,12 --exec [=[/summon creeper -1 -60 2.5 {NoAI:1b,Rotation:[180f,0f],ignited:1b}$<SEMICOLON>/summon cow 2.5 -60 2.5 {NoAI:1b,Rotation:[180f,0f]}$<SEMICOLON>/kill @e[type=cow]]=]
+        --ticks 15 --screenshot ${MC_TEST_RUN}/creeper_flash.png --exit)
+    mc_py_test(gl_creeper_flash_white gl_creeper_flash check_image.py ${MC_TEST_RUN}/creeper_flash.png
+        --region 755,250,810,400 --mean-rgb 128,162,124 --tol 25)
+    mc_py_test(gl_mob_death_red gl_creeper_flash check_image.py ${MC_TEST_RUN}/creeper_flash.png
+        --region 460,355,585,410 --mean-rgb 114,44,35 --tol 25)
+    # At night: a charged creeper's swirl, a zombie in diamond armor, a spider's glowing eyes.
+    mc_gl_test(gl_mobs_night ${MC_SIM_SCENE} --time 18000 --pos 0.5,-58.4,-3 --look 0,12 --exec [=[/summon spider -2.5 -60 2.5 {NoAI:1b,Rotation:[180f,0f]}$<SEMICOLON>/summon zombie 1 -60 2.5 {NoAI:1b,Rotation:[180f,0f],equipment:{head:{id:"minecraft:diamond_helmet"},chest:{id:"minecraft:diamond_chestplate"}}}$<SEMICOLON>/summon creeper 3.5 -60 2.5 {NoAI:1b,Rotation:[180f,0f],powered:1b}]=]
+        --ticks 3 --screenshot ${MC_TEST_RUN}/mobs_night.png --exit)
+    mc_py_test(gl_mobs_night_eyes gl_mobs_night check_image.py ${MC_TEST_RUN}/mobs_night.png
+        --region 910,330,990,370 --count-rgb 220,20,20 --tol 70 --min-count 60)
+    mc_py_test(gl_mobs_night_armor gl_mobs_night check_image.py ${MC_TEST_RUN}/mobs_night.png
+        --region 545,205,640,330 --mean-rgb 18,37,48 --tol 12)
+    mc_py_test(gl_mobs_night_swirl gl_mobs_night check_image.py ${MC_TEST_RUN}/mobs_night.png
+        --region 300,240,410,400 --mean-rgb 31,57,66 --tol 15)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

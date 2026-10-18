@@ -15,6 +15,7 @@
 #include "core/Log.h"
 #include "game/CreativeTabs.h"
 #include "game/Item.h"
+#include "entity/mob/EntityTypes.h"
 #include "game/Loot.h"
 #include "game/Menu.h"
 #include "game/Recipes.h"
@@ -327,6 +328,10 @@ bool Game::loadRegistries() {
         log::error("biomes: {}", err);
         return false;
     }
+    client_.entityTypes = std::make_unique<EntityTypes>();
+    if (!client_.entityTypes->load(cli.dataDir / "entities.json", *client_.items, *client_.biomes, &err))
+        log::warn("entities: {}", err);
+    log::info("Mobs: {}", client_.entityTypes->all().size());
     return true;
 }
 
@@ -344,6 +349,7 @@ void Game::shutdown() {
     client_.creativeTabs.reset();
     client_.recipes.reset();
     client_.loot.reset();
+    client_.entityTypes.reset();
     client_.items.reset();
     client_.biomes.reset();
     client_.registry.reset();

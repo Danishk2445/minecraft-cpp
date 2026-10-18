@@ -33,6 +33,7 @@ public:
 
     // Where the attack strength shows while it recovers (the option), and hardcore hearts.
     AttackIndicator attackIndicator = AttackIndicator::Crosshair;
+    bool attackReady = false; // a living target and a full attack: the crosshair's full sprite
     bool hardcore = false;
 
 private:

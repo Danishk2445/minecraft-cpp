@@ -15,6 +15,7 @@ enum class AttackIndicator : uint8_t { Off, Crosshair, Hotbar };
 struct Options {
     // Video
     int fov = 70;             // 30..110 degrees
+    float fovEffectScale = 1.0f; // vanilla "FOV Effects" (accessibility): how much sprinting, flying and bows widen or narrow it
     int renderDistance = 12;  // 2..32 chunks
     int guiScale = 0;         // 0 = auto, else 1..max
     int maxFps = 120;         // 10..260; 260 = unlimited

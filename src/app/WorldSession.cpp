@@ -21,7 +21,10 @@
 #include "world/sim/Weathering.h"
 #include "game/Loot.h"
 #include "game/Tools.h"
+#include "entity/Arrow.h"
 #include "entity/ExperienceOrb.h"
+#include "entity/mob/Monsters.h"
+#include "game/Combat.h"
 #include "entity/DisplayTicks.h"
 #include "entity/FallingBlockEntity.h"
 #include "entity/LightningBolt.h"
@@ -47,6 +50,7 @@
 #include "world/gen/feature/BiomeDecorator.h"
 #include "world/level/Environment.h"
 #include "world/level/Level.h"
+#include "world/level/NaturalSpawner.h"
 #include "world/light/LightEngine.h"
 #include "world/storage/ChunkStorage.h"
 #include "world/storage/WorldSave.h"
@@ -122,6 +126,10 @@ bool WorldSession::init() {
     if (params_.commandLine) {
         if (cli.time) level_->setDayTime(*cli.time);
         level_->daylightCycle = !cli.freezeTime;
+        for (const auto& [rule, value] : cli.gameRules) {
+            std::string err;
+            if (!level_->setGameRule(rule, value, &err)) log::warn("--gamerule {}={}: {}", rule, value, err);
+        }
         if (!cli.weather.empty()) {
             level_->setWeather(0, 1000000, cli.weather != "clear", cli.weather == "thunder");
             level_->settleWeather();
@@ -186,6 +194,7 @@ bool WorldSession::init() {
     inventoryMenu_ = std::make_unique<InventoryMenu>(player_->inventory, client_.recipes.get());
     level_->setPlayer(player_.get());
     level_->setItems(client_.items.get());
+    level_->setEntityTypes(client_.entityTypes.get());
     level_->setLoot(client_.loot.get());
     level_->setRecipes(client_.recipes.get());
     level_->difficulty = params_.difficulty;
@@ -435,11 +444,17 @@ void WorldSession::tick() {
     if (player_->noPhysics || level_->chunks().isReady(here)) {
         // Vanilla handles the mouse buttons before the entities tick; the dead don't act.
         if (!player_->dead() && !player_->sleeping()) tickInteraction();
+        player_->inRain = level_->isRainingAt(BlockPos::containing(player_->pos)) ||
+                          level_->isRainingAt(BlockPos::containing(player_->pos + glm::dvec3(0.0, player_->height, 0.0)));
         if (player_->sleeping()) {
             player_->oldPos = player_->pos;
             tickSleep();
         } else {
             player_->tick(*level_, player_->dead() ? PlayerInput{} : readPlayerInput());
+            // Vanilla LivingEntity.pushEntities: the player shoves the mobs it walks into.
+            if (player_->isPushable())
+                for (Entity* e : level_->entitiesIn(player_->box(), player_.get()))
+                    if (e->isPushable()) pushApart(*player_, *e);
         }
         if (player_->mode() != GameMode::Spectator)
             player_->survivalTick(*level_, params_.difficulty, level_->naturalRegeneration);
@@ -458,6 +473,21 @@ void WorldSession::tick() {
         return ctx.itemName(st);
     });
     worldRenderer_->tickHands(*player_);
+    // Vanilla AbstractClientPlayer.getFieldOfViewModifier, eased by half each tick.
+    {
+        float target = 1.0f;
+        if (player_->flying) target *= 1.1f;
+        target *= ((player_->sprinting ? 1.3f : 1.0f) + 1.0f) / 2.0f;
+        if (player_->usingItem() && player_->useItem->id == "minecraft:bow") {
+            const float f = std::min(float(72000 - player_->useItemRemaining) / 20.0f, 1.0f);
+            target *= 1.0f - f * f * 0.15f;
+        }
+        // The FOV Effects scale (harness runs: none unless asked, so their framing stays put).
+        const float scale = params_.commandLine ? client_.cli.fovEffects.value_or(0.0f) : client_.options.fovEffectScale;
+        target = 1.0f + (target - 1.0f) * scale;
+        oldFovModifier_ = fovModifier_;
+        fovModifier_ = std::clamp(fovModifier_ + (target - fovModifier_) * 0.5f, 0.1f, 1.5f);
+    }
     // Vanilla Camera.tick: the eye height eases toward the player's (crouching).
     oldEyeHeight_ = eyeHeight_;
     eyeHeight_ += (player_->eyeHeight() - eyeHeight_) * 0.5f;
@@ -483,6 +513,11 @@ void WorldSession::tick() {
             particles_.add(e.data >= 2 ? ParticleType::ExplosionEmitter : ParticleType::Explosion, e.point,
                            glm::dvec3(1.0, 0.0, 0.0));
             break;
+        case LevelEventType::EntityPoof:
+        case LevelEventType::Hearts:
+        case LevelEventType::Crit:
+        case LevelEventType::DamageIndicator:
+        case LevelEventType::Sweep: spawnEntityParticles(e); break;
         }
     }
     tickClientParticles();
@@ -501,7 +536,14 @@ void WorldSession::setupCamera(float partialTick) {
     camera_.position = feet + glm::dvec3(0.0, oldEyeHeight_ + (eyeHeight_ - oldEyeHeight_) * partialTick, 0.0);
     camera_.yaw = player_->yaw;
     camera_.pitch = player_->pitch;
-    camera_.fov = float(client_.options.fov);
+    // Vanilla GameRenderer.getFov: the eased FOV modifier (flying, sprinting, drawing a bow),
+    // narrower in water and lava, and while dying.
+    float fov = float(client_.options.fov) * (oldFovModifier_ + (fovModifier_ - oldFovModifier_) * partialTick);
+    if (player_->dead()) fov /= (1.0f - 500.0f / (float(player_->deathTime) + partialTick + 500.0f)) * 2.0f + 1.0f;
+    const float effects = params_.commandLine ? client_.cli.fovEffects.value_or(0.0f) : client_.options.fovEffectScale;
+    if (player_->eyeInWater(*level_) || level_->fluid(BlockPos::containing(player_->eyePos())).kind == FluidKind::Lava)
+        fov *= 1.0f + (0.85714287f - 1.0f) * effects;
+    camera_.fov = fov;
     // Vanilla Camera.setup: lying in bed (in first person), looking along it from the pillow,
     // 0.3 above the eyes.
     if (player_->sleeping() && perspective_ == Perspective::FirstPerson) {
@@ -629,7 +671,15 @@ bool WorldSession::useBed(const BlockPos& pos, StateId state) {
         message("block.minecraft.bed.no_sleep");
         return true;
     }
-    // Monsters nearby keep the player up (M12).
+    // Monsters within 8 blocks across and 5 up or down keep a survival player up.
+    if (player_->mode() != GameMode::Creative) {
+        const glm::dvec3 c(head.x + 0.5, head.y, head.z + 0.5);
+        for (Entity* e : level_->entitiesIn(AABB(c.x - 8.0, c.y - 5.0, c.z - 8.0, c.x + 8.0, c.y + 5.0, c.z + 8.0)))
+            if (dynamic_cast<Monster*>(e)) {
+                message("block.minecraft.bed.not_safe");
+                return true;
+            }
+    }
     player_->sleepingPos = head;
     player_->sleepTimer = 0;
     player_->stopUsingItem();
@@ -751,10 +801,29 @@ void WorldSession::tickClientParticles() {
         return resolveTint(reg.blockOf(s).tint, 0, colors);
     });
     tickRainParticles(*level_, center, tickCount_, particles_);
-    // Lit TNT smokes from its top (vanilla PrimedTnt.tick on the client).
-    for (const auto& e : level_->entities())
-        if (!e->removed && dynamic_cast<const PrimedTnt*>(e.get()))
-            particles_.add(ParticleType::Smoke, e->pos + glm::dvec3(0.0, 0.5, 0.0));
+    // Lit TNT smokes from its top (vanilla PrimedTnt.tick on the client); critical arrows
+    // trail sparks (AbstractArrow.tick).
+    for (const auto& e : level_->entities()) {
+        if (e->removed) continue;
+        if (dynamic_cast<const PrimedTnt*>(e.get())) particles_.add(ParticleType::Smoke, e->pos + glm::dvec3(0.0, 0.5, 0.0));
+        if (const auto* a = dynamic_cast<const Arrow*>(e.get()); a && a->crit && !a->inGround)
+            for (int i = 0; i < 4; ++i)
+                particles_.add(ParticleType::Crit, a->oldPos + (a->pos - a->oldPos) * (double(i) / 4.0),
+                               glm::dvec3(-a->velocity.x, -a->velocity.y + 0.2, -a->velocity.z));
+    }
+    // Critical hits throw sparks around the target for 3 ticks (vanilla TrackingEmitter).
+    for (CritEmitter& c : critEmitters_) {
+        Xoroshiro& r = particles_.random();
+        for (int i = 0; i < 16; ++i) {
+            const double dx = r.nextFloat() * 2.0f - 1.0f, dy = r.nextFloat() * 2.0f - 1.0f, dz = r.nextFloat() * 2.0f - 1.0f;
+            if (dx * dx + dy * dy + dz * dz > 1.0) continue;
+            particles_.add(ParticleType::Crit,
+                           {c.pos.x + c.size.x * dx / 4.0, c.pos.y + c.size.y * (0.5 + dy / 4.0), c.pos.z + c.size.x * dz / 4.0},
+                           {dx, dy + 0.2, dz});
+        }
+        ++c.life;
+    }
+    std::erase_if(critEmitters_, [](const CritEmitter& c) { return c.life >= 3; });
     // Vanilla Entity.doWaterSplashEffect: bubbles and a splash where the player falls in.
     if (player_->inWater && !wasInWater_ && !player_->noPhysics) {
         Xoroshiro& r = particles_.random();
@@ -786,6 +855,11 @@ void WorldSession::tickClientParticles() {
 
 bool WorldSession::useHeldItemOn(const BlockPos& pos, Direction face) {
     ItemStack& held = player_->inventory.selectedStack();
+    if (!held.empty() && spawnEggType(*held.item)) {
+        if (!spawnFromEgg(*level_, *held.item, pos, face)) return false;
+        if (player_->mode() != GameMode::Creative) held.shrink(1);
+        return true;
+    }
     if (!held.empty() && shortId(held.item->id) == "bone_meal") {
         if (!sim::applyBoneMeal(*level_, pos, face)) return false;
         if (player_->mode() != GameMode::Creative) held.shrink(1);
@@ -811,6 +885,14 @@ void WorldSession::startUsingItem() {
         if (stack.empty()) continue;
         if (equipFromHand(stack) || useBucket(stack)) {
             player_->swing(offhand);
+            return;
+        }
+        // Vanilla BowItem.use: drawn with arrows to shoot (creative players need none).
+        if (stack.item->id == "minecraft:bow") {
+            if (!player_->invulnerable() && !findArrows()) continue;
+            player_->useItem = stack.item;
+            player_->useItemRemaining = 72000;
+            player_->useOffhand = offhand;
             return;
         }
         if (!stack.item->isFood() || !player_->canEat(stack.item->alwaysEdible)) continue;
@@ -918,8 +1000,17 @@ bool WorldSession::equipFromHand(ItemStack& stack) {
 
 void WorldSession::continueUsingItem(bool held) {
     ItemStack& stack = player_->useOffhand ? player_->inventory.offhand : player_->inventory.selectedStack();
-    if (!held || stack.empty() || stack.item != player_->useItem) {
-        player_->stopUsingItem(); // released, or the item left the hand
+    if (stack.empty() || stack.item != player_->useItem) {
+        player_->stopUsingItem(); // the item left the hand
+        return;
+    }
+    if (stack.item->id == "minecraft:bow") {
+        if (held) --player_->useItemRemaining;
+        else releaseBow(stack);
+        return;
+    }
+    if (!held) {
+        player_->stopUsingItem(); // released
         return;
     }
     auto crumbs = [&](int count) {
@@ -1047,7 +1138,14 @@ void WorldSession::die() {
     deathHandled_ = true;
     ScreenContext ctx;
     ctx.lang = client_.lang.get();
-    client_.chat->addMessage(ctx.translate(std::string(player_->deathMessageKey()), {"Player"}), client_.chatTicks);
+    // "Player was slain by Zombie": the attacker named by its type.
+    std::string killer;
+    if (!player_->lastAttackerType.empty()) {
+        std::string key = "entity." + player_->lastAttackerType;
+        std::replace(key.begin(), key.end(), ':', '.');
+        killer = ctx.translate(key);
+    }
+    client_.chat->addMessage(ctx.translate(std::string(player_->deathMessageKey()), {"Player", killer}), client_.chatTicks);
     breaking_.active = false;
     // What menus hold (the cursor, crafting grids) goes back first, to drop with the rest.
     if (openMenu_) openMenu_->returnItems(*player_);
@@ -1221,6 +1319,11 @@ void WorldSession::submitEntities(float partialTick, int skyDarken) {
             out.submitPrimedTnt(*tnt, *level_, partialTick, skyDarken);
         else if (const auto* bolt = dynamic_cast<const LightningBolt*>(e.get())) // seen from anywhere
             out.submitLightning(*bolt, partialTick);
+        else if (const auto* mob = dynamic_cast<const Mob*>(e.get());
+                 mob && near(*mob, double(mob->width * 2.0f + mob->height) / 3.0 * 64.0))
+            out.submitMob(*mob, *level_, partialTick, skyDarken);
+        else if (const auto* arrow = dynamic_cast<const Arrow*>(e.get()); arrow && near(*arrow, 64.0))
+            out.submitArrow(*arrow, *level_, partialTick);
     }
     // Pickups fly to the player's middle, easing in over 3 ticks (vanilla ItemPickupParticle).
     const glm::dvec3 target = glm::mix(player_->oldPos, player_->pos, double(partialTick)) + glm::dvec3(0.0, 0.5, 0.0);
@@ -1274,11 +1377,40 @@ PlayerInput WorldSession::readPlayerInput() {
 
 void WorldSession::updateTarget(float partialTick) {
     target_.reset();
-    // Vanilla block_interaction_range: 4.5, plus 0.5 in creative; from the eyes in every view.
-    const double reach = player_->mode() == GameMode::Creative ? 5.0 : 4.5;
+    entityTarget_ = 0;
+    // Vanilla GameRenderer.pick: block_interaction_range 4.5 and entity_interaction_range 3
+    // (both 5 in creative), from the eyes in every view; an entity before the block wins.
+    const bool creative = player_->mode() == GameMode::Creative;
+    const double blockReach = creative ? 5.0 : 4.5, entityReach = creative ? 5.0 : 3.0;
+    const double pick = std::max(blockReach, entityReach);
     const glm::dvec3 eye =
         glm::mix(player_->oldPos, player_->pos, double(partialTick)) + glm::dvec3(0.0, player_->eyeHeight(), 0.0);
-    target_ = raycastBlocks(*level_, eye, player_->viewVector(), reach);
+    const glm::dvec3 view = player_->viewVector();
+    const std::optional<BlockHit> block = raycastBlocks(*level_, eye, view, pick);
+    const double blockSq = block ? block->distance * block->distance : pick * pick;
+    if (player_->mode() != GameMode::Spectator) {
+        double best = blockSq;
+        const Entity* hit = nullptr;
+        const AABB area = player_->box().expandedTowards(view * pick).inflated(1.0, 1.0, 1.0);
+        for (const Entity* e : level_->entitiesIn(area, player_.get())) {
+            if (!e->isPickable()) continue;
+            const AABB b = e->box();
+            if (b.contains(eye)) {
+                hit = e;
+                best = 0.0;
+                break;
+            }
+            if (auto t = clipBox(b, eye, view, pick); t && t->first * t->first < best) {
+                best = t->first * t->first;
+                hit = e;
+            }
+        }
+        if (hit && best < blockSq) {
+            if (best <= entityReach * entityReach) entityTarget_ = hit->id;
+            return; // the entity hides the block; out of reach, nothing is targeted
+        }
+    }
+    if (block && block->distance <= blockReach) target_ = block;
 }
 
 // Debris (or, mining, a chip off `face`) with the block's particle texture.
@@ -1487,13 +1619,16 @@ void WorldSession::tickInteraction() {
     // Use (vanilla Minecraft.startUseItem): on click, then every 4 ticks while held
     // (rightClickDelay). In order: the block's menu, the block's own reaction (doors, levers,
     // a cake), the item on the block (tools, placing), then the item by itself (food).
-    // Sneaking with an item in hand skips the block's part. Eating holds the button.
+    // Sneaking with an item in hand skips the block's part. Eating holds the button. A mob
+    // under the crosshair takes the click first (feeding, shearing, spawn eggs).
     if (player_->usingItem()) {
         continueUsingItem(useHeld);
     } else if (player_->mode() != GameMode::Spectator && (useClicks_ > 0 || (useHeld && useDelay_ == 0))) {
         useDelay_ = 4;
         bool done = false;
-        if (target_) {
+        if (Entity* e = level_->entity(entityTarget_)) {
+            done = useOnEntity(*e); // it swings the hand itself
+        } else if (target_) {
             const StateId s = level_->getBlock(target_->pos);
             const bool bypass = player_->crouching && !player_->inventory.selectedStack().empty();
             const auto use = bypass ? std::nullopt : useBlock(registry, s, horizontalFacing(player_->yaw));
@@ -1531,6 +1666,17 @@ void WorldSession::tickAttack(bool attackHeld) {
     // swings even at nothing, which also resets the attack strength; holding on a block
     // swings every tick.
     const bool blocked = missTime_ > 0 || player_->usingItem() || player_->mode() == GameMode::Spectator;
+    // A click on an entity attacks it (vanilla Player.attack), never a held button.
+    if (Entity* e = level_->entity(entityTarget_)) {
+        breaking_.active = false;
+        if (attackClicks_ > 0 && !blocked) {
+            const ItemStack before = player_->inventory.selectedStack();
+            playerAttack(*level_, *player_, *e);
+            if (!before.empty() && player_->inventory.selectedStack().empty()) spawnItemBreak(*before.item);
+            player_->swing();
+        }
+        return;
+    }
     if (attackClicks_ > 0 && !blocked) {
         if (!target_) {
             if (player_->mode() != GameMode::Creative) missTime_ = 10;
@@ -1566,6 +1712,95 @@ void WorldSession::tickAttack(bool attackHeld) {
     }
 }
 
+bool WorldSession::useOnEntity(Entity& e) {
+    auto* mob = dynamic_cast<Mob*>(&e);
+    if (!mob || !mob->alive()) return false;
+    // Vanilla Player.interactOn, the main hand then the off hand; creative players keep what
+    // the interaction would have used up.
+    for (const bool offhand : {false, true}) {
+        ItemStack& held = offhand ? player_->inventory.offhand : player_->inventory.selectedStack();
+        const ItemStack before = held;
+        if (!mob->interact(*level_, *player_, held)) continue;
+        if (player_->mode() == GameMode::Creative && held.item == before.item) held = before;
+        player_->swing(offhand);
+        return true;
+    }
+    return false;
+}
+
+ItemStack* WorldSession::findArrows() {
+    // Vanilla getProjectile: arrows in the off hand, then the main hand, then the inventory.
+    const ItemRegistry& items = *client_.items;
+    auto isArrow = [&](const ItemStack& s) { return !s.empty() && items.inTag(*s.item, "arrows"); };
+    if (isArrow(player_->inventory.offhand)) return &player_->inventory.offhand;
+    if (isArrow(player_->inventory.selectedStack())) return &player_->inventory.selectedStack();
+    for (int i = 0; i < Inventory::kMainSize; ++i)
+        if (isArrow(player_->inventory.slot(i))) return &player_->inventory.slot(i);
+    return nullptr;
+}
+
+void WorldSession::releaseBow(ItemStack& bow) {
+    // Vanilla BowItem.releaseUsing: the draw's power (full after a second), an arrow at
+    // 3x that from the eyes, critical at full power; the bow wears and the arrow is used.
+    const int charge = 72000 - player_->useItemRemaining;
+    player_->stopUsingItem();
+    float power = float(charge) / 20.0f;
+    power = std::min((power * power + power * 2.0f) / 3.0f, 1.0f);
+    if (power < 0.1f) return;
+    const bool creative = player_->mode() == GameMode::Creative;
+    ItemStack* ammo = findArrows();
+    if (!ammo && !creative) return;
+    auto arrow = std::make_unique<Arrow>();
+    arrow->owner = player_->id;
+    arrow->pos = arrow->oldPos = glm::dvec3(player_->pos.x, player_->eyePos().y - 0.1, player_->pos.z);
+    arrow->shootFromRotation(*player_, player_->pitch, player_->yaw, power * 3.0f, 1.0f, level_->random());
+    arrow->crit = power == 1.0f;
+    arrow->pickup = creative ? Arrow::Pickup::CreativeOnly : Arrow::Pickup::Allowed;
+    arrow->pickupItem = ItemStack{ammo ? ammo->item : client_.items->find("arrow"), 1};
+    level_->addEntity(std::move(arrow));
+    if (creative) return;
+    const Item* bowItem = bow.item;
+    if (bow.hurt(1)) {
+        bow = ItemStack{};
+        spawnItemBreak(*bowItem);
+    }
+    if (ammo) ammo->shrink(1);
+}
+
+void WorldSession::spawnEntityParticles(const LevelEvent& e) {
+    Xoroshiro& r = particles_.random();
+    const double w = double(e.data & 0xFFFF) / 100.0, h = double(e.data >> 16) / 100.0;
+    // Vanilla getRandomX/Y/Z: anywhere across the box.
+    auto randomIn = [&] {
+        return glm::dvec3(e.point.x + w * (2.0 * r.nextDouble() - 1.0), e.point.y + h * r.nextDouble(),
+                          e.point.z + w * (2.0 * r.nextDouble() - 1.0));
+    };
+    switch (e.type) {
+    case LevelEventType::EntityPoof: // vanilla makePoofParticles
+        for (int i = 0; i < 20; ++i) {
+            const glm::dvec3 v(r.nextGaussian() * 0.02, r.nextGaussian() * 0.02, r.nextGaussian() * 0.02);
+            particles_.add(ParticleType::Poof, randomIn() - v * 10.0, v);
+        }
+        break;
+    case LevelEventType::Hearts:
+        for (int i = 0; i < int(e.state); ++i) {
+            const glm::dvec3 v(r.nextGaussian() * 0.02, r.nextGaussian() * 0.02, r.nextGaussian() * 0.02);
+            particles_.add(ParticleType::Heart, randomIn() + glm::dvec3(0.0, 0.5, 0.0), v);
+        }
+        break;
+    case LevelEventType::Crit: critEmitters_.push_back({e.point, glm::dvec2(w, h), 0}); break;
+    case LevelEventType::DamageIndicator:
+        for (int i = 0; i < int(e.state); ++i) {
+            const glm::dvec3 at(e.point.x + r.nextGaussian() * 0.1, e.point.y + h * 0.5, e.point.z + r.nextGaussian() * 0.1);
+            particles_.add(ParticleType::DamageIndicator, at,
+                           {r.nextGaussian() * 0.2, r.nextGaussian() * 0.2, r.nextGaussian() * 0.2});
+        }
+        break;
+    case LevelEventType::Sweep: particles_.add(ParticleType::SweepAttack, e.point); break;
+    default: break;
+    }
+}
+
 void WorldSession::renderHud(glm::ivec2 fb, float, const std::function<void()>& renderGui) {
     GuiGraphics& gui = *client_.gui;
     gui.begin(fb, client_.guiScale());
@@ -1580,6 +1815,10 @@ void WorldSession::renderHud(glm::ivec2 fb, float, const std::function<void()>& 
     gui.setItemContext(items);
     // The crosshair hides under screens.
     hud_->attackIndicator = client_.options.attackIndicator;
+    // Vanilla renderCrosshair's full indicator: a living target and a weapon worth waiting for.
+    const auto* aimed = dynamic_cast<const LivingEntity*>(level_->entity(entityTarget_));
+    hud_->attackReady = aimed && aimed->alive() && player_->attackStrengthScale(0.0f) >= 1.0f &&
+                        player_->attackStrengthDelay() > 5.0f;
     hud_->hardcore = params_.hardcore;
     hud_->render(gui, *player_, perspective_ == Perspective::FirstPerson && !client_.screenOpen, eyeInWater,
                  [&gui](const ItemStack& stack, float x, float y) {
@@ -1602,6 +1841,11 @@ void WorldSession::renderDebugOverlay(GuiGraphics& gui) {
     lines.push_back(std::format("{:.0f} fps  C: {}/{} sections, {} draws", fps, r.drawn, r.sections, r.draws));
     const auto st = level_->chunks().stats();
     lines.push_back(std::format("Chunks: {} loaded, {} lit, {} ready, {} jobs", st.entries, st.lit, st.meshReady, st.inFlight));
+    // Vanilla's entity line, and the mob caps (vanilla F3's "SC" spawn counts).
+    lines.push_back(std::format("E: {}  M: {}/{}  A: {}/{}", level_->entities().size(),
+                                spawner::mobCount(*level_, MobCategory::Monster), spawner::localCap(*level_, MobCategory::Monster),
+                                spawner::mobCount(*level_, MobCategory::Creature),
+                                spawner::localCap(*level_, MobCategory::Creature)));
     lines.push_back("");
     lines.push_back(std::format("XYZ: {:.3f} / {:.5f} / {:.3f}", p.x, p.y, p.z));
     const BlockPos b = BlockPos::containing(p);
@@ -1627,6 +1871,13 @@ void WorldSession::renderDebugOverlay(GuiGraphics& gui) {
                                 level_->dayTime() % 24000, env.timeOfDay, env.skyDarken));
     lines.push_back(std::format("Mode: {}{}{}", gameModeName(player_->mode()), player_->flying ? ", flying" : "",
                                 player_->onGround ? ", on ground" : ""));
+    if (const Entity* e = level_->entity(entityTarget_)) {
+        lines.push_back("");
+        lines.push_back("Targeted Entity");
+        lines.push_back(std::string(e->type()));
+        if (const auto* mob = dynamic_cast<const Mob*>(e))
+            lines.push_back(std::format("Health: {:.1f}/{:.0f}{}", mob->health, mob->maxHealth, mob->isBaby() ? " (baby)" : ""));
+    }
     if (target_) {
         const BlockPos& t = target_->pos;
         lines.push_back("");

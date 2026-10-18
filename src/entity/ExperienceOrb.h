@@ -16,7 +16,7 @@ public:
     ExperienceOrb();
     std::string_view type() const override { return "minecraft:experience_orb"; }
     void tick(Level& level) override;
-    bool hurtServer(Level& level, DamageType type, float amount) override;
+    bool hurtServer(Level& level, const DamageSource& source, float amount) override;
     void saveExtra(Json& out) const override;
     void loadExtra(const Json& in, const ItemRegistry& items) override;
     std::unique_ptr<Entity> clone() const override { return std::make_unique<ExperienceOrb>(*this); }

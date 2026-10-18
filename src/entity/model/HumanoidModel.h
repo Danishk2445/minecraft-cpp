@@ -22,6 +22,7 @@ struct HumanoidPose {
     bool attackLeftArm = false; // the swing is the off hand's (left arm for a right-handed player)
     bool crouching = false;
     bool rightArmItem = false, leftArmItem = false; // ArmPose.ITEM instead of EMPTY
+    bool bowDrawn = false;      // ArmPose.BOW_AND_ARROW on the right arm: both arms aim along the look
     bool bodyHidden = false;    // spectators: only the head is drawn
 };
 

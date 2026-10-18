@@ -72,6 +72,9 @@ bool EntityRenderer::init(const ClientAssets& assets) {
     glVertexArrayAttribBinding(vao_, 4, 0);
     playerRest_ = playerModel(false);
     playerPosed_ = playerRest_;
+    initMobModels();
+    // The charged creeper's swirl scrolls across its texture.
+    const_cast<Texture&>(texture("minecraft:entity/creeper/creeper_armor")).setWrap(GL_REPEAT);
     if (!glowShader_.load("lightning.vert", "lightning.frag")) return false;
     glCreateVertexArrays(1, &glowVao_);
     glCreateBuffers(1, &glowVbo_);
@@ -393,6 +396,7 @@ void EntityRenderer::submitPlayer(const Player& player, const Level& level, floa
     pose.crouching = player.crouching;
     pose.rightArmItem = !player.inventory.selectedStack().empty();
     pose.leftArmItem = !player.inventory.offhand.empty();
+    pose.bowDrawn = player.usingItem() && player.useItem->id == "minecraft:bow" && !player.useOffhand;
     pose.bodyHidden = spectator; // PlayerModel: spectators are a floating head
     resetPose(playerPosed_.root, playerRest_.root);
     animateHumanoid(playerPosed_.root, pose);
@@ -425,27 +429,20 @@ void EntityRenderer::submitPlayer(const Player& player, const Level& level, floa
                 feet, m, light, 0xFFFFFF, spectator ? 38.0f / 255.0f : 1.0f,
                 (player.hurtTime > 0 || player.deathTime > 0) ? kHurtOverlay : 0u);
     if (spectator) return;
-    // ItemInHandLayer: each held item hangs from its arm.
+    // HumanoidArmorLayer, then ItemInHandLayer: each held item hangs from its arm (a bow
+    // being drawn shows its pull).
+    submitArmor(player.inventory.armor, playerPosed_.root, false, feet, m, light,
+                (player.hurtTime > 0 || player.deathTime > 0) ? kHurtOverlay : 0u);
     for (const bool left : {false, true}) {
         const ItemStack& stack = left ? player.inventory.offhand : player.inventory.selectedStack();
-        if (stack.empty()) continue;
-        const ModelPart& arm = *playerPosed_.root.find(left ? "left_arm" : "right_arm");
-        glm::mat4 t = m * poseMatrix(arm.pose);
-        t = glm::rotate(t, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-        t = glm::rotate(t, glm::radians(180.0f), glm::vec3(0, 1, 0));
-        t = glm::translate(t, glm::vec3((left ? -1.0f : 1.0f) / 16.0f, 0.125f, -0.625f));
-        ItemModelContext ctx;
-        ctx.display = left ? DisplayContext::ThirdPersonLeft : DisplayContext::ThirdPersonRight;
-        ctx.count = stack.count;
-        ctx.maxStack = stack.maxStack();
-        ctx.holderPos = feet;
-        ctx.holderYaw = player.yaw;
-        layers_.clear();
-        assets_->itemDefinitions().evaluate(stack.item->id, ctx, &assets_->grassColormap(), layers_);
-        itemQuads_.clear();
-        buildItemQuads(layers_, ctx.display, assets_->blockEntityModels(), assets_->blockAtlas(), itemQuads_);
-        submitItem(itemQuads_, feet, t, light);
+        const bool using_ = player.usingItem() && player.useOffhand == left;
+        submitHeldItem(stack, *playerPosed_.root.find(left ? "left_arm" : "right_arm"), left, 0.0f, feet, m, light,
+                       player.yaw, using_ ? player.useItem->useTicks > 0 && player.useItem->id == "minecraft:bow"
+                                                ? 72000 - player.useItemRemaining
+                                                : 0
+                                          : 0);
     }
+    if (player.remainingFireTicks > 0 && !player.invulnerable()) submitFlame(feet, player.width, player.height);
     submitShadow(level, feet, 0.5f, skyDarken);
 }
 
@@ -460,19 +457,24 @@ void EntityRenderer::render(const glm::mat4& viewProj, const ChunkRenderer::Fog&
     shader_.set("uFog", fog.distances);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    for (Pass pass : {Pass::Cutout, Pass::Shadow, Pass::Translucent}) {
+    for (Pass pass : {Pass::Cutout, Pass::Shadow, Pass::Translucent, Pass::Additive}) {
         // Cutout models are drawn without culling (vanilla entityCutoutNoCull), translucent
-        // ones with it (itemEntityTranslucentCull); shadows don't write depth.
-        if (pass == Pass::Translucent) glEnable(GL_CULL_FACE);
+        // ones with it (itemEntityTranslucentCull); shadows don't write depth. Additive ones
+        // (vanilla eyes, energy swirls) add their color, fading to nothing in the fog.
+        if (pass == Pass::Translucent || pass == Pass::Additive) glEnable(GL_CULL_FACE);
         else glDisable(GL_CULL_FACE);
         if (pass == Pass::Cutout) {
             glDisable(GL_BLEND);
+        } else if (pass == Pass::Additive) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
+            shader_.set("uFogColor", glm::vec4(0.0f, 0.0f, 0.0f, fog.color.a));
         } else {
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
-        glDepthMask(pass == Pass::Shadow ? GL_FALSE : GL_TRUE);
-        shader_.set("uAlphaCutoff", pass == Pass::Shadow ? -1.0f : 0.1f);
+        glDepthMask(pass == Pass::Shadow || pass == Pass::Additive ? GL_FALSE : GL_TRUE);
+        shader_.set("uAlphaCutoff", pass == Pass::Shadow ? -1.0f : pass == Pass::Additive ? 0.0f : 0.1f);
         for (const Batch& b : batches_) {
             if (b.pass != pass) continue;
             b.texture->bind(0);

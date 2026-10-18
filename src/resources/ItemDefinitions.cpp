@@ -223,7 +223,8 @@ float rangeValue(const Node& n, const ItemModelContext& ctx) {
         return positiveModulo(float(0.5 - (yaw - 0.25 - toTarget)), 1.0f);
     }
     if (n.property == "minecraft:count") return float(ctx.count) / float(std::max(ctx.maxStack, 1));
-    return 0.0f; // damage, cooldown, crossbow/pull, use_duration, use_cycle, bundle/fullness
+    if (n.property == "minecraft:use_duration") return ctx.usingItem ? float(ctx.useDuration) : 0.0f;
+    return 0.0f; // damage, cooldown, crossbow/pull, use_cycle, bundle/fullness
 }
 
 uint32_t resolveTint(const ItemTintSource& t, const Colormap* grass) {

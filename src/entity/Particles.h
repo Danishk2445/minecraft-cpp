@@ -38,6 +38,11 @@ enum class ParticleType : uint8_t {
     TintedLeaves,     // falling from leaves (colored like them)
     CherryLeaves,
     CampfireSmoke,
+    Poof,            // a dead mob's smoke (vanilla ExplodeParticle)
+    Heart,           // animals in love
+    Crit,            // critical hits, critical arrows
+    DamageIndicator, // dark hearts from a hard hit
+    SweepAttack,     // a sword's sweep
     Count,
 };
 // The particles/<name>.json definition each type draws its sprites from.

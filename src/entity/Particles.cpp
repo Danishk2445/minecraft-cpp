@@ -31,6 +31,11 @@ std::string_view particleDefinition(ParticleType type) {
     case ParticleType::TintedLeaves: return "tinted_leaves";
     case ParticleType::CherryLeaves: return "cherry_leaves";
     case ParticleType::CampfireSmoke: return "campfire_cosy_smoke";
+    case ParticleType::Poof: return "poof";
+    case ParticleType::Heart: return "heart";
+    case ParticleType::Crit: return "crit";
+    case ParticleType::DamageIndicator: return "damage_indicator";
+    case ParticleType::SweepAttack: return "sweep_attack";
     case ParticleType::Count: break;
     }
     return {};
@@ -255,6 +260,55 @@ void ParticleSystem::add(ParticleType type, const glm::dvec3& at, const glm::dve
         p.alpha = 1.0f;
         pickSprite(p);
         break;
+    case ParticleType::Poof:
+        // Vanilla ExplodeParticle: rises and slows, playing its frames.
+        p = base(type, at);
+        p.gravity = -0.1f;
+        p.friction = 0.9f;
+        p.vel = speed + glm::dvec3(random_.nextDouble() * 2.0 - 1.0, random_.nextDouble() * 2.0 - 1.0,
+                                   random_.nextDouble() * 2.0 - 1.0) *
+                            double(0.05f);
+        p.color = glm::vec3(random_.nextFloat() * 0.3f + 0.7f);
+        p.size = 0.1f * (random_.nextFloat() * random_.nextFloat() * 6.0f + 1.0f);
+        p.lifetime = int(16.0 / (double(random_.nextFloat()) * 0.8 + 0.2)) + 2;
+        spriteFromAge(p);
+        break;
+    case ParticleType::Heart:
+        // Vanilla HeartParticle: floats up a little and slows.
+        p = withSpeed(type, at, glm::dvec3(0.0));
+        p.speedUpWhenBlocked = true;
+        p.friction = 0.86f;
+        p.vel *= double(0.01f);
+        p.vel.y += 0.1;
+        p.size *= 1.5f;
+        p.lifetime = 16;
+        p.hasPhysics = false;
+        pickSprite(p);
+        break;
+    case ParticleType::Crit:
+    case ParticleType::DamageIndicator:
+        // Vanilla CritParticle (damage indicators: thrown up by 1 more, 20 ticks).
+        p = withSpeed(type, at, glm::dvec3(0.0));
+        p.friction = 0.7f;
+        p.gravity = 0.5f;
+        p.vel *= double(0.1f);
+        p.vel += (type == ParticleType::DamageIndicator ? speed + glm::dvec3(0.0, 1.0, 0.0) : speed) * 0.4;
+        p.color = glm::vec3(float(random_.nextDouble() * double(0.3f) + double(0.6f)));
+        p.size *= 0.75f;
+        p.lifetime = type == ParticleType::DamageIndicator ? 20
+                                                           : std::max(int(6.0 / (random_.nextDouble() * 0.8 + 0.6)), 1);
+        p.hasPhysics = false;
+        pickSprite(p);
+        break;
+    case ParticleType::SweepAttack:
+        // Vanilla AttackSweepParticle: 4 ticks, full bright, a block across.
+        p = base(type, at);
+        p.lifetime = 4;
+        p.color = glm::vec3(random_.nextFloat() * 0.6f + 0.4f);
+        p.size = 1.0f - float(speed.x) * 0.5f;
+        p.hasPhysics = false;
+        spriteFromAge(p);
+        break;
     case ParticleType::Terrain:
     case ParticleType::Count: return;
     }
@@ -407,6 +461,7 @@ bool ParticleSystem::tickOne(const BlockGetter& level, Particle& p) {
         p.vel *= 0.99;
         return true;
     case ParticleType::Explosion:
+    case ParticleType::SweepAttack:
         if (p.age++ >= p.lifetime) return false;
         spriteFromAge(p);
         return true;
@@ -493,7 +548,11 @@ bool ParticleSystem::tickOne(const BlockGetter& level, Particle& p) {
         p.vel.x *= double(0.7f);
         p.vel.z *= double(0.7f);
     }
-    if (p.type == ParticleType::Smoke || p.type == ParticleType::LargeSmoke) spriteFromAge(p);
+    if (p.type == ParticleType::Smoke || p.type == ParticleType::LargeSmoke || p.type == ParticleType::Poof) spriteFromAge(p);
+    if (p.type == ParticleType::Crit || p.type == ParticleType::DamageIndicator) { // vanilla CritParticle.tick
+        p.color.g *= 0.96f;
+        p.color.b *= 0.9f;
+    }
     // Lava pops trail smoke, less as they age.
     if (p.type == ParticleType::Lava && random_.nextFloat() > float(p.age) / float(p.lifetime))
         add(ParticleType::Smoke, p.pos, p.vel);
@@ -519,6 +578,9 @@ float ParticleSystem::quadSize(const Particle& p, float pt) {
     case ParticleType::SmallFlame:
     case ParticleType::SoulFireFlame: return p.size * (1.0f - f * f * 0.5f);
     case ParticleType::Lava: return p.size * (1.0f - f * f);
+    case ParticleType::Heart:
+    case ParticleType::Crit:
+    case ParticleType::DamageIndicator: return p.size * std::clamp(f * 32.0f, 0.0f, 1.0f);
     default: return p.size;
     }
 }
@@ -536,7 +598,8 @@ glm::vec2 ParticleSystem::light(const Particle& p, glm::vec2 cell, float pt) {
     case ParticleType::DrippingLava:
     case ParticleType::FallingLava:
     case ParticleType::LandingLava: return {15.0f, cell.y};
-    case ParticleType::Explosion: return {15.0f, 15.0f};
+    case ParticleType::Explosion:
+    case ParticleType::SweepAttack: return {15.0f, 15.0f};
     default: return cell;
     }
 }

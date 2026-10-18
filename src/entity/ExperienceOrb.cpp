@@ -100,7 +100,7 @@ void ExperienceOrb::playerTouch(Level& level, Player& player) {
     if (--count <= 0) removed = true;
 }
 
-bool ExperienceOrb::hurtServer(Level&, DamageType, float amount) {
+bool ExperienceOrb::hurtServer(Level&, const DamageSource&, float amount) {
     health = int(float(health) - amount);
     if (health <= 0) removed = true;
     return true;

@@ -15,9 +15,12 @@ class Level;
 
 namespace sim {
 
-// Explodes with `power` (TNT 4) at `center`; `source` (the TNT) is neither hurt nor
-// pushed by it. Emits an Explosion level event.
-void explode(Level& level, const Entity* source, const glm::dvec3& center, float power);
+// Explodes with `power` (TNT 4, creepers 3) at `center`; `source` (the TNT, the creeper) is
+// neither hurt nor pushed by it, and a living source is blamed for the damage. Without
+// `breakBlocks` (mob griefing off) only entities feel it; with `decay` (mobs' blasts) each
+// broken block's drops survive one time in `power`. Emits an Explosion level event.
+void explode(Level& level, const Entity* source, const glm::dvec3& center, float power, bool breakBlocks = true,
+             bool decay = false);
 
 // Vanilla Explosion.getSeenPercent: the fraction of a grid of points on `box` with a clear
 // line (through collision shapes) to `center`.

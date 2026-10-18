@@ -243,7 +243,7 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - impact = `(1 - d/(2P))·exposure`;
   - damage = `((i²+i)/2)·7·2P + 1`;
   - knockback scales with impact.
-- **Drops:** TNT drops everything (no decay since 1.21); other explosions would drop with chance 1/P. Loot merges into stacks of up to 16, popped at the first block. TNT caught in a blast is lit on a fuse of `rand(20) + 10` ticks.
+- **Drops:** TNT drops everything (no decay since 1.21); creepers' blasts keep each drop with chance 1/P. Loot merges into stacks of up to 16, popped at the first block. TNT caught in a blast is lit on a fuse of `rand(20) + 10` ticks.
 - **Exposure:** the share of points on the entity's box, a grid `1/(2·size+1)` apart, with a clear line (collision shapes) to the center.
 - **Power:** TNT 4 with an 80-tick fuse, exploding from 1/16 of its height; creeper 3, with a 30-tick fuse.
 - **Primed TNT:** hops `(−sin a·0.02, 0.2, −cos a·0.02)`; gravity 0.04, drag 0.98, ground bounce ×(0.7, −0.5, 0.7). It swells by `1 + g⁴·0.3` (`g = 1 − fuse/10`) over its last 10 ticks and flashes white when `⌊fuse⌋/5` is even.
@@ -281,10 +281,13 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - attack speed: sword 1.6, pickaxe 1.2, shovel 1.0, axe 0.8–1.0, hoe 1–4, hand 4.
   - Wear: 1 per block with hardness > 0 (swords 2). Correct-tool rules: `minecraft:incorrect_for_<tier>_tool` denies drops first, then `mineable/<kind>` gives the tier's speed and drops.
 - **Attack strength:** `attackStrengthTicker` counts up each tick; it resets when swinging at nothing, attacking, or changing the kind of held item. Scale `clamp((ticker + adjust)/(20/attackSpeed), 0, 1)`; attack damage × `0.2 + s²·0.8` (M12). A miss outside creative pauses attacking for 10 ticks (missTime).
-- **Combat** *(mem, M12)*:
-  - a crit (falling, scale > 0.9) does ×1.5;
-  - knockback is 0.4, plus 1 level when sprinting.
-- **Difficulty** *(mem, M12)*: mob→player damage on Easy is `min(d/2+1, d)`, on Normal `d`, on Hard `1.5d`.
+- **Combat** (Player.attack, `game/Combat`):
+  - damage = the weapon's attack damage × `0.2 + s²·0.8`, s the attack strength at +0.5 ticks; the ticker resets;
+  - critical (s > 0.9, falling, not on the ground, a ladder, in water or sprinting): ×1.5;
+  - every hit pushes 0.4 away from where it came from (vanilla `knockback`: `v/2 − dir·k`, upward `min(0.4, vy/2 + k)` on the ground, less the knockback resistance); a full-strength sprinting hit adds 0.5 along the look and slows the attacker to ×0.6;
+  - sweep (a sword, s > 0.9, no crit or sprint, on the ground, moved less than 2.5 × the walk speed this tick): everything within the target's box grown by (1, 0.25, 1) and 3 blocks of the player takes `1·s` and a 0.4 push;
+  - weapons wear 1 (swords) or 2 (tools); attacking costs 0.1 exhaustion; damage over 2 throws `⌊d/2⌋` damage indicators.
+- **Difficulty:** damage to players that scales (mob attacks and arrows from mobs, explosions) is `min(d/2+1, d)` on Easy, `d` on Normal, `1.5d` on Hard, nothing on Peaceful. Regional difficulty (equipment, burning zombies' fire): `difficulty·(0.75 + clamp((t − 72000)/1440000, 0, 1)·0.25 + moon)`, the special multiplier `clamp((e − 2)/2, 0, 1)`.
 - **Experience:** to the next level `2L+7` (L ≤ 15), `5L−38` (L ≤ 30), `9L−158`. Orbs split into the largest of 2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3, 1; they drift to a player within 8 blocks (`(1 − d/8)²·0.1` per tick) and are taken one per 2 ticks.
 - **Item entities:** a 10-tick pickup delay (40 when thrown); gravity 0.04 with 0.98 drag (×0.6 friction on the ground); they rise slowly in water; merge with equal stacks within 0.5 blocks; despawn after 6000 ticks; burn in fire and lava unless fire resistant.
 - **Furnaces** (AbstractFurnaceBlockEntity.serverTick): fuel lights when there is something to cook; cooking takes the recipe's time (200; 100 in a smoker or blast furnace); without fire the progress unwinds 2 per tick. Experience gathers per item and is paid when the output is taken, its fraction rounded up by chance. Fuel: coal 1600, logs and planks 300, sticks 100, a lava bucket 20000 (leaving the bucket), a coal block 16000.
@@ -295,29 +298,32 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   - first person looks along the bed from the pillow; third person draws the model laid along the bed, `T(−facing·1.52)·Ry(south 90, west 0, north 270, east 180)·Rz(90)·Ry(270)`.
 - **Signs** (SignRenderer): `T(0.5, 0.5, 0.5)·Ry(−rotation)` (wall signs then `T(0, −0.3125, −0.4375)`); hanging signs `T(0.5, 0.9375, 0.5)·Ry(−rotation)·T(0, −0.3125, 0)`. The back side turns 180°. Text: `T(0, 0.3333, 0.0467)·S(1/96, −1/96, 1/96)` (hanging: `T(0, −0.32, 0.073)` and 0.9/64), lines 10 (9) apart from −20 (−18), centered by `−width/2`, at most 90 (60) pixels. Plain text is the dye color × 0.4 in the block's light; glowing text is full-bright, outlined in that dark color (cream F0EBCC for black) within 16 blocks. The editor (SignEditScreen) draws the board 96×48 at `(w/2 − 48, 66)` and text at y 90, scale 0.9765628 (hanging: a 16-px picture at 4.5× and text at y 125); the cursor blinks every 6 ticks.
 
-## Mobs *(mem)*
-| Mob | HP | Speed | Size | Notes |
-|---|---|---|---|---|
-| zombie | 20 | 0.23 | 0.6×1.95 | damage 3, armor 2, burns in sun |
-| skeleton | 20 | 0.25 | 0.6×1.99 | bow every 20 (Hard) / 40 ticks |
-| creeper | 20 | 0.25 | 0.6×1.7 | swells < 3 blocks, cancels > 7, fuse 30 |
-| spider | 16 | 0.3 | 1.4×0.9 | damage 2, climbs walls, neutral in light |
-| pig | 10 | 0.25 | 0.9×0.9 | carrot, potato, beetroot |
-| cow | 10 | 0.2 | 0.9×1.4 | wheat; milk with a bucket |
-| sheep | 8 | 0.23 | 0.9×1.3 | wheat; eats grass to regrow wool |
-| chicken | 4 | 0.25 | 0.4×0.7 | seeds; egg every 6000–12000 ticks; slow fall |
+## Mobs (`entity/mob`, `entity/ai`, `entity/path`, `world/level/NaturalSpawner`)
+| Mob | HP | Speed | Size (eyes) | Goals (priority) | Notes |
+|---|---|---|---|---|---|
+| pig | 10 | 0.25 | 0.9×0.9 (0.765) | float 0, panic 1.25 1, breed 3, tempt 1.2 4, follow parent 1.1 5, stroll 6, look 7, look around 8 | carrots, potatoes, beetroots (and carrots on sticks tempt) |
+| cow | 10 | 0.2 | 0.9×1.4 (1.3) | float, panic 2.0, breed, tempt 1.25, follow 1.25, stroll, look, look around | wheat; milked with a bucket |
+| sheep | 8 | 0.23 | 0.9×1.3 (1.235) | as the cow (panic 1.25, tempt and follow 1.1), eat grass 5 | wheat; 1–3 wool when sheared |
+| chicken | 4 | 0.25 | 0.4×0.7 (0.644) | as the cow (panic 1.4, tempt 1.0, follow 1.1) | seeds; egg every 6000–12000 ticks; falls ×0.6; water costs nothing |
+| zombie | 20 | 0.23 | 0.6×1.95 (1.74) | attack 2, stroll 7, look 8, look around 8; targets: hurt by 1, player 2 | 3 damage, armor 2, follow range 35, burns, babies ×1.5 speed |
+| skeleton | 20 | 0.25 | 0.6×1.99 (1.74) | restrict sun 2, flee sun 3, bow or melee 4, stroll 5, look 6; targets as the zombie | bow every 40 ticks (Hard 20) after a 20-tick draw |
+| creeper | 20 | 0.25 | 0.6×1.7 | float 1, swell 2, melee 4, stroll 0.8 5, look 6; targets: player 1, hurt by 2 | fuse 30, power 3 (charged 6) |
+| spider | 16 | 0.3 | 1.4×0.9 (0.65) | float 1, leap 0.4 3, melee 4, stroll 0.8 5, look 6; targets: hurt by 1, player in the dark 2 | climbs walls, ignores cobwebs, gives up in light (1/100) |
 
-- **Spawning:**
-  - caps per 17×17 chunk area: monster 70, creature 10;
-  - hostiles need block light 0 and sky light ≤ rand(0..7);
-  - animals need grass below and light > 8;
-  - animals mostly spawn during chunk generation.
-- **Despawning:** immediate beyond 128 blocks; a 1/800 chance per tick beyond 32 blocks.
-- **Breeding:** love mode lasts 600 ticks, a baby grows up in 24,000 ticks, and the parent cooldown is 6000.
-- **Bow:**
-  - power `p = (f² + 2f)/3` with f = ticks/20, clamped at 1;
-  - arrow speed 3p, gravity 0.05, drag 0.99;
-  - damage `ceil(speed·2)`, plus a crit bonus.
+- **Tick** (Mob.tick): despawn check, previous values, fluids and rain, the shared living environment (`LivingEntity::environmentTick`: invulnerability, landing, air, fire, lava, blocks, void), death (loot at once, vanish after 20 ticks), then aiStep: tiny speeds zeroed, the AI (sensing, the target and goal selectors in full every other tick, `(tickCount + id) % 2`, else only the goals that tick every tick; navigation; move, look and jump controls), jumping (`max(0.42·jumpFactor, vy)`, 10-tick delay; +0.04 in fluids), input ×0.98, travel, shoving, the mob's own step (burning, growing, eggs), the body rotation and the walk animation.
+- **Travel** (LivingEntity.travel): on land `speed·0.216/f³` with input `(xxa, 0, zza)` where zza = speed (mobs move at speed² × modifier), friction `f·0.91`, gravity 0.08 with drag 0.98; ladders cap at 0.15; in water 0.02 and drag 0.8 (sinking `g/16`); in lava 0.02 and drag 0.5; out of a fluid against a wall a 0.3 hop.
+- **Controls:** MoveControl turns the body up to 90° a tick toward the wanted point and jumps when it is higher than a step or blocked by a non-door, non-fence block; STRAFE moves sideways unless that leaves walkable ground. LookControl turns the head (10°/40° a tick by default) for 2 ticks after each request, else back toward the body; walking keeps it within 75° of the body. BodyRotationControl: moving, the body faces the yaw; standing, it follows a head turned over 15°, and after 10 ticks eases toward it over 10 more.
+- **Goals:** GoalSelector stops goals that can't continue, starts those whose flags (move, look, jump, target) are free or held by an interruptible goal of a worse priority (lower number wins), then ticks the running ones; goal delays halve (`reducedTickDelay`) since they tick every other tick. Panic runs to a random spot within 5 (4 up or down) for 40 ticks after a panic-causing hit (attacks, fire, lava, cactus, lightning, explosions), or to water within 5 when burning. Stroll: 1 in 60 checks (unless idle 100+ ticks), the best of 10 random spots within 10 (7 up or down) by the walk target value (animals: grass 10, else brightness − 0.5; monsters: 0.5 − brightness), on land only (`landRandomPos`) 99.9% of the time. Melee: re-paths every 4–11 ticks (more when far), attacks every 20 ticks within reach (the box grown by 0.828 sideways). Targeting: within the follow range (×0.8 sneaking, ×0.5 wearing their own head), in sight (a collider ray from eye to eye, at most 128), 1 in 5 checks; forgotten out of range or after 3 (hurt by: 15) seconds unseen.
+- **Path finding** (`entity/path`, WalkNodeEvaluator and PathFinder): A* over block nodes; the heuristic is 1.5 × the distance to the target, costs the step length plus the node's malus; at most `followRange·16` nodes and `followRange` blocks walked. A node's type is the worst over the mob's box (`⌊w+1⌋` wide, `⌊h+1⌋` high): open air over a floor is WALKABLE, unless next to fire, lava, cactus or water (DANGER/WATER_BORDER); fences, walls and closed gates are FENCE (−1), closed wooden doors −1 (no door opening), leaves −1, water 8, fire danger 8, damage-fire 16. Neighbors: the four sides (up a step to 1 block, or 1.125 with the jump check, down to the fall limit: 3, or more with a target and spare health), then diagonals past two accepted sides no higher than the node. Ground navigation moves the target down to the ground (or up out of a block), steers to each node's center (advancing within `max(w/2, 0.75 − w/2)` or when the next node lies the other way), gives up when it moved less than `speed²·25` blocks in 100 ticks or took 3× longer than expected for a node; skeletons by day cut paths at the open sky; spiders without a path head straight for the target.
+- **Spawning** (`NaturalSpawner`): each tick (animals every 400) every ticking chunk within 128 blocks of the player (a spectator stops it) tries one spot: random x, z, and y from the bottom to one above the surface, not inside a full opaque block; three packs, each up to `⌈4r⌉` (then the type's group size) steps of `rand(6) − rand(6)`; the spot must be over 24 blocks from the player and the world spawn, its floor sturdy and not bright (emission < 14, not glass, leaves, ice, barriers, bedrock, magma), the spot and the one above free of full collision, fluids, rails, redstone and harm, the type's rule (animals: grass below and raw brightness > 8; monsters: not Peaceful, sky light ≤ rand(32), block light 0, darkness ≤ rand(8)), the mob's box clear, its walk target value ≥ 0, no liquid. Caps: `cap·spawnable chunks/289` counted over non-persistent mobs. New chunks: while `rand < 0.1` (0.07 in snowy plains and ice spikes) a pack of the biome's animals at the surface, retrying 4 times each.
+- **Despawning** (checkDespawn): beyond 128 blocks at once; beyond 32 after 600 idle ticks, 1 in 800 per tick; idle time resets within 32 blocks; monsters gain 2 idle ticks a tick in the light (brightness > 0.5); animals never despawn.
+- **Breeding:** food sets 600 ticks of love (only at age 0); two in love within 8 blocks walk together and after 60 ticks within 3 blocks make a baby (age −24000), the parents rest 6000 ticks; 1–7 experience. Feeding a baby adds `⌊(−age/20)·0.1⌋` seconds. Babies follow the nearest adult over 3 blocks away (within 8, 4 up or down) until within 3 or beyond 16.
+- **Undead in daylight:** each tick when it is bright outside (darkening < 4), brightness `f > 0.5`, `30·rand < (f − 0.4)·2`, dry and under the open sky: a helmet wears by `rand(2)`, else 8 seconds of fire.
+- **Skeleton bow** (performRangedAttack): an arrow from the eyes − 0.1 toward the target's lower third, aimed `0.2 × horizontal distance` higher, speed 1.6, spread `14 − 4·difficulty`, damage `2·power + 0.11·difficulty ± 0.574`.
+- **Arrows** (AbstractArrow): drag 0.99 (water 0.6, before the move), gravity 0.05; the first block (collider shapes) or entity (boxes grown by 0.3, entering only, not the shooter until clear of it) on the segment; damage `⌈|v|·base⌉`, critical `+rand(d/2 + 2)`; in a block they back off 0.05, shake 7 ticks and stay a minute; a creative player bounces them off (×−0.1).
+- **Player bow:** power `p = (f² + 2f)/3`, f the draw in seconds (at most 1); below 0.1 nothing; speed `3p` along the look plus the player's motion, spread 1, critical at `p = 1`; the FOV shrinks by `0.15·min(f, 1)²`.
+- **Creeper:** the swell grows by 1 a tick while its target is within 3 blocks (ignited: always), shrinks once it is beyond 7 or unseen; at 30 it explodes. A fall adds `1.5 × distance` (up to 25). Drawn scaled `(1 + g⁴·0.4)·w` across and `(1 + g⁴·0.1)/w` up, `w = 1 + sin(100s)·s·0.01`, flashing white `0.75·⌊clamp(s, 0.5, 1)·15⌋/15` when `⌊10s⌋` is odd.
+- **Rendering:** vanilla's LivingEntityRenderer transform `Ry(180 − body)·Rz(death flip)·S(−1, −1, 1)·T(0, −1.501, 0)`; the death flip is `min(√((t−1)/20·1.6), 1)` × 90° (spiders 180°). Baby models (BabyModelTransform): head parts moved by (0, y, z) (scaled by 0.75 when the head shrinks, humanoids), the rest scaled ½ about a pivot moved down 24: pig (4, 4), cow (8, 6), sheep (8, 4), chicken (5, 2), zombie (16, 0, head ×0.75). Shadows: pig, cow, sheep 0.7, chicken 0.3, humanoids 0.5, spider 0.8 (babies halved). Wool tint: white E6E6E6, other dyes ¾ of their texture color. Armor: the outer layer grown 1.0 (legs 0.9) for helmet, chestplate and boots, the inner 0.5 (legs 0.4) for leggings, posed like the body.
 
 ## Simulation (`world/sim`)
 - **Updates:** `setBlockAndUpdate` = set, the new block's `onPlace`, `neighborChanged` for the six neighbors (W, E, D, U, N, S), then shape updates spreading out (budget 512). The level tick runs time, weather, scheduled block ticks then fluid ticks (65,536 each), chunk ticks (post-processing, lightning, precipitation, random ticks), entities, block entities.

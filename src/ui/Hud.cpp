@@ -49,11 +49,14 @@ void Hud::render(GuiGraphics& g, const Player& player, bool firstPerson, bool ey
     if (firstPerson && !spectator) {
         g.batch().setBlend(GuiBatch::Blend::Invert);
         g.sprite("hud/crosshair", std::floor((size.x - 15) / 2), std::floor((size.y - 15) / 2), 15, 15);
-        // Vanilla renderCrosshair: the attack strength as a bar under it while it recovers.
-        // (The full sprite, for a ready attack on a living target, arrives with mobs.)
+        // Vanilla renderCrosshair: the attack strength as a bar under it while it recovers,
+        // a sword when a living target can be hit at full strength.
         const float strength = player.attackStrengthScale(0.0f);
-        if (attackIndicator == AttackIndicator::Crosshair && strength < 1.0f) {
-            const float x = std::floor(size.x / 2) - 8, y = std::floor(size.y / 2) - 7 + 16;
+        const float ix = std::floor(size.x / 2) - 8, iy = std::floor(size.y / 2) - 7 + 16;
+        if (attackIndicator == AttackIndicator::Crosshair && attackReady) {
+            g.sprite("hud/crosshair_attack_indicator_full", ix, iy, 16, 16);
+        } else if (attackIndicator == AttackIndicator::Crosshair && strength < 1.0f) {
+            const float x = ix, y = iy;
             g.sprite("hud/crosshair_attack_indicator_background", x, y, 16, 4);
             g.spriteRegion("hud/crosshair_attack_indicator_progress", 16, 4, 0, 0, x, y, float(int(strength * 17.0f)), 4);
         }

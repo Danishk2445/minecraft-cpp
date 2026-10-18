@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "entity/ItemEntity.h"
+#include "entity/LivingEntity.h"
 #include "entity/Player.h"
 #include "entity/PrimedTnt.h"
 #include "game/BlockEntities.h"
@@ -77,9 +78,12 @@ float seenPercent(const BlockGetter& level, const glm::dvec3& center, const AABB
     return total ? float(clear) / float(total) : 0.0f;
 }
 
-void explode(Level& level, const Entity* source, const glm::dvec3& center, float power) {
+void explode(Level& level, const Entity* source, const glm::dvec3& center, float power, bool breakBlocks, bool decay) {
     const BlockRegistry& reg = level.registry();
-    std::vector<BlockPos> blocks = explodedBlocks(level, center, power);
+    std::vector<BlockPos> blocks = breakBlocks ? explodedBlocks(level, center, power) : std::vector<BlockPos>{};
+    const auto* living = dynamic_cast<const LivingEntity*>(source);
+    DamageSource damage = DamageSource::explosion(living);
+    if (!living) damage.direct = source;
 
     // Entities within twice the power: hurt and thrown by distance and how much they see.
     const float reach = power * 2.0f;
@@ -92,7 +96,7 @@ void explode(Level& level, const Entity* source, const glm::dvec3& center, float
         if (length == 0.0) return std::nullopt;
         dir /= length;
         const float seen = seenPercent(level, center, e.box());
-        e.hurtServer(level, DamageType::Explosion, damageAt(power, distance01, seen));
+        e.hurtServer(level, damage, damageAt(power, distance01, seen));
         return dir * ((1.0 - distance01) * double(seen));
     };
     const AABB area(std::floor(center.x - reach - 1.0), std::floor(center.y - reach - 1.0), std::floor(center.z - reach - 1.0),
@@ -120,6 +124,7 @@ void explode(Level& level, const Entity* source, const glm::dvec3& center, float
         const bool tnt = shortId(reg.blockOf(s).id) == "tnt";
         if (!tnt && level.doTileDrops && level.loot())
             for (ItemStack stack : level.loot()->drops(s, false, r)) {
+                if (decay && r.nextFloat() > 1.0f / power) continue; // vanilla survives_explosion
                 for (Collected& c : drops) {
                     if (!c.stack.sameItem(stack) || c.stack.count + stack.count > stack.maxStack()) continue;
                     const int moved = std::min(std::min(c.stack.maxStack(), 16) - c.stack.count, stack.count);

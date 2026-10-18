@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -23,6 +25,7 @@ class BlockLoot;
 class ChunkStorage;
 class BiomeRegistry;
 class BiomeDecorator;
+class EntityTypes;
 class ItemRegistry;
 class Player;
 class RecipeBook;
@@ -34,6 +37,13 @@ enum class LevelEventType : uint8_t {
     LavaFizz,    // lava met water or burned something (smoke)
     BoneMeal,    // bone meal used at `pos` (happy-villager sparkles, `data` of them)
     Explosion,   // at `point`, of power `data` (its particles)
+    // Entities (M12); `data` packs the entity's box (width | height << 16, in hundredths)
+    // around `point` (its feet) where particles fill it.
+    EntityPoof,      // a dead mob vanishing (vanilla entity event 60)
+    Hearts,          // in love (one heart) or bred (`state` 7 hearts)
+    Crit,            // a critical hit on it (vanilla crit particles)
+    DamageIndicator, // `state` dark hearts out of what the player's hit took
+    Sweep,           // a sword's sweep at `point`
 };
 struct LevelEvent {
     LevelEventType type;
@@ -105,9 +115,15 @@ public:
     const std::vector<std::unique_ptr<Entity>>& entities() const { return entities_; }
     // Live entities whose boxes intersect `box`, except `except`.
     std::vector<Entity*> entitiesIn(const AABB& box, const Entity* except = nullptr) const;
-    // The player (not owned): orbs drift to it and it picks up what it touches.
-    void setPlayer(Player* player) { player_ = player; }
+    // The entity (or the player) with this id, if it is still in the level.
+    Entity* entity(uint32_t id) const;
+    // The player (not owned): orbs drift to it and it picks up what it touches. It gets an
+    // id so mobs can target it.
+    void setPlayer(Player* player);
     Player* player() const { return player_; }
+    // Mob types, spawns and loot (data/entities.json); without them no mob loads or spawns.
+    void setEntityTypes(const EntityTypes* types) { entityTypes_ = types; }
+    const EntityTypes* entityTypes() const { return entityTypes_; }
     // The item registry, for loading saved entities.
     void setItems(const ItemRegistry* items) { items_ = items; }
     // Block loot: blocks a neighbor update removes (a torch losing its wall, a door's other
@@ -150,6 +166,14 @@ public:
     bool doTileDrops = true;
     bool doEntityDrops = true; // entities leave items (falling blocks that can't land)
     bool doVinesSpread = true;
+    bool doMobSpawning = true;
+    bool doMobLoot = true;    // mobs drop loot and experience
+    bool mobGriefing = true;  // creepers break blocks, sheep eat grass, mobs trample farmland
+    // A game rule by its vanilla name ("doMobSpawning"): its value as text, or nothing for
+    // an unknown rule; setting checks the value (true/false, or a number for the counters).
+    std::optional<std::string> gameRule(std::string_view name) const;
+    bool setGameRule(std::string_view name, std::string_view value, std::string* error = nullptr);
+    static std::vector<std::string_view> gameRuleNames();
     // The world's difficulty (fire spreads faster on harder ones).
     Difficulty difficulty = Difficulty::Normal;
 
@@ -164,6 +188,10 @@ public:
     BiomeId biomeAt(const BlockPos& p) const;
     // Vanilla skyDarken: sky light lost to night and weather (0 by day .. 11 at night).
     int skyDarken() const;
+    // Vanilla isBrightOutside (isDay): the sky darkened by less than 4.
+    bool isBrightOutside() const { return skyDarken() < 4; }
+    // Vanilla canSeeSky: full sky light at p.
+    bool canSeeSky(const BlockPos& p) const { return (lightAt(p) >> 4) >= 15; }
 
     // Weather (vanilla ServerLevelData's weather times and ServerLevel.advanceWeatherCycle):
     // clear for clearWeatherTime ticks, else rain and thunder each toggle when their timer
@@ -254,11 +282,15 @@ private:
     int64_t dayTime_ = 6000; // noon
 
     std::vector<std::unique_ptr<Entity>> entities_;
+    std::unordered_map<uint32_t, Entity*> byId_;
+    void dropRemoved(); // erases removed entities (and their ids)
+    const EntityTypes* entityTypes_ = nullptr;
     std::unordered_map<BlockPos, std::shared_ptr<BlockEntity>> blockEntities_;
     const RecipeBook* recipes_ = nullptr;
     void tickBlockEntities();
     uint32_t nextEntityId_ = 1;
     std::unordered_set<ChunkPos> savedEntityChunks_; // chunks whose save file lists entities
+    std::unordered_set<ChunkPos> populatedChunks_;   // loaded chunks that got animals when generated
     Player* player_ = nullptr;
     const ItemRegistry* items_ = nullptr;
     const BiomeDecorator* decorator_ = nullptr;

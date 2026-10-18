@@ -1,6 +1,7 @@
 #include "entity/LightningBolt.h"
 
 #include "entity/Player.h"
+#include "entity/mob/Mob.h"
 #include "world/level/Level.h"
 #include "world/sim/Fire.h"
 
@@ -56,7 +57,13 @@ void LightningBolt::tick(Level& level) {
     if (life >= 0 && !visualOnly) {
         // Everything within 3 blocks (9 up) is struck: set alight and hurt by 5.
         const AABB area(pos.x - 3.0, pos.y - 3.0, pos.z - 3.0, pos.x + 3.0, pos.y + 6.0 + 3.0, pos.z + 3.0);
-        for (Entity* e : level.entitiesIn(area, this)) e->hurtServer(level, DamageType::LightningBolt, 5.0f);
+        for (Entity* e : level.entitiesIn(area, this)) {
+            if (auto* mob = dynamic_cast<Mob*>(e)) {
+                if (mob->alive()) mob->thunderHit(level);
+            } else {
+                e->hurtServer(level, DamageType::LightningBolt, 5.0f);
+            }
+        }
         if (Player* p = level.player(); p && !p->dead() && p->box().intersects(area)) {
             p->igniteForTicks(8 * 20);
             p->hurt(DamageType::LightningBolt, 5.0f);

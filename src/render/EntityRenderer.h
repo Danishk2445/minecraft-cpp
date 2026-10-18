@@ -4,6 +4,7 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -17,6 +18,7 @@
 #include "gfx/Texture.h"
 #include "render/ChunkRenderer.h"
 #include "ui/Font.h"
+#include "game/Inventory.h"
 #include "world/block/BlockRegistry.h"
 
 namespace mc {
@@ -25,7 +27,10 @@ class ClientAssets;
 class Level;
 class Player;
 
+class Arrow;
 class ExperienceOrb;
+class LivingEntity;
+class Mob;
 class FallingBlockEntity;
 class ItemEntity;
 class LightningBolt;
@@ -82,8 +87,14 @@ public:
     // relative to `origin`, drawn with the font's texture.
     void submitText(const std::vector<Font::GlyphQuad>& quads, const Texture& fontTexture, const glm::dvec3& origin,
                     const glm::mat4& transform, glm::vec2 light);
-    // The player model (Steve), posed at `partialTick`, with its held items and shadow.
+    // The player model (Steve), posed at `partialTick`, with its armor, held items and shadow.
     void submitPlayer(const Player& player, const Level& level, float partialTick, int skyDarken);
+    // A mob (M12): its model posed by its setupAnim, the type's layers (sheep wool, spider
+    // eyes, a charged creeper's swirl), armor and held items, the hurt red and the creeper's
+    // flashing, falling over when dead; flames when burning; its shadow.
+    void submitMob(const Mob& mob, const Level& level, float partialTick, int skyDarken);
+    // Vanilla ArrowRenderer: the crossed fletched quads, shaking when it hits.
+    void submitArrow(const Arrow& arrow, const Level& level, float partialTick);
 
     // Draws everything submitted. The lightmap must be bound to texture unit 1.
     void render(const glm::mat4& viewProj, const ChunkRenderer::Fog& fog);
@@ -96,7 +107,7 @@ private:
         glm::vec2 light;
         uint32_t overlay = 0; // RGBA8: a color mixed in by its alpha (see submitModel)
     };
-    enum class Pass : uint8_t { Cutout, Shadow, Translucent };
+    enum class Pass : uint8_t { Cutout, Shadow, Translucent, Additive };
     struct Batch {
         const Texture* texture;
         size_t first, count; // vertices
@@ -127,6 +138,24 @@ private:
     std::vector<const BakedModel*> blockModels_;
     // Player models at rest and a working copy posed each frame.
     ModelDefinition playerRest_, playerPosed_;
+    // Mob models by name ("pig", "pig_baby", "armor_outer", ...): at rest and posed.
+    struct MobModel {
+        ModelDefinition rest, posed;
+    };
+    std::unordered_map<std::string, MobModel> mobModels_;
+    void initMobModels();
+    // The named model reset to its rest pose, to be posed and submitted.
+    ModelDefinition& posedModel(const std::string& name);
+    // Vanilla HumanoidArmorLayer: the worn armor (feet to head) on a humanoid body.
+    void submitArmor(std::span<const ItemStack> armor, const ModelPart& body, bool baby, const glm::dvec3& origin,
+                     const glm::mat4& transform, glm::vec2 light, uint32_t overlay);
+    // Vanilla ItemInHandLayer: a held item from the arm (`armShift` model units sideways
+    // for thin arms), drawn and pulled like the holder's bow when it is using one.
+    void submitHeldItem(const ItemStack& stack, const ModelPart& arm, bool left, float armShift,
+                        const glm::dvec3& origin, const glm::mat4& transform, glm::vec2 light, float holderYaw,
+                        int useDuration);
+    // Vanilla EntityRenderDispatcher.renderFlame: fire wrapped round a burning entity.
+    void submitFlame(const glm::dvec3& feet, float width, float height);
 };
 
 } // namespace mc

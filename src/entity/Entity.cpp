@@ -56,6 +56,21 @@ void Entity::moveTowardsClosestSpace(const BlockGetter& level, float random01) {
     velocity[best.axis] = push;
 }
 
+void pushApart(Entity& a, Entity& b) {
+    if (a.noPhysics || b.noPhysics) return;
+    double dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+    double d = std::max(std::abs(dx), std::abs(dz)); // Mth.absMax
+    if (d < 0.01) return;
+    d = std::sqrt(d);
+    dx /= d;
+    dz /= d;
+    const double scale = std::min(1.0 / d, 1.0) * 0.05;
+    dx *= scale;
+    dz *= scale;
+    if (a.isPushable()) a.velocity += glm::dvec3(-dx, 0.0, -dz);
+    if (b.isPushable()) b.velocity += glm::dvec3(dx, 0.0, dz);
+}
+
 BlockPos Entity::blockBelow() const {
     return BlockPos(int(std::floor(pos.x)), int(std::floor(pos.y - 0.500001)), int(std::floor(pos.z)));
 }

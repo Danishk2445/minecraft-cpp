@@ -8,6 +8,9 @@
 
 #include "entity/LightningBolt.h"
 #include "entity/PrimedTnt.h"
+#include "entity/mob/Animals.h"
+#include "entity/mob/Monsters.h"
+#include "game/DyeColor.h"
 #include "game/BlockEntities.h"
 #include "world/block/BlockRegistry.h"
 #include "world/level/Level.h"
@@ -167,6 +170,73 @@ struct SnbtParser {
         return Json(*text);
     }
 };
+
+// /summon of a mob: vanilla finalizes it (equipment, babies, colors) only without data;
+// the data's keys (vanilla NBT names) set what they name.
+bool summonMob(Level& level, const std::string& type, const glm::dvec3& at, const Json& data, std::string& err) {
+    std::unique_ptr<Mob> mob = createMob(*level.entityTypes(), type);
+    if (!mob) {
+        err = "can't summon " + type;
+        return false;
+    }
+    mob->random = Xoroshiro(int64_t(level.random().nextLong()));
+    mob->pos = mob->oldPos = at;
+    float yaw = 0.0f, pitch = 0.0f;
+    if (const Json r = data.value("Rotation", Json::array()); r.is_array() && r.size() == 2) {
+        yaw = r[0].get<float>();
+        pitch = r[1].get<float>();
+    }
+    mob->setRotation(yaw, pitch);
+    if (data.empty()) {
+        SpawnGroup group;
+        mob->finalizeSpawn(level, SpawnReason::Command, group);
+    }
+    auto flag = [&](const char* key) {
+        const Json v = data.value(key, Json());
+        return v.is_boolean() ? v.get<bool>() : v.is_number() && v.get<double>() != 0.0;
+    };
+    mob->noAi = flag("NoAI");
+    mob->persistenceRequired = flag("PersistenceRequired") || mob->noAi;
+    if (data.contains("Health")) mob->health = std::clamp(data["Health"].get<float>(), 0.0f, mob->maxHealth);
+    if (auto* animal = dynamic_cast<Animal*>(mob.get()); animal && data.contains("Age")) animal->setAge(data["Age"].get<int>());
+    if (auto* zombie = dynamic_cast<Zombie*>(mob.get()); zombie && data.contains("IsBaby")) zombie->setBaby(flag("IsBaby"));
+    if (auto* sheep = dynamic_cast<Sheep*>(mob.get())) {
+        if (const Json c = data.value("Color", Json()); c.is_number()) sheep->color = std::clamp(c.get<int>(), 0, 15);
+        else if (c.is_string()) sheep->color = dyeColorIndex(c.get<std::string>()).value_or(0);
+        if (data.contains("Sheared")) sheep->sheared = flag("Sheared");
+    }
+    if (auto* creeper = dynamic_cast<Creeper*>(mob.get())) {
+        if (data.contains("powered")) creeper->powered = flag("powered");
+        if (data.contains("ignited")) creeper->ignited = flag("ignited");
+        if (data.contains("Fuse")) creeper->maxSwell = std::max(1, data["Fuse"].get<int>());
+    }
+    const std::string variant = data.value("variant", std::string());
+    if (!variant.empty()) {
+        const FarmVariant v = variant == "warm" || variant == "minecraft:warm" ? FarmVariant::Warm : FarmVariant::Temperate;
+        if (auto* pig = dynamic_cast<Pig*>(mob.get())) pig->variant = v;
+        if (auto* chicken = dynamic_cast<Chicken*>(mob.get())) chicken->variant = v;
+    }
+    // Vanilla 1.21.5 equipment:{mainhand:{id:...},head:{id:...},...}.
+    if (const Json eq = data.value("equipment", Json::object()); eq.is_object() && level.itemRegistry()) {
+        static constexpr std::pair<const char*, EquipmentSlot> kSlots[] = {
+            {"mainhand", EquipmentSlot::MainHand}, {"offhand", EquipmentSlot::OffHand}, {"feet", EquipmentSlot::Feet},
+            {"legs", EquipmentSlot::Legs},         {"chest", EquipmentSlot::Chest},     {"head", EquipmentSlot::Head}};
+        for (const auto& [key, slot] : kSlots) {
+            const Json item = eq.value(key, Json());
+            const std::string id = item.is_object() ? item.value("id", std::string()) : std::string();
+            if (id.empty()) continue;
+            const Item* it = level.itemRegistry()->find(id);
+            if (!it) {
+                err = "unknown item " + id;
+                return false;
+            }
+            mob->setItemSlot(slot, ItemStack{it, 1});
+        }
+        if (auto* skeleton = dynamic_cast<Skeleton*>(mob.get())) skeleton->reassessWeaponGoal(level);
+    }
+    level.addEntity(std::move(mob));
+    return true;
+}
 
 } // namespace
 
@@ -533,6 +603,11 @@ void Commands::addBasics() {
             if (src.feedback) src.feedback("Summoned new " + type);
             return true;
         }
+        if (src.level && src.level->entityTypes() && src.level->entityTypes()->find(type)) {
+            if (!summonMob(*src.level, type, at, data, err)) return false;
+            if (src.feedback) src.feedback("Summoned new " + type);
+            return true;
+        }
         if (!src.summon || !src.summon(type, at, data, err)) {
             if (err.empty()) err = "can't summon " + a[0];
             return false;
@@ -563,9 +638,54 @@ void Commands::addBasics() {
             return true;
         });
 
-    add("kill", "/kill", [](CommandSource& src, Args a, std::string& err) {
-        if (!a.empty() && a[0] != "@s" && a[0] != src.name) {
-            err = "only the player can be killed";
+    add("kill", "/kill [@s|@e[type=<entity>]]", [](CommandSource& src, Args a, std::string& err) {
+        // @e (optionally of one type, or every type but one): every entity, mobs dying
+        // properly (with their drops), others just removed.
+        if (!a.empty() && a[0].starts_with("@e")) {
+            std::string filter;
+            bool negate = false;
+            if (a[0].size() > 2) {
+                const std::string_view sel = std::string_view(a[0]).substr(2);
+                if (!sel.starts_with("[type=") || !sel.ends_with("]")) {
+                    err = "expected @e or @e[type=<entity>]";
+                    return false;
+                }
+                filter = std::string(sel.substr(6, sel.size() - 7));
+                if (filter.starts_with("!")) {
+                    negate = true;
+                    filter.erase(0, 1);
+                }
+                if (!filter.starts_with("minecraft:")) filter = "minecraft:" + filter;
+            }
+            auto matches = [&](std::string_view type) { return filter.empty() || ((type == filter) != negate); };
+            int killed = 0;
+            if (src.level) {
+                std::vector<Entity*> targets;
+                for (const auto& e : src.level->entities())
+                    if (!e->removed && matches(e->type())) targets.push_back(e.get());
+                for (Entity* e : targets) {
+                    if (auto* living = dynamic_cast<LivingEntity*>(e)) {
+                        if (!living->alive()) continue;
+                        living->hurtServer(*src.level, DamageType::GenericKill, 3.4e38f);
+                    } else {
+                        e->removed = true;
+                    }
+                    ++killed;
+                }
+            }
+            if (matches("minecraft:player") && src.kill) {
+                src.kill();
+                ++killed;
+            }
+            if (killed == 0) {
+                err = "No entity was found";
+                return false;
+            }
+            if (src.feedback) src.feedback(killed == 1 ? "Killed 1 entity" : std::format("Killed {} entities", killed));
+            return true;
+        }
+        if (!a.empty() && a[0] != "@s" && a[0] != "@p" && a[0] != src.name) {
+            err = "expected @s, @p, @e or @e[type=<entity>]";
             return false;
         }
         if (!src.kill) return false;
@@ -610,58 +730,27 @@ void Commands::addBasics() {
     add("xp", "/xp (add|set|query) <targets> <amount> [points|levels]", experience);
 
     // The rules that exist so far, with vanilla's names: switches, and randomTickSpeed.
-    add("gamerule",
-        "/gamerule <doDaylightCycle|keepInventory|naturalRegeneration|doFireTick|waterSourceConversion|"
-        "lavaSourceConversion|doTileDrops|doEntityDrops|doVinesSpread|doWeatherCycle|randomTickSpeed|"
-        "snowAccumulationHeight> [value]",
-        [](CommandSource& src, Args a, std::string& err) {
-            if (!src.level || a.empty() || a.size() > 2) {
-                err = "expected a rule and an optional value";
-                return false;
-            }
-            Level& level = *src.level;
-            if (a[0] == "randomTickSpeed" || a[0] == "snowAccumulationHeight") {
-                int& rule = a[0] == "randomTickSpeed" ? level.randomTickSpeed : level.snowAccumulationHeight;
-                if (a.size() == 1) {
-                    if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], rule));
-                    return true;
-                }
-                long long v = 0;
-                if (!parseLong(a[1], v) || v < 0) {
-                    err = "expected a whole number of at least 0";
-                    return false;
-                }
-                rule = int(std::min<long long>(v, a[0] == "randomTickSpeed" ? 4096 : 8));
-                if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], rule));
-                return true;
-            }
-            bool* rule = a[0] == "doDaylightCycle"         ? &level.daylightCycle
-                         : a[0] == "keepInventory"         ? &level.keepInventory
-                         : a[0] == "naturalRegeneration"   ? &level.naturalRegeneration
-                         : a[0] == "doFireTick"            ? &level.doFireTick
-                         : a[0] == "waterSourceConversion" ? &level.waterSourceConversion
-                         : a[0] == "lavaSourceConversion"  ? &level.lavaSourceConversion
-                         : a[0] == "doTileDrops"           ? &level.doTileDrops
-                         : a[0] == "doEntityDrops"         ? &level.doEntityDrops
-                         : a[0] == "doVinesSpread"         ? &level.doVinesSpread
-                         : a[0] == "doWeatherCycle"        ? &level.doWeatherCycle
-                                                           : nullptr;
-            if (!rule) {
-                err = "unknown game rule " + a[0];
-                return false;
-            }
-            if (a.size() == 1) {
-                if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], *rule));
-                return true;
-            }
-            if (a[1] != "true" && a[1] != "false") {
-                err = "expected true or false";
-                return false;
-            }
-            *rule = a[1] == "true";
-            if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], *rule));
+    std::string ruleUsage = "/gamerule <";
+    for (const std::string_view name : Level::gameRuleNames()) ruleUsage += std::string(name) + "|";
+    ruleUsage.back() = '>';
+    add("gamerule", ruleUsage + " [value]", [](CommandSource& src, Args a, std::string& err) {
+        if (!src.level || a.empty() || a.size() > 2) {
+            err = "expected a rule and an optional value";
+            return false;
+        }
+        const auto value = src.level->gameRule(a[0]);
+        if (!value) {
+            err = "unknown game rule " + a[0];
+            return false;
+        }
+        if (a.size() == 1) {
+            if (src.feedback) src.feedback(std::format("Gamerule {} is currently set to: {}", a[0], *value));
             return true;
-        });
+        }
+        if (!src.level->setGameRule(a[0], a[1], &err)) return false;
+        if (src.feedback) src.feedback(std::format("Gamerule {} is now set to: {}", a[0], *src.level->gameRule(a[0])));
+        return true;
+    });
 }
 
 void Commands::add(std::string name, std::string usage, Handler handler, int permission) {

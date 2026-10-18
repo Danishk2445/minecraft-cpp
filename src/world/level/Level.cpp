@@ -1,14 +1,18 @@
 #include "world/level/Level.h"
 
 #include <algorithm>
+#include <charconv>
 #include <functional>
 
+#include "entity/Arrow.h"
 #include "entity/ExperienceOrb.h"
 #include "entity/FallingBlockEntity.h"
 #include "entity/ItemEntity.h"
 #include "entity/LightningBolt.h"
 #include "entity/Player.h"
 #include "entity/PrimedTnt.h"
+#include "entity/mob/Mob.h"
+#include "world/level/NaturalSpawner.h"
 #include "game/BlockEntities.h"
 #include "game/Loot.h"
 #include "world/block/BlockBehavior.h"
@@ -44,7 +48,14 @@ void Level::tick() {
 
 void Level::tickChunks() {
     for (const ChunkManager::NewlyTicking& n : chunks_.takeNewlyTicking())
-        if (n.generated) sim::postProcessChunk(*this, n.pos);
+        if (n.generated) {
+            sim::postProcessChunk(*this, n.pos);
+            // Animals the chunk starts with; a chunk that got some is saved with a mark so
+            // it never gets them again (one without rolls the same nothing next time).
+            if (spawner::populateChunk(*this, n.pos) > 0) populatedChunks_.insert(n.pos);
+        }
+    // Vanilla spawns before the random ticks.
+    spawner::tick(*this);
     const bool thunder = isRaining() && isThundering();
     for (const ChunkPos c : chunks_.tickingChunks()) {
         const Chunk* chunk = chunks_.chunk(c);
@@ -102,8 +113,32 @@ void Level::tickBlockEntities() {
 
 Entity& Level::addEntity(std::unique_ptr<Entity> entity) {
     entity->id = nextEntityId_++;
+    byId_[entity->id] = entity.get();
     entities_.push_back(std::move(entity));
     return *entities_.back();
+}
+
+Entity* Level::entity(uint32_t id) const {
+    if (id == 0) return nullptr;
+    const auto it = byId_.find(id);
+    return it == byId_.end() || it->second->removed ? nullptr : it->second;
+}
+
+void Level::setPlayer(Player* player) {
+    if (player_) byId_.erase(player_->id);
+    player_ = player;
+    if (player_) {
+        player_->id = nextEntityId_++;
+        byId_[player_->id] = player_;
+    }
+}
+
+void Level::dropRemoved() {
+    std::erase_if(entities_, [this](const std::unique_ptr<Entity>& e) {
+        if (!e->removed) return false;
+        byId_.erase(e->id);
+        return true;
+    });
 }
 
 std::vector<Entity*> Level::entitiesIn(const AABB& box, const Entity* except) const {
@@ -125,7 +160,7 @@ void Level::tickEntities() {
         e.tick(*this);
     }
     touchPlayer();
-    std::erase_if(entities_, [](const std::unique_ptr<Entity>& e) { return e->removed; });
+    dropRemoved();
 }
 
 void Level::touchPlayer() {
@@ -133,6 +168,7 @@ void Level::touchPlayer() {
     for (Entity* e : entitiesIn(player_->box().inflated(1.0, 0.5, 1.0), player_)) {
         if (auto* item = dynamic_cast<ItemEntity*>(e)) item->playerTouch(*this, *player_);
         else if (auto* orb = dynamic_cast<ExperienceOrb*>(e)) orb->playerTouch(*this, *player_);
+        else if (auto* arrow = dynamic_cast<Arrow*>(e)) arrow->playerTouch(*this, *player_);
     }
 }
 
@@ -152,6 +188,13 @@ std::unique_ptr<Entity> Level::loadEntity(const Json& j) {
     else if (type == "minecraft:experience_orb") e = std::make_unique<ExperienceOrb>();
     else if (type == "minecraft:falling_block") e = std::make_unique<FallingBlockEntity>(registry_);
     else if (type == "minecraft:tnt") e = std::make_unique<PrimedTnt>();
+    else if (type == "minecraft:arrow") e = std::make_unique<Arrow>();
+    else if (entityTypes_) {
+        if (auto mob = createMob(*entityTypes_, type)) {
+            mob->random = Xoroshiro(int64_t(random_.nextLong()));
+            e = std::move(mob);
+        }
+    }
     if (!e || !items_) return nullptr;
     auto vec = [&](const char* key) {
         const Json v = j.value(key, Json::array());
@@ -164,6 +207,7 @@ std::unique_ptr<Entity> Level::loadEntity(const Json& j) {
         e->yaw = e->oldYaw = r[0].get<float>();
         e->pitch = e->oldPitch = r[1].get<float>();
     }
+    if (auto* living = dynamic_cast<LivingEntity*>(e.get())) living->setRotation(e->yaw, e->pitch);
     e->loadExtra(j, *items_);
     if (auto* item = dynamic_cast<ItemEntity*>(e.get())) {
         if (item->stack.empty()) return nullptr;
@@ -506,10 +550,12 @@ void Level::attachStorage(std::shared_ptr<const ChunkStorage> storage) {
                 entities.push_back(saveEntity(*e));
                 if (unloading) e->removed = true;
             }
-            if (unloading) std::erase_if(entities_, [](const std::unique_ptr<Entity>& e) { return e->removed; });
+            if (unloading) dropRemoved();
             if (entities.empty() && blockEntities.empty()) savedEntityChunks_.erase(c);
             else savedEntityChunks_.insert(c);
             Json extra;
+            if (populatedChunks_.contains(c)) extra["populated"] = true;
+            if (unloading) populatedChunks_.erase(c);
             if (!ticks.empty()) extra["ticks"] = std::move(ticks);
             if (!fluidTicks.empty()) extra["fluid_ticks"] = std::move(fluidTicks);
             if (!entities.empty()) extra["entities"] = std::move(entities);
@@ -542,17 +588,80 @@ void Level::attachStorage(std::shared_ptr<const ChunkStorage> storage) {
                 blockEntities_[p] = std::move(be);
             }
             if (!entities.empty() || !blockEntities.empty()) savedEntityChunks_.insert(c);
+            if (extra.value("populated", false)) populatedChunks_.insert(c);
         },
         // A chunk is saved for its extras too: entities (when it has some, or its file lists
         // some), block entities and pending ticks.
         [this](ChunkPos c) {
-            if (savedEntityChunks_.contains(c) || blockTicks_.anyInChunk(c) || fluidTicks_.anyInChunk(c)) return true;
+            if (savedEntityChunks_.contains(c) || populatedChunks_.contains(c) || blockTicks_.anyInChunk(c) ||
+                fluidTicks_.anyInChunk(c))
+                return true;
             for (const auto& e : entities_)
                 if (!e->removed && ChunkPos::of(BlockPos::containing(e->pos)) == c) return true;
             for (const auto& [pos, be] : blockEntities_)
                 if (ChunkPos::of(pos) == c) return true;
             return false;
         });
+}
+
+namespace {
+
+// The rules /gamerule knows: booleans by member, and the two counters.
+struct BoolRule {
+    std::string_view name;
+    bool Level::* field;
+};
+constexpr BoolRule kBoolRules[] = {
+    {"doDaylightCycle", &Level::daylightCycle},     {"keepInventory", &Level::keepInventory},
+    {"naturalRegeneration", &Level::naturalRegeneration}, {"doFireTick", &Level::doFireTick},
+    {"waterSourceConversion", &Level::waterSourceConversion}, {"lavaSourceConversion", &Level::lavaSourceConversion},
+    {"doTileDrops", &Level::doTileDrops},           {"doEntityDrops", &Level::doEntityDrops},
+    {"doVinesSpread", &Level::doVinesSpread},       {"doWeatherCycle", &Level::doWeatherCycle},
+    {"doMobSpawning", &Level::doMobSpawning},       {"doMobLoot", &Level::doMobLoot},
+    {"mobGriefing", &Level::mobGriefing},
+};
+
+} // namespace
+
+std::vector<std::string_view> Level::gameRuleNames() {
+    std::vector<std::string_view> out;
+    for (const BoolRule& r : kBoolRules) out.push_back(r.name);
+    out.push_back("randomTickSpeed");
+    out.push_back("snowAccumulationHeight");
+    return out;
+}
+
+std::optional<std::string> Level::gameRule(std::string_view name) const {
+    for (const BoolRule& r : kBoolRules)
+        if (r.name == name) return this->*r.field ? "true" : "false";
+    if (name == "randomTickSpeed") return std::to_string(randomTickSpeed);
+    if (name == "snowAccumulationHeight") return std::to_string(snowAccumulationHeight);
+    return std::nullopt;
+}
+
+bool Level::setGameRule(std::string_view name, std::string_view value, std::string* error) {
+    for (const BoolRule& r : kBoolRules)
+        if (r.name == name) {
+            if (value != "true" && value != "false") {
+                if (error) *error = "expected true or false";
+                return false;
+            }
+            this->*r.field = value == "true";
+            return true;
+        }
+    if (name == "randomTickSpeed" || name == "snowAccumulationHeight") {
+        int v = 0;
+        const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), v);
+        if (ec != std::errc() || ptr != value.data() + value.size() || v < 0) {
+            if (error) *error = "expected a whole number of at least 0";
+            return false;
+        }
+        if (name == "randomTickSpeed") randomTickSpeed = std::min(v, 4096);
+        else snowAccumulationHeight = std::min(v, 8);
+        return true;
+    }
+    if (error) *error = "unknown game rule " + std::string(name);
+    return false;
 }
 
 Json Level::saveData() const {
@@ -568,6 +677,9 @@ Json Level::saveData() const {
             {"do_tile_drops", doTileDrops},
             {"do_entity_drops", doEntityDrops},
             {"do_vines_spread", doVinesSpread},
+            {"do_mob_spawning", doMobSpawning},
+            {"do_mob_loot", doMobLoot},
+            {"mob_griefing", mobGriefing},
             {"do_weather_cycle", doWeatherCycle},
             {"snow_accumulation_height", snowAccumulationHeight},
             {"clear_weather_time", clearWeatherTime},
@@ -590,6 +702,9 @@ void Level::loadData(const Json& j) {
     doTileDrops = j.value("do_tile_drops", doTileDrops);
     doEntityDrops = j.value("do_entity_drops", doEntityDrops);
     doVinesSpread = j.value("do_vines_spread", doVinesSpread);
+    doMobSpawning = j.value("do_mob_spawning", doMobSpawning);
+    doMobLoot = j.value("do_mob_loot", doMobLoot);
+    mobGriefing = j.value("mob_griefing", mobGriefing);
     doWeatherCycle = j.value("do_weather_cycle", doWeatherCycle);
     snowAccumulationHeight = std::clamp(j.value("snow_accumulation_height", snowAccumulationHeight), 0, 8);
     clearWeatherTime = j.value("clear_weather_time", clearWeatherTime);

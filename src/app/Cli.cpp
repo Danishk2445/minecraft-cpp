@@ -131,6 +131,25 @@ const std::vector<Option>& options() {
              o.weather = std::string(v);
              return true;
          }},
+        {"--gamerule", "NAME=VALUE[,...]", "set game rules as the world opens, before chunks generate (doMobSpawning=false)",
+         [](CliOptions& o, std::string_view v) {
+             while (!v.empty()) {
+                 const size_t comma = v.find(',');
+                 const std::string_view one = v.substr(0, comma);
+                 const size_t eq = one.find('=');
+                 if (eq == std::string_view::npos) return false;
+                 o.gameRules.emplace_back(std::string(one.substr(0, eq)), std::string(one.substr(eq + 1)));
+                 v = comma == std::string_view::npos ? std::string_view() : v.substr(comma + 1);
+             }
+             return true;
+         }},
+        {"--fov-effects", "SCALE", "harness: FOV effects 0..1 (sprinting, flying, bows); 0 by default for stable framing",
+         [](CliOptions& o, std::string_view v) {
+             std::array<double, 1> f{};
+             if (!parseFloats(v, f) || f[0] < 0.0 || f[0] > 1.0) return false;
+             o.fovEffects = float(f[0]);
+             return true;
+         }},
         {"--debug-overlay", "", "show the F3 debug screen",
          [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
         {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
@@ -284,7 +303,7 @@ std::optional<CliOptions> parseCli(int argc, char** argv, std::string& error) {
         // Options about a world open it directly instead of the title screen.
         static constexpr std::string_view kWorldOptions[] = {
             "--world", "--world-type", "--seed", "--pos", "--look", "--gamemode", "--exec", "--time",
-            "--freeze-time", "--weather", "--perspective", "--hold", "--wait-chunks", "--debug-overlay"};
+            "--freeze-time", "--weather", "--perspective", "--hold", "--wait-chunks", "--debug-overlay", "--gamerule"};
         if (std::find(std::begin(kWorldOptions), std::end(kWorldOptions), arg) != std::end(kWorldOptions))
             out.worldRequested = true;
     }

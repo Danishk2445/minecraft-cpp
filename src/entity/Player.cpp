@@ -296,65 +296,16 @@ void Player::giveExperienceLevels(int levels) {
     }
 }
 
-void Player::updateArmor() {
-    int armor = 0;
-    float toughness = 0.0f;
-    for (const ItemStack& piece : inventory.armor)
-        if (!piece.empty()) {
-            armor += piece.item->armor;
-            toughness += piece.item->toughness;
-        }
-    armorValue = armor;
-    armorToughness = toughness;
-}
-
-bool Player::hurt(DamageType type, float amount) {
-    const DamageInfo& info = damageInfo(type);
-    if (dead() || (invulnerable() && !info.bypassesInvulnerability)) return false;
-    // Vanilla Player.hurtServer: difficulty scales some damage.
-    if (info.scalesWithDifficulty) {
+bool Player::preHurt(const DamageSource& source, float& amount) {
+    // Vanilla Player.hurtServer: difficulty scales some damage; none left is no hit.
+    const DamageScaling scaling = source.info().scaling;
+    const bool byMob = source.attacker && !source.attacker->isPlayer() && dynamic_cast<const LivingEntity*>(source.attacker);
+    if (scaling == DamageScaling::Always || (scaling == DamageScaling::WhenCausedByMob && byMob)) {
         if (difficulty_ == Difficulty::Peaceful) amount = 0.0f;
         else if (difficulty_ == Difficulty::Easy) amount = std::min(amount / 2.0f + 1.0f, amount);
         else if (difficulty_ == Difficulty::Hard) amount = amount * 3.0f / 2.0f;
-        if (amount == 0.0f) return false;
     }
-    // LivingEntity.hurtServer: a helmet takes falling blocks for a quarter of the damage.
-    if (ItemStack& helmet = inventory.armor[3]; info.damagesHelmet && !helmet.empty()) {
-        helmet.hurt(std::max(1, int(amount / 4.0f)));
-        updateArmor();
-        amount *= 0.75f;
-    }
-    amount = std::max(amount, 0.0f);
-    // Within the second half of the invulnerability window only a harder hit counts, and
-    // only by what it adds.
-    float dealt = amount;
-    if (invulnerableTime > 10 && !info.bypassesCooldown) {
-        if (amount <= lastHurt) return false;
-        dealt = amount - lastHurt;
-        lastHurt = amount;
-    } else {
-        lastHurt = amount;
-        invulnerableTime = 20;
-        hurtDuration = 10;
-        hurtTime = hurtDuration;
-    }
-    // actuallyHurt: armor takes a quarter of the damage as wear (at least 1), then reduces it.
-    if (!info.bypassesArmor) {
-        const int wear = std::max(1, int(dealt / 4.0f));
-        for (ItemStack& piece : inventory.armor)
-            if (!piece.empty() && !(info.fire && fireResistant(*piece.item))) piece.hurt(wear);
-        updateArmor();
-        dealt = damageAfterArmor(dealt, float(armorValue), armorToughness);
-    }
-    causeFoodExhaustion(info.exhaustion);
-    if (dealt <= 0.0f) return true;
-    health = std::max(0.0f, health - dealt);
-    lastDamage = type;
-    return true;
-}
-
-void Player::heal(float amount) {
-    if (!dead()) health = std::min(maxHealth, health + amount);
+    return amount != 0.0f;
 }
 
 void Player::igniteForTicks(int ticks) {
@@ -363,121 +314,10 @@ void Player::igniteForTicks(int ticks) {
     remainingFireTicks = std::max(remainingFireTicks, ticks);
 }
 
-bool Player::eyeInWater(const BlockGetter& level) const {
-    // Vanilla updateFluidOnEyes: the fluid's surface above the eyes (less 1/9).
-    const double eyeY = pos.y + eyeHeight() - 0.11111111;
-    const BlockPos p = BlockPos::containing({pos.x, eyeY, pos.z});
-    const FluidState f = level.fluid(p);
-    if (f.kind != FluidKind::Water) return false;
-    const bool full = level.fluid(p.offset(0, 1, 0)).kind == FluidKind::Water;
-    const double amount = f.falling || f.source() ? 8.0 : 8.0 - double(f.level);
-    return double(p.y) + (full ? 1.0 : amount / 9.0) > eyeY;
-}
-
-bool Player::inWall(const BlockGetter& level) const {
-    if (noPhysics) return false;
-    // Vanilla isInWall: a flat square 0.8 of the width at the eyes inside a solid block.
-    const double half = width * 0.8 / 2.0, eyeY = pos.y + eyeHeight();
-    const AABB eyes(pos.x - half, eyeY - 5e-7, pos.z - half, pos.x + half, eyeY + 5e-7, pos.z + half);
-    for (int y = int(std::floor(eyes.min.y)); y <= int(std::floor(eyes.max.y)); ++y)
-        for (int z = int(std::floor(eyes.min.z)); z <= int(std::floor(eyes.max.z)); ++z)
-            for (int x = int(std::floor(eyes.min.x)); x <= int(std::floor(eyes.max.x)); ++x) {
-                const StateId s = level.getBlock({x, y, z});
-                if (!(level.registry().info(s).flags & kOpaqueCube)) continue;
-                for (const AABB& b : level.registry().collisionShape(s))
-                    if (b.moved(glm::dvec3(x, y, z)).intersects(eyes)) return true;
-            }
-    return false;
-}
-
 void Player::survivalTick(const BlockGetter& level, Difficulty difficulty, bool naturalRegeneration) {
     difficulty_ = difficulty;
-    if (dead()) {
-        ++deathTime;
-        return;
-    }
-    if (invulnerableTime > 0) --invulnerableTime;
-    if (hurtTime > 0) --hurtTime;
-    updateArmor();
-    const BlockRegistry& reg = level.registry();
-    auto blockId = [&](const BlockPos& p) { return std::string_view(reg.blockOf(level.getBlock(p)).id).substr(10); };
-
-    // Landing: fall damage past 3 blocks, less on hay, honey and beds, none on slime unless
-    // sneaking, double on a stalagmite; never for those who may fly.
-    if (landedFall > 0.0) {
-        double fall = landedFall;
-        landedFall = 0.0;
-        const std::string_view on = blockId(landedOn);
-        if (on == "farmland") landedOnFarmland = std::pair(landedOn, fall);
-        float multiplier = 1.0f;
-        DamageType type = DamageType::Fall;
-        // The blocks' fallOn: hay and honey take 80% off, slime all of it (unless sneaking),
-        // a bed half the distance, and a stalagmite's tip adds 2.5 to it and doubles the damage.
-        if (on == "hay_block" || on == "honey_block") multiplier = 0.2f;
-        else if (on == "slime_block" && !crouching) multiplier = 0.0f;
-        else if (on.ends_with("_bed")) fall *= 0.5;
-        else if (on == "pointed_dripstone" && reg.value(level.getBlock(landedOn), "vertical_direction") == "up" &&
-                 reg.value(level.getBlock(landedOn), "thickness") == "tip") {
-            fall += 2.5;
-            multiplier = 2.0f;
-            type = DamageType::Stalagmite;
-        }
-        const int damage = int(std::floor((fall + 1.0e-6 - 3.0) * double(multiplier)));
-        if (damage > 0 && !invulnerable()) {
-            lastFallDistance = float(fall);
-            hurt(type, float(damage));
-        }
-    }
-    // Air runs out under water (not for creative players); drowning hurts every second.
-    if (eyeInWater(level)) {
-        if (!invulnerable() && --airSupply <= -20) {
-            airSupply = 0;
-            hurt(DamageType::Drown, 2.0f);
-        }
-    } else if (airSupply < maxAirSupply) {
-        airSupply = std::min(airSupply + 4, maxAirSupply);
-    }
-    // Water puts fire out; lava sets it and burns.
-    if (inWater) remainingFireTicks = 0;
-    if (inLava) {
-        igniteForTicks(15 * 20);
-        hurt(DamageType::Lava, 4.0f);
-        fallDistance *= 0.5;
-    }
-    if (remainingFireTicks > 0) {
-        if (remainingFireTicks % 20 == 0 && !inLava) hurt(DamageType::OnFire, 1.0f);
-        --remainingFireTicks;
-    }
-    // The blocks the body is in (vanilla entityInside) and the one stood on (stepOn).
-    const AABB b = box().inflated(-1.0e-7, -1.0e-7, -1.0e-7);
-    bool inFireBlock = false, inSoulFire = false, inCactus = false, inBerries = false, inCampfire = false, soulCampfire = false;
-    for (int y = int(std::floor(b.min.y)); y <= int(std::floor(b.max.y)); ++y)
-        for (int z = int(std::floor(b.min.z)); z <= int(std::floor(b.max.z)); ++z)
-            for (int x = int(std::floor(b.min.x)); x <= int(std::floor(b.max.x)); ++x) {
-                const StateId s = level.getBlock({x, y, z});
-                const std::string_view id = std::string_view(reg.blockOf(s).id).substr(10);
-                if (id == "fire") inFireBlock = true;
-                else if (id == "soul_fire") inSoulFire = true;
-                else if (id == "cactus") inCactus = true;
-                else if (id == "sweet_berry_bush" && reg.intValue(s, "age") > 0) inBerries = true;
-                else if ((id == "campfire" || id == "soul_campfire") && reg.boolValue(s, "lit")) {
-                    inCampfire = true;
-                    soulCampfire = soulCampfire || id == "soul_campfire";
-                }
-            }
-    if (inFireBlock || inSoulFire) {
-        igniteForTicks(8 * 20);
-        hurt(DamageType::InFire, inSoulFire ? 2.0f : 1.0f);
-    }
-    if (inCampfire) hurt(DamageType::Campfire, soulCampfire ? 2.0f : 1.0f);
-    if (inCactus) hurt(DamageType::Cactus, 1.0f);
-    if (inBerries) {
-        const glm::dvec3 moved = pos - oldPos;
-        if (std::abs(moved.x) >= 0.003 || std::abs(moved.z) >= 0.003) hurt(DamageType::SweetBerryBush, 1.0f);
-    }
-    if (onGround && !crouching && blockId(blockBelow()) == "magma_block") hurt(DamageType::HotFloor, 1.0f);
-    if (inWall(level)) hurt(DamageType::InWall, 1.0f);
-    if (pos.y < double(kWorldMinY - 64)) hurt(DamageType::OutOfWorld, 4.0f);
+    environmentTick(level);
+    if (dead()) return;
 
     // Hunger; Peaceful heals and feeds on its own.
     food.tick(health, maxHealth, difficulty, naturalRegeneration, [this](float h) { heal(h); },
@@ -486,11 +326,6 @@ void Player::survivalTick(const BlockGetter& level, Difficulty difficulty, bool 
         if (health < maxHealth && tickCount % 20 == 0) heal(1.0f);
         if (food.needsFood() && tickCount % 10 == 0) ++food.foodLevel;
     }
-}
-
-std::string_view Player::deathMessageKey() const {
-    if (lastDamage == DamageType::Fall && lastFallDistance > 5.0f) return "death.fell.accident.generic";
-    return damageInfo(lastDamage).deathMessage;
 }
 
 void Player::respawn() {

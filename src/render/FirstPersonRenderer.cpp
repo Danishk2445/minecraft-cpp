@@ -83,7 +83,27 @@ void FirstPersonRenderer::render(EntityRenderer& entities, const ClientAssets& a
             continue;
         }
         glm::mat4 m = base;
-        if (player.usingItem() && left == player.useOffhand) {
+        const bool usingHere = player.usingItem() && left == player.useOffhand;
+        const bool drawingBow = usingHere && player.useItem->id == "minecraft:bow";
+        if (drawingBow) {
+            // Vanilla renderArmWithItem, UseAnim.BOW: the bow held across the body, pulled back
+            // (and trembling) as it draws.
+            m = glm::translate(m, glm::vec3(side * 0.56f, -0.52f + equipped * -0.6f, -0.72f));
+            m = glm::translate(m, glm::vec3(side * -0.2785682f, 0.18344387f, 0.15731531f));
+            m = rotX(m, -13.935f);
+            m = rotY(m, side * 35.3f);
+            m = rotZ(m, side * -9.785f);
+            const float drawn = 72000.0f - (float(player.useItemRemaining) - pt + 1.0f);
+            float power = drawn / 20.0f;
+            power = std::min((power * power + power * 2.0f) / 3.0f, 1.0f);
+            if (power > 0.1f) {
+                const float tremble = std::sin((drawn - 0.1f) * 1.3f) * (power - 0.1f);
+                m = glm::translate(m, glm::vec3(0.0f, tremble * 0.004f, 0.0f));
+            }
+            m = glm::translate(m, glm::vec3(0.0f, 0.0f, power * 0.04f));
+            m = glm::scale(m, glm::vec3(1.0f, 1.0f, 1.0f + power * 0.2f));
+            m = rotY(m, -side * 45.0f);
+        } else if (usingHere) {
             // applyEatTransform: the item bobs to the mouth, then applyItemArmTransform.
             const float f = float(player.useItemRemaining) - pt + 1.0f;
             const float f1 = f / float(player.useItem->useTicks);
@@ -114,6 +134,8 @@ void FirstPersonRenderer::render(EntityRenderer& entities, const ClientAssets& a
         ctx.maxStack = shown.maxStack();
         ctx.holderPos = player.pos;
         ctx.holderYaw = player.yaw;
+        ctx.usingItem = drawingBow;
+        ctx.useDuration = drawingBow ? 72000 - player.useItemRemaining : 0;
         layers_.clear();
         assets.itemDefinitions().evaluate(shown.item->id, ctx, &assets.grassColormap(), layers_);
         quads_.clear();
