@@ -1,6 +1,7 @@
 #include "ui/GameMenuScreens.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 #include <GLFW/glfw3.h>
@@ -112,15 +113,52 @@ void OptionsScreen::renderContents(GuiGraphics& g, glm::vec2, float) {
 void OptionsSubScreen::init(glm::vec2 size) {
     WidgetScreen::init(size);
     clearWidgets();
+    listed_.clear();
     row_ = column_ = 0;
     addOptions();
     ScreenHost* host = ctx_.host;
     add<Button>(std::floor(size.x / 2) - 100, size.y - 27, 200, 20, t("gui.done"), [host](Button&) { host->popScreen(); });
+    layoutList();
+}
+
+float OptionsSubScreen::maxScroll() const {
+    // AbstractScrollArea: the rows against the list's height less its 4-pixel padding.
+    const int rows = row_ + (column_ > 0 ? 1 : 0);
+    return std::max(0.0f, 25.0f * float(rows) - (listBottom() - 33 - 4));
+}
+
+void OptionsSubScreen::layoutList() {
+    scroll_ = std::clamp(scroll_, 0.0f, maxScroll());
+    for (auto& [w, y] : listed_) {
+        w->y = y - std::floor(scroll_);
+        w->visible = w->y + w->height > 33 && w->y < listBottom();
+    }
+}
+
+bool OptionsSubScreen::mouseScrolled(glm::vec2, double amount) {
+    scroll_ -= float(amount) * 25.0f / 2.0f; // half a row a notch
+    layoutList();
+    return true;
+}
+
+std::optional<glm::vec4> OptionsSubScreen::clipOf(const Widget& w) const {
+    for (const auto& [listed, y] : listed_)
+        if (listed == &w) return glm::vec4(0.0f, 33.0f, size_.x, listBottom());
+    return std::nullopt;
 }
 
 void OptionsSubScreen::renderContents(GuiGraphics& g, glm::vec2, float) {
     renderSeparators(g, 33, 33);
     g.centeredText(title_, std::floor(size_.x / 2), 12, 0xFFFFFFFF);
+    if (maxScroll() > 0) {
+        // AbstractScrollArea.renderScrollbar, right of the 310-wide rows.
+        const float top = 33, view = listBottom() - top, content = float(row_ + (column_ > 0 ? 1 : 0)) * 25.0f + 4;
+        const float thumb = std::clamp(float(int(view * view / content)), 32.0f, view - 8);
+        const float x = std::floor(size_.x / 2) - 155 + 310 + 10;
+        const float y = std::max(top, float(int(scroll_) * int(view - thumb) / int(maxScroll())) + top);
+        g.sprite("widget/scroller_background", x, top, 6, view);
+        g.sprite("widget/scroller", x, y, 6, thumb);
+    }
 }
 
 VideoSettingsScreen::VideoSettingsScreen(ScreenContext ctx) : OptionsSubScreen(ctx, ctx.translate("options.videoTitle")) {}
@@ -132,6 +170,10 @@ void VideoSettingsScreen::addOptions() {
     auto label = [ctx](const char* key, const std::string& value) {
         return ctx.translate("options.generic_value", {ctx.translate(key), value});
     };
+    option<CycleButton>(t("options.graphics"),
+                        std::vector<std::string>{t("options.graphics.fast"), t("options.graphics.fancy"),
+                                                 t("options.graphics.fabulous")},
+                        int(o.graphics), [host](int i) { host->options().graphics = GraphicsMode(i); host->optionsChanged(); });
     option<Slider>((o.renderDistance - 2) / 30.0,
                    [label, ctx](double v) {
                        return label("options.renderDistance",
@@ -179,8 +221,34 @@ void VideoSettingsScreen::addOptions() {
                         std::vector<std::string>{t("options.particles.all"), t("options.particles.decreased"),
                                                  t("options.particles.minimal")},
                         int(o.particles), [host](int i) { host->options().particles = ParticleMode(i); host->optionsChanged(); });
+    // Vanilla mipmapLevels: OFF at 0.
+    option<Slider>(o.mipmapLevels / 4.0,
+                   [label, ctx](double v) {
+                       const int n = int(std::lround(v * 4.0));
+                       return label("options.mipmapLevels", n == 0 ? ctx.translate("options.off") : std::to_string(n));
+                   },
+                   [host](double v) { host->options().mipmapLevels = int(std::lround(v * 4.0)); host->optionsChanged(); });
     option<CycleButton>(t("options.entityShadows"), std::vector<std::string>{onOff(false), onOff(true)},
                         int(o.entityShadows), [host](int i) { host->options().entityShadows = i == 1; host->optionsChanged(); });
+    // Vanilla entityDistanceScaling: 50% to 500% in steps of 25.
+    option<Slider>((o.entityDistance - 0.5) / 4.5,
+                   [ctx](double v) {
+                       const int percent = 50 + int(std::lround(v * 18.0)) * 25;
+                       return ctx.translate("options.percent_value",
+                                            {ctx.translate("options.entityDistanceScaling"), std::to_string(percent)});
+                   },
+                   [host](double v) {
+                       host->options().entityDistance = 0.5f + float(std::lround(v * 18.0)) * 0.25f;
+                       host->optionsChanged();
+                   });
+    // Vanilla biomeBlendRadius: OFF (Fastest) .. 15x15 (Maximum).
+    option<Slider>(o.biomeBlend / 7.0,
+                   [label, ctx](double v) {
+                       const int r = int(std::lround(v * 7.0));
+                       return label("options.biomeBlendRadius",
+                                    ctx.translate("options.biomeBlendRadius." + std::to_string(r * 2 + 1)));
+                   },
+                   [host](double v) { host->options().biomeBlend = int(std::lround(v * 7.0)); host->optionsChanged(); });
     option<CycleButton>(t("options.viewBobbing"), std::vector<std::string>{onOff(false), onOff(true)}, int(o.viewBobbing),
                         [host](int i) { host->options().viewBobbing = i == 1; host->optionsChanged(); });
     // Vanilla genericValueOrOffLabel: OFF at 0.
@@ -199,7 +267,196 @@ void ControlsScreen::addOptions() {
     const ScreenContext ctx = ctx_;
     option<Button>(t("options.mouse_settings"),
                    [ctx](Button&) { ctx.host->pushScreen(std::make_unique<MouseSettingsScreen>(ctx)); });
-    option<Button>(t("controls.keybinds"), nullptr).active = false; // key rebinding: M13
+    option<Button>(t("controls.keybinds"),
+                   [ctx](Button&) { ctx.host->pushScreen(std::make_unique<KeyBindsScreen>(ctx)); });
+}
+
+// --- Key binds ---
+
+KeyBindsScreen::KeyBindsScreen(ScreenContext ctx) : WidgetScreen(ctx, ctx.translate("controls.keybinds.title")) {}
+
+KeyBindings& KeyBindsScreen::keys() const { return ctx_.host->options().keys; }
+
+std::string KeyBindsScreen::keyText(const InputKey& key) const {
+    const std::string name = key.name();
+    if (key.type == InputKey::Type::Mouse) {
+        const std::string text = t(name);
+        return text != name ? text : ctx_.translate("key.mouse", {std::to_string(key.code + 1)});
+    }
+    // Letters, digits and punctuation by the keyboard layout (vanilla glfwGetKeyName), upper case.
+    if (key.bound())
+        if (const char* local = glfwGetKeyName(key.code, 0); local && *local) {
+            std::string text = local;
+            for (char& c : text) c = char(std::toupper(static_cast<unsigned char>(c)));
+            return text;
+        }
+    const std::string text = t(name);
+    if (text != name) return text;
+    // No layout name (no display) and no translation: the name's last part.
+    std::string tail = name.substr(name.rfind('.') + 1);
+    for (char& c : tail) c = char(std::toupper(static_cast<unsigned char>(c)));
+    return tail;
+}
+
+void KeyBindsScreen::init(glm::vec2 size) {
+    WidgetScreen::init(size);
+    clearWidgets();
+    rows_.clear();
+    // KeyBindsList: sorted by category, then by translated name; a title row starts each category.
+    std::vector<KeyAction> order;
+    for (size_t i = 0; i < kKeyActionCount; ++i) order.push_back(KeyAction(i));
+    std::stable_sort(order.begin(), order.end(), [&](KeyAction a, KeyAction b) {
+        const KeyMappingInfo &ia = keyMappingInfo(a), &ib = keyMappingInfo(b);
+        const int ca = keyCategoryOrder(ia.category), cb = keyCategoryOrder(ib.category);
+        return ca != cb ? ca < cb : t(ia.name) < t(ib.name);
+    });
+    std::string category;
+    for (KeyAction a : order) {
+        const KeyMappingInfo& info = keyMappingInfo(a);
+        if (info.category != category) {
+            category = info.category;
+            rows_.push_back({t(category), std::nullopt, nullptr, nullptr});
+        }
+        Row row{t(info.name), a, nullptr, nullptr};
+        row.change = std::make_unique<Button>(0, 0, 75, 20, "", [this, a](Button&) {
+            selected_ = a;
+            refresh();
+        });
+        row.reset = std::make_unique<Button>(0, 0, 50, 20, t("controls.reset"), [this, a](Button&) {
+            keys()[a] = keyMappingInfo(a).defaultKey;
+            refresh();
+            ctx_.host->optionsChanged();
+        });
+        rows_.push_back(std::move(row));
+    }
+    const float cx = std::floor(size.x / 2);
+    resetAll_ = &add<Button>(cx - 154, size.y - 27, 150, 20, t("controls.resetAll"), [this](Button&) {
+        keys().resetAll();
+        refresh();
+        ctx_.host->optionsChanged();
+    });
+    add<Button>(cx + 4, size.y - 27, 150, 20, t("gui.done"), [this](Button&) { ctx_.host->popScreen(); });
+    scroll_ = std::clamp(scroll_, 0.0f, maxScroll());
+    refresh();
+    layoutRows();
+}
+
+float KeyBindsScreen::maxScroll() const {
+    return std::max(0.0f, float(rows_.size()) * kRowHeight - (listBottom() - kTop - 4));
+}
+
+void KeyBindsScreen::layoutRows() {
+    // KeyEntry.render: Reset 10 left of the scrollbar, the key 5 left of that, both 2 above the row.
+    const float rowLeft = std::floor(size_.x / 2) - kRowWidth / 2 + 2;
+    const float resetX = rowLeft + kRowWidth + 8 - 50 - 10;
+    for (size_t i = 0; i < rows_.size(); ++i) {
+        if (!rows_[i].change) continue;
+        const float y = rowTop(i) - 2;
+        rows_[i].reset->x = resetX;
+        rows_[i].change->x = resetX - 5 - 75;
+        rows_[i].reset->y = rows_[i].change->y = y;
+    }
+}
+
+void KeyBindsScreen::refresh() {
+    const KeyBindings& k = keys();
+    for (Row& row : rows_) {
+        if (!row.action) continue;
+        const KeyAction a = *row.action;
+        std::string text = keyText(k[a]);
+        row.change->tooltip.clear();
+        // KeyEntry.refreshEntry: what else uses the key, in red brackets with a tooltip.
+        if (k.conflicts(a)) {
+            std::string others;
+            for (size_t i = 0; i < kKeyActionCount; ++i)
+                if (KeyAction(i) != a && k.keys[i] == k[a]) {
+                    if (!others.empty()) others += ", ";
+                    others += t(keyMappingInfo(KeyAction(i)).name);
+                }
+            row.change->tooltip = ctx_.translate("controls.keybinds.duplicateKeybinds", {others});
+            text = "§c[ §f" + text + "§c ]";
+        }
+        if (selected_ == a) text = "§e> §f§n" + text + "§r§e <";
+        row.change->message = text;
+        row.reset->active = !k.isDefault(a);
+    }
+    if (resetAll_) resetAll_->active = !k.allDefault();
+}
+
+void KeyBindsScreen::bind(const InputKey& key) {
+    keys()[*selected_] = key;
+    selected_.reset();
+    refresh();
+    ctx_.host->optionsChanged();
+}
+
+bool KeyBindsScreen::mouseClicked(glm::vec2 mouse, int button, int mods) {
+    if (selected_) {
+        bind(InputKey::mouse(button));
+        return true;
+    }
+    if (inList(mouse))
+        for (Row& row : rows_)
+            if (row.change && (row.change->mouseClicked(mouse, button) || row.reset->mouseClicked(mouse, button)))
+                return true;
+    return WidgetScreen::mouseClicked(mouse, button, mods);
+}
+
+bool KeyBindsScreen::mouseScrolled(glm::vec2, double amount) {
+    scroll_ = std::clamp(scroll_ - float(amount) * kRowHeight / 2, 0.0f, maxScroll());
+    layoutRows();
+    return true;
+}
+
+bool KeyBindsScreen::keyPressed(int key, int scancode, int mods) {
+    if (selected_) {
+        bind(key == GLFW_KEY_ESCAPE ? InputKey{} : InputKey::key(key));
+        return true;
+    }
+    return WidgetScreen::keyPressed(key, scancode, mods);
+}
+
+void KeyBindsScreen::render(GuiGraphics& g, glm::vec2 mouse, float partialTick) {
+    renderBackground(g);
+    const float cx = std::floor(size_.x / 2), bottom = listBottom();
+    g.texture(inWorld() ? "minecraft:gui/inworld_menu_list_background" : "minecraft:gui/menu_list_background", 0, kTop,
+              size_.x, bottom + std::floor(scroll_), size_.x, bottom - kTop, 32, 32);
+    renderSeparators(g, kTop, size_.y - bottom);
+    // The rows, clipped to the list; a mouse outside it hovers nothing in it.
+    const glm::vec2 listMouse = inList(mouse) ? mouse : glm::vec2(-1.0f);
+    const float rowLeft = cx - kRowWidth / 2 + 2;
+    g.enableScissor(0, kTop, size_.x, bottom);
+    for (size_t i = 0; i < rows_.size(); ++i) {
+        const float top = rowTop(i);
+        if (top + kRowHeight < kTop || top - 2 > bottom) continue;
+        const Row& row = rows_[i];
+        if (!row.action) {
+            // CategoryEntry: centered on the row's bottom line.
+            g.text(row.label, cx - std::floor(float(g.textWidth(row.label)) / 2), top + 16 - 9 - 1, 0xFFFFFFFF);
+            continue;
+        }
+        row.reset->render(g, listMouse, partialTick);
+        row.change->render(g, listMouse, partialTick);
+        g.text(row.label, rowLeft, top + 8 - 4, 0xFFFFFFFF);
+        if (!row.change->tooltip.empty()) {
+            const float x = row.change->x - 6;
+            g.fill(x, top - 1, x + 3, top + 16, 0xFFFF0000);
+        }
+    }
+    g.disableScissor();
+    if (maxScroll() > 0) {
+        const float view = bottom - kTop, content = float(rows_.size()) * kRowHeight + 4;
+        const float thumb = std::clamp(float(int(view * view / content)), 32.0f, view - 8);
+        const float x = rowLeft + kRowWidth + 6;
+        const float y = std::max(kTop, float(int(scroll_) * int(view - thumb) / int(maxScroll())) + kTop);
+        g.sprite("widget/scroller_background", x, kTop, 6, view);
+        g.sprite("widget/scroller", x, y, 6, thumb);
+    }
+    g.centeredText(title_, cx, 12, 0xFFFFFFFF);
+    for (auto& w : widgets_) w->render(g, mouse, partialTick);
+    for (const Row& row : rows_)
+        if (row.change && !row.change->tooltip.empty() && row.change->isMouseOver(listMouse))
+            g.textTooltip(row.change->tooltip, mouse.x, mouse.y);
 }
 
 MouseSettingsScreen::MouseSettingsScreen(ScreenContext ctx)

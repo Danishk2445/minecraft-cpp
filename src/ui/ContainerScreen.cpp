@@ -8,6 +8,7 @@
 
 #include "entity/Player.h"
 #include "game/Item.h"
+#include "game/Options.h"
 #include "resources/Language.h"
 #include "ui/GuiGraphics.h"
 
@@ -22,6 +23,12 @@ double nowSeconds() {
 } // namespace
 
 std::string ScreenContext::translate(const std::string& key) const { return lang ? lang->get(key) : key; }
+
+bool ScreenContext::keyMatches(KeyAction action, int key) const {
+    static const KeyBindings kDefaults;
+    const KeyBindings& keys = host ? host->options().keys : kDefaults;
+    return keys[action] == InputKey::key(key);
+}
 
 std::string ScreenContext::translate(const std::string& key, const std::vector<std::string>& args) const {
     const std::string pattern = translate(key);
@@ -276,21 +283,22 @@ bool ContainerScreen::mouseReleased(glm::vec2 mouse, int button, int mods) {
 }
 
 bool ContainerScreen::keyPressed(int key, int, int mods) {
-    if (key == GLFW_KEY_E) {
+    if (ctx_.keyMatches(KeyAction::Inventory, key)) {
         close();
         return true;
     }
     if (menu_.carried().empty() && hovered_) {
-        if (key == GLFW_KEY_F) {
+        if (ctx_.keyMatches(KeyAction::SwapOffhand, key)) {
             slotClicked(hovered_, hovered_->index, Inventory::kOffhandSlot, ClickType::Swap);
             return true;
         }
-        if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
-            slotClicked(hovered_, hovered_->index, key - GLFW_KEY_1, ClickType::Swap);
-            return true;
-        }
+        for (int i = 0; i < 9; ++i)
+            if (ctx_.keyMatches(hotbarAction(i), key)) {
+                slotClicked(hovered_, hovered_->index, i, ClickType::Swap);
+                return true;
+            }
     }
-    if (hovered_ && hovered_->hasItem() && key == GLFW_KEY_Q) {
+    if (hovered_ && hovered_->hasItem() && ctx_.keyMatches(KeyAction::Drop, key)) {
         slotClicked(hovered_, hovered_->index, (mods & kControl) ? 1 : 0, ClickType::Throw);
         return true;
     }

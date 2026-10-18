@@ -14,6 +14,7 @@
 #include "entity/Player.h"
 #include "game/BlockEntities.h"
 #include "game/ContainerMenus.h"
+#include "game/KeyBindings.h"
 #include "game/WorldParams.h"
 #include "gfx/Camera.h"
 #include "ui/Screen.h"
@@ -25,12 +26,14 @@ struct Client;
 class BlockOverlay;
 class GuiGraphics;
 class Hud;
+class ActionScript;
 class InventoryMenu;
 class Level;
 struct LevelEvent;
 class BiomeDecorator;
 class OverworldGenerator;
 class WorldRenderer;
+struct SpriteInfo;
 
 class WorldSession {
 public:
@@ -55,6 +58,8 @@ public:
     void runCommand(const std::string& line, const std::function<void(const std::string&)>& reply);
 
     Player& player() { return *player_; }
+    // Where a player without a bed (re)spawns: on top of the spawn column.
+    glm::dvec3 spawnOnTop() const;
     // The menu of the block the player opened, if its screen is up.
     Menu* openMenu() { return openMenu_.get(); }
     // A screen the world asks for outside input (the death screen, a block's menu, or
@@ -72,9 +77,13 @@ public:
     Level& level() { return *level_; }
     InventoryMenu& inventoryMenu();
     const Camera& camera() const { return camera_; }
+    const WorldRenderer& worldRenderer() const { return *worldRenderer_; }
     // The spawn area is generated and meshed (the loading screen waits for it).
     bool viewReady() const;
     bool viewMeshed() const;
+    // The last frame drew every uploaded section the camera can see (the occlusion search
+    // has caught up), for harness screenshots.
+    bool viewDrawn() const;
     // Fraction of the spawn area ready, for the loading screen.
     float loadProgress() const;
     // The loading screen's progress and chunk map.
@@ -93,6 +102,20 @@ public:
     std::string statusLine() const; // for the window title
     // An /assertblock check failed (the harness exits with an error).
     bool assertionFailed() const { return assertionFailed_; }
+    // --script: still playing.
+    bool scriptRunning() const;
+
+    // What an action script does with the controls (ActionScript.h).
+    Client& client() { return client_; }
+    const Client& client() const { return client_; }
+    // A screen to open ("inventory") or "close" the open container screen, after this tick.
+    void requestScreen(std::string name) {
+        if (pendingScreen_.empty()) pendingScreen_ = std::move(name);
+    }
+    bool screenOpen() const;
+    void useClick() { ++useClicks_; }
+    // What the crosshair targets, now (after turning).
+    void refreshTarget() { updateTarget(1.0f); }
 
 private:
     enum class Perspective : uint8_t { FirstPerson, ThirdPersonBack, ThirdPersonFront };
@@ -102,7 +125,8 @@ private:
     void setupCamera(float partialTick);
     void updateTarget(float partialTick);
     PlayerInput readPlayerInput();
-    bool controlDown(int key, std::string_view action) const;
+    // The action's key held (with the cursor captured and no screen open), or --hold naming it.
+    bool controlDown(KeyAction action) const;
     void tickInteraction();
     void breakBlock(const BlockPos& p);
     // The player died: the death message, drops and experience, then the death screen.
@@ -153,6 +177,11 @@ private:
     void tickClientParticles();
     bool placeBlock();
     void renderHud(glm::ivec2 fb, float partialTick, const std::function<void()>& renderGui);
+    // Vanilla ScreenEffectRenderer.getViewBlockingState: the particle sprite of an opaque
+    // block at any of 8 points around the eyes, or null.
+    const SpriteInfo* viewBlockingSprite() const;
+    // Vanilla getMaxLocalRawBrightness through LightTexture.getBrightness: 0..1 at the eyes.
+    float eyeBrightness() const;
     // Items, orbs and pickup animations for the entity renderer.
     void submitEntities(float partialTick, int skyDarken);
     // Vanilla GameRenderer.tryTakeScreenshotIfNeeded: once the whole view is drawn, the
@@ -175,6 +204,8 @@ private:
     bool wasInWater_ = true; // no splash on the first tick
     int skyFlashTime_ = 0;    // lightning lights the sky (vanilla ClientLevel.skyFlashTime)
     int waterVisionTime_ = 0; // ticks the eyes have spent under water (vanilla, up to 600)
+    float vignette_ = 1.0f;   // vanilla Gui.vignetteBrightness (eased toward the darkness at the eyes)
+    bool vignetteSettled_ = false; // harness runs start it at its target
     Camera camera_;
     Perspective perspective_ = Perspective::FirstPerson;
     float eyeHeight_ = 1.62f, oldEyeHeight_ = 1.62f; // the camera's eased eye height
@@ -209,10 +240,12 @@ private:
     bool deathHandled_ = false;
     std::string pendingScreen_;
     std::unique_ptr<Menu> openMenu_;
+    std::unique_ptr<ActionScript> script_;
     std::shared_ptr<SignBlockEntity> editingSign_;
     bool editingFront_ = true;
     std::optional<MenuAccess> menuAccess_;
     bool hasIcon_ = false;
+    bool settleSpawn_ = false; // a new player at the generator's spawn: lift onto what was built there
 };
 
 } // namespace mc

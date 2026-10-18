@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 
 #include "game/Inventory.h"
+#include "game/KeyBindings.h"
 #include "game/WorldParams.h"
 
 namespace mc {
@@ -75,6 +76,9 @@ struct ScreenContext {
     std::string translate(const std::string& key, const std::vector<std::string>& args) const;
     // The item's name with its rarity color (vanilla getHoverName styled by rarity).
     std::string itemName(const ItemStack& stack) const;
+    // Whether keyboard `key` is the action's binding (vanilla KeyMapping.matches); the
+    // default bindings without a host.
+    bool keyMatches(KeyAction action, int key) const;
 };
 
 class Screen {
@@ -102,6 +106,8 @@ public:
     virtual bool closeOnEscape() const { return true; }
     // Called once when the screen closes.
     virtual void removed() {}
+    // Waiting for a key to bind: every key goes to the screen, none to the game's hotkeys.
+    virtual bool waitingForKey() const { return false; }
 
     void close() { closing_ = true; }
     bool closing() const { return closing_; }

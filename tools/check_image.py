@@ -8,6 +8,7 @@ Examples:
   check_image.py shot.png --size 320x240 --no-magenta
   check_image.py shot.png --region 0,0,40,40 --mean-rgb 120,167,255 --tol 10
   check_image.py shot.png --pixel 160,120 --rgb 255,0,0 --tol 5 --min-colors 50
+  check_image.py culled.png --same-as unculled.png --max-diff-pixels 50
 """
 import argparse
 import sys
@@ -39,11 +40,16 @@ def main() -> int:
     ap.add_argument("--max-colors", type=int)
     ap.add_argument("--luma-vs", help="another image: compare mean luma over --region (ratio this/other)")
     ap.add_argument("--min-ratio", type=float, default=1.0)
+    ap.add_argument("--max-ratio", type=float)
     ap.add_argument("--min-luma", type=float)
     ap.add_argument("--max-luma", type=float)
     ap.add_argument("--count-rgb", type=lambda s: parse_ints(s, 3),
                     help="count pixels within --tol of this color inside --region")
     ap.add_argument("--min-count", type=int, default=1)
+    ap.add_argument("--max-count", type=int, help="with --count-rgb: at most this many")
+    ap.add_argument("--same-as", help="another image of the same view: at most --max-diff-pixels may differ by more than --tol")
+    ap.add_argument("--max-diff-pixels", type=int, help="with --same-as (default 0 unless --min-diff-pixels is given)")
+    ap.add_argument("--min-diff-pixels", type=int, help="with --same-as: at least this many pixels must differ")
     args = ap.parse_args()
 
     img = np.asarray(Image.open(args.image).convert("RGB")).astype(np.int32)
@@ -98,6 +104,10 @@ def main() -> int:
         n = int(near.sum())
         if n < args.min_count:
             failures.append(f"{n} pixels near {args.count_rgb}, expected at least {args.min_count}")
+        elif args.max_count is not None and n > args.max_count:
+            failures.append(f"{n} pixels near {args.count_rgb}, expected at most {args.max_count}")
+        else:
+            print(f"{n} pixels near {args.count_rgb}")
 
     if args.luma_vs:
         other = np.asarray(Image.open(args.luma_vs).convert("RGB")).astype(np.int32)
@@ -109,8 +119,24 @@ def main() -> int:
         ratio = a / max(b, 1e-6)
         if ratio < args.min_ratio:
             failures.append(f"luma ratio {a:.1f}/{b:.1f} = {ratio:.2f} < {args.min_ratio}")
+        elif args.max_ratio is not None and ratio > args.max_ratio:
+            failures.append(f"luma ratio {a:.1f}/{b:.1f} = {ratio:.2f} > {args.max_ratio}")
         else:
             print(f"luma ratio {a:.1f}/{b:.1f} = {ratio:.2f}")
+
+    if args.same_as:
+        other = np.asarray(Image.open(args.same_as).convert("RGB")).astype(np.int32)
+        if other.shape != img.shape:
+            failures.append(f"size differs from {args.same_as}")
+        else:
+            differ = int((np.abs(img - other) > args.tol).any(axis=2).sum())
+            most = args.max_diff_pixels if args.max_diff_pixels is not None else (None if args.min_diff_pixels else 0)
+            if most is not None and differ > most:
+                failures.append(f"{differ} pixels differ from {args.same_as}, expected at most {most}")
+            elif args.min_diff_pixels is not None and differ < args.min_diff_pixels:
+                failures.append(f"{differ} pixels differ from {args.same_as}, expected at least {args.min_diff_pixels}")
+            else:
+                print(f"{differ} pixels differ from {args.same_as}")
 
     for f in failures:
         print(f"{args.image}: {f}")

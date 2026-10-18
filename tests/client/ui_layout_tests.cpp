@@ -8,6 +8,8 @@
 #include <vector>
 
 #include <GLFW/glfw3.h>
+#include <unistd.h>
+
 #include <gtest/gtest.h>
 
 #include "game/Options.h"
@@ -74,7 +76,10 @@ protected:
         pack_.reset();
     }
     void SetUp() override {
-        saves_ = std::filesystem::path(::testing::TempDir()) / "ui_layout_saves";
+        // One directory per test: ctest runs them as parallel processes.
+        saves_ = std::filesystem::path(::testing::TempDir()) /
+                 ("ui_layout_saves_" + std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) + "_" +
+                  std::to_string(getpid()));
         std::filesystem::remove_all(saves_);
         std::filesystem::create_directories(saves_);
         host_ = std::make_unique<FakeHost>(saves_);
@@ -116,16 +121,34 @@ protected:
 
     // Every visible widget on screen, no two overlapping, labels translated and fitting.
     void checkLayout(const WidgetScreen& screen, glm::vec2 size, const std::string& what) const {
+        // Widgets in a scrolling list count as the part of them the list shows.
+        struct Shown {
+            const Widget* w;
+            glm::vec4 r; // x0, y0, x1, y1
+        };
+        std::vector<Shown> shownRects;
+        for (const auto& w : screen.widgets()) {
+            if (!w->visible) continue;
+            glm::vec4 r(w->x, w->y, w->x + w->width, w->y + w->height);
+            if (const auto clip = screen.clipOf(*w))
+                r = glm::vec4(std::max(r.x, clip->x), std::max(r.y, clip->y), std::min(r.z, clip->z), std::min(r.w, clip->w));
+            if (r.z > r.x && r.w > r.y) shownRects.push_back({w.get(), r});
+        }
         std::vector<const Widget*> shown;
-        for (const auto& w : screen.widgets())
-            if (w->visible) shown.push_back(w.get());
+        for (const Shown& s : shownRects) shown.push_back(s.w);
+        const auto rectOf = [&](const Widget* w) {
+            for (const Shown& s : shownRects)
+                if (s.w == w) return s.r;
+            return glm::vec4(0.0f);
+        };
         for (const Widget* w : shown) {
             const std::string where = what + " at " + std::to_string(int(size.x)) + "x" + std::to_string(int(size.y)) +
                                       ": '" + w->message + "'";
-            EXPECT_GE(w->x, 0.0f) << where;
-            EXPECT_GE(w->y, 0.0f) << where;
-            EXPECT_LE(w->x + w->width, size.x) << where;
-            EXPECT_LE(w->y + w->height, size.y) << where;
+            const glm::vec4 r = rectOf(w);
+            EXPECT_GE(r.x, 0.0f) << where;
+            EXPECT_GE(r.y, 0.0f) << where;
+            EXPECT_LE(r.z, size.x) << where;
+            EXPECT_LE(r.w, size.y) << where;
             EXPECT_FALSE(untranslated(w->message)) << where;
             const auto* button = dynamic_cast<const Button*>(w);
             if (button && button->icon.empty() && dynamic_cast<const CycleButton*>(w) == nullptr) {
@@ -136,8 +159,8 @@ protected:
             }
             for (const Widget* o : shown) {
                 if (o <= w) continue;
-                const bool overlap = w->x < o->x + o->width && o->x < w->x + w->width && w->y < o->y + o->height &&
-                                     o->y < w->y + w->height;
+                const glm::vec4 q = rectOf(o);
+                const bool overlap = r.x < q.z && q.x < r.z && r.y < q.w && q.y < r.w;
                 EXPECT_FALSE(overlap) << where << " overlaps '" << o->message << "'";
             }
         }
@@ -201,6 +224,33 @@ TEST_F(UiLayout, MenuScreens) {
         checkAllSizes(mouse, "mouse settings" + suffix);
         ChatSettingsScreen chat(ctx());
         checkAllSizes(chat, "chat settings" + suffix);
+    }
+}
+
+TEST_F(UiLayout, OptionListsScroll) {
+    // 1280x720 at GUI scale 3: Video Settings has more rows than fit, so the list scrolls
+    // and only clicks inside it reach its options.
+    VideoSettingsScreen video(ctx());
+    const glm::vec2 size(427, 240);
+    video.init(size);
+    const Widget* last = nullptr;
+    for (const auto& w : video.widgets())
+        if (video.clipOf(*w)) last = w.get();
+    ASSERT_NE(last, nullptr);
+    EXPECT_FALSE(last->visible);
+    video.mouseScrolled(size / 2.0f, -100.0);
+    EXPECT_TRUE(last->visible);
+    EXPECT_LE(last->y + last->height, size.y - 33);
+    // A click on the Done button's row lands on Done, not on an option scrolled under it.
+    const Widget& done = *video.widgets().back();
+    EXPECT_EQ(done.message, "Done");
+    EXPECT_FALSE(video.clipOf(done).has_value());
+    // Resizing keeps the list scrolled within range.
+    video.init(glm::vec2(640, 360));
+    for (const auto& w : video.widgets()) {
+        if (video.clipOf(*w)) {
+            EXPECT_TRUE(w->visible) << w->message; // everything fits at scale 2
+        }
     }
 }
 

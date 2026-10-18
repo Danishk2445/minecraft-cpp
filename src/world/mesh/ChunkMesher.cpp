@@ -424,6 +424,7 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
     BiomeTints tints(options, n);
     const FluidMesher fluids(reg, cells, options);
     std::vector<const BakedModel*> models;
+    const std::optional<TagId> leaves = reg.tag("minecraft:leaves");
     const ColumnSnapshot* self = n.column(0, 0);
     for (int si = 0; si < kSectionCount; ++si) {
         if (!(sectionMask & (1u << si))) continue;
@@ -437,12 +438,14 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
         cells.fill(n, minY);
         tints.reset(minY);
         const int wx0 = n.center.minBlockX(), wz0 = n.center.minBlockZ();
+        std::bitset<4096> opaque; // for the section's VisGraph
 
         for (int y = 0; y < 16; ++y)
             for (int z = 0; z < 16; ++z)
                 for (int x = 0; x < 16; ++x) {
                     const StateId s = cells.at(x, y, z);
                     const StateInfo& info = reg.info(s);
+                    if (info.flags & kOpaqueCube) opaque.set(size_t(x | z << 4 | y << 8));
                     if (info.fluid.kind != FluidKind::None) {
                         const RenderLayer fl = info.fluid.kind == FluidKind::Lava ? RenderLayer::Solid : RenderLayer::Translucent;
                         fluids.mesh(glm::ivec3(x, y, z), info, tints.at(x, y, z).water, mesh.layers[size_t(fl)],
@@ -480,8 +483,12 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                     int power = 0, age = 0;
                     if (block.tint.source == TintSource::Redstone) power = reg.intValue(s, "power");
                     if (block.tint.source == TintSource::Stem) age = reg.intValue(s, "age");
-                    auto& verts = mesh.layers[size_t(info.layer)];
+                    RenderLayer layer = info.layer;
+                    if (options.fastLeaves && leaves && reg.hasTag(s, *leaves)) layer = RenderLayer::Solid;
+                    auto& verts = mesh.layers[size_t(layer)];
                     const glm::ivec3 pos(x, y, z);
+                    // Plants' random nudge: the model moves, its lighting stays the cell's.
+                    const glm::vec3 origin = glm::vec3(pos) + glm::vec3(reg.modelOffset(s, BlockPos(wx0 + x, minY + y, wz0 + z)));
 
                     // Lazily computed smooth light per (face, flush).
                     FaceLight faceLight[12];
@@ -553,7 +560,7 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                             }
                             for (int k = 0; k < 4; ++k) {
                                 const int i = (k + first) & 3;
-                                const glm::vec3 p = glm::vec3(pos) + q.pos[size_t(i)];
+                                const glm::vec3 p = origin + q.pos[size_t(i)];
                                 const glm::vec3 c = tintColor * bright[i];
                                 verts.push_back({packPos(p.x), packPos(p.y), packPos(p.z),
                                                  uint8_t(std::clamp(blkL[i], 0.0f, 240.0f) + 0.5f),
@@ -565,7 +572,7 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                             if (info.layer == RenderLayer::Translucent) {
                                 glm::vec3 c(0.0f);
                                 for (const auto& p : q.pos) c += p;
-                                mesh.translucentCenters.push_back(glm::vec3(pos) + c * 0.25f);
+                                mesh.translucentCenters.push_back(origin + c * 0.25f);
                             }
                             if (stats) ++stats->quads;
                         }
@@ -573,6 +580,7 @@ void meshSections(const BlockRegistry& reg, const MesherOptions& options, const 
                 }
         const glm::vec3 eye = options.cameraPos - glm::vec3(float(wx0), float(minY), float(wz0));
         sortTranslucent(mesh.layers[size_t(RenderLayer::Translucent)], mesh.translucentCenters, eye);
+        mesh.visibility = resolveVisibility(opaque);
         out.push_back(std::move(mesh));
     }
 }

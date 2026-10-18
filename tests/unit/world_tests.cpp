@@ -375,3 +375,60 @@ TEST(WorldSaves, FoldersSeedsAndListing) {
     EXPECT_FALSE(deleteWorld(dir, ".."));
     std::filesystem::remove_all(dir);
 }
+
+// Cave culling (M13): the mesher's VisGraph of a stone section with a tunnel through it,
+// and of sections that don't block sight.
+TEST_F(WorldFixture, MesherResolvesSectionVisibility) {
+    const StateId stone = S("stone"), glass = S("glass"), leaves = S("oak_leaves");
+    // Stone with a 1x1 tunnel running north-south at x=8, y=72, a glass pane of it at z=8.
+    const SectionMesh tunnel = meshOne([&](Chunk& c) {
+        for (int y = 64; y < 80; ++y)
+            for (int z = 0; z < 16; ++z)
+                for (int x = 0; x < 16; ++x)
+                    if (!(x == 8 && y == 72)) c.set(x, y, z, stone);
+        c.set(8, 72, 8, glass);
+    });
+    EXPECT_TRUE(tunnel.visibility.visible(Direction::North, Direction::South));
+    EXPECT_TRUE(tunnel.visibility.visible(Direction::South, Direction::North));
+    EXPECT_FALSE(tunnel.visibility.visible(Direction::North, Direction::Up));
+    EXPECT_FALSE(tunnel.visibility.visible(Direction::Down, Direction::Up));
+    EXPECT_FALSE(tunnel.visibility.visible(Direction::West, Direction::East));
+    // Solid stone: no face sees another. Leaves don't block sight.
+    const SectionMesh solid = meshOne([&](Chunk& c) {
+        for (int y = 64; y < 80; ++y)
+            for (int z = 0; z < 16; ++z)
+                for (int x = 0; x < 16; ++x) c.set(x, y, z, stone);
+    });
+    EXPECT_EQ(solid.visibility.bits, 0u);
+    const SectionMesh leafy = meshOne([&](Chunk& c) {
+        for (int y = 64; y < 80; ++y)
+            for (int z = 0; z < 16; ++z)
+                for (int x = 0; x < 16; ++x) c.set(x, y, z, leaves);
+    });
+    EXPECT_EQ(leafy.visibility.bits, VisibilitySet::kAll);
+}
+
+TEST_F(WorldFixture, MesherOffsetsPlants) {
+    // A cross model centered in its cell: the mean of its corners is the cell's middle plus
+    // the block's random offset.
+    const auto center = [&](const char* id) {
+        const SectionMesh m = meshOne([&](Chunk& c) { c.set(5, 64, 9, S(id)); });
+        glm::dvec3 sum(0.0);
+        size_t n = 0;
+        for (const auto& layer : m.layers)
+            for (const TerrainVertex& v : layer) {
+                sum += glm::dvec3(v.x, v.y, v.z) / 2048.0 - 8.0;
+                ++n;
+            }
+        EXPECT_GT(n, 0u) << id;
+        return n ? sum / double(n) : sum;
+    };
+    for (const char* id : {"poppy", "short_grass"}) {
+        const glm::dvec3 expected = glm::dvec3(5.5, 0.5, 9.5) + registry->modelOffset(S(id), BlockPos(5, 64, 9));
+        const glm::dvec3 got = center(id);
+        EXPECT_NEAR(got.x, expected.x, 1e-3) << id;
+        EXPECT_NEAR(got.y, expected.y, 1e-3) << id;
+        EXPECT_NEAR(got.z, expected.z, 1e-3) << id;
+    }
+    EXPECT_NE(registry->modelOffset(S("poppy"), BlockPos(5, 64, 9)), glm::dvec3(0.0));
+}

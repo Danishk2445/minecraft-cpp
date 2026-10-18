@@ -34,20 +34,39 @@ void WidgetScreen::renderSeparators(GuiGraphics& g, float headerHeight, float fo
     g.texture(footer, 0, size_.y - footerHeight, 0, 0, size_.x, 2, 32, 2);
 }
 
+namespace {
+
+bool inside(const glm::vec4& r, glm::vec2 p) { return p.x >= r.x && p.y >= r.y && p.x < r.z && p.y < r.w; }
+
+} // namespace
+
 void WidgetScreen::render(GuiGraphics& g, glm::vec2 mouse, float partialTick) {
     renderBackground(g);
-    for (auto& w : widgets_) w->render(g, mouse, partialTick);
+    for (auto& w : widgets_) {
+        if (const std::optional<glm::vec4> clip = clipOf(*w)) {
+            g.enableScissor(clip->x, clip->y, clip->z, clip->w);
+            w->render(g, inside(*clip, mouse) ? mouse : glm::vec2(-1.0f), partialTick);
+            g.disableScissor();
+        } else {
+            w->render(g, mouse, partialTick);
+        }
+    }
     renderContents(g, mouse, partialTick);
-    for (auto& w : widgets_)
-        if (!w->tooltip.empty() && w->isMouseOver(mouse)) g.textTooltip(w->tooltip, mouse.x, mouse.y);
+    for (auto& w : widgets_) {
+        const std::optional<glm::vec4> clip = clipOf(*w);
+        if (!w->tooltip.empty() && w->isMouseOver(mouse) && (!clip || inside(*clip, mouse)))
+            g.textTooltip(w->tooltip, mouse.x, mouse.y);
+    }
 }
 
 bool WidgetScreen::mouseClicked(glm::vec2 mouse, int button, int) {
-    for (auto& w : widgets_)
+    for (auto& w : widgets_) {
+        if (const std::optional<glm::vec4> clip = clipOf(*w); clip && !inside(*clip, mouse)) continue;
         if (w->visible && w->mouseClicked(mouse, button)) {
             setFocus(w->focusable() ? w.get() : nullptr);
             return true;
         }
+    }
     setFocus(nullptr);
     return false;
 }

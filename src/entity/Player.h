@@ -94,6 +94,9 @@ public:
     void resetAttackStrengthTicker() { attackStrengthTicker = 0; }
     // The first-person hands lag behind the view (vanilla LocalPlayer xBob/yBob).
     float xBob = 0.0f, yBob = 0.0f, xBobO = 0.0f, yBobO = 0.0f;
+    // View bobbing (vanilla walkDist and bob): the distance walked (0.6 a block) and how
+    // much walking bobs the view, eased toward the speed on the ground (at most 0.1).
+    float walkDist = 0.0f, walkDistO = 0.0f, bob = 0.0f, oBob = 0.0f;
     // Stacks thrown out of menus or the hotbar, waiting for the world to spawn them as
     // item entities (menus have no level at hand).
     std::vector<ItemStack> droppedItems;

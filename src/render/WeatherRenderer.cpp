@@ -48,7 +48,7 @@ void WeatherRenderer::render(const Level& level, const Camera& camera, const glm
                              float partialTick, const glm::vec4& fogColor, const glm::vec4& fogDistances) {
     const float rain = level.rainLevel(partialTick);
     if (rain <= 0.0f) return;
-    constexpr int kRadius = 10; // vanilla's with fancy graphics
+    const int kRadius = radius;
     const glm::dvec3 cam = camera.position;
     const int cx = int(std::floor(cam.x)), cy = int(std::floor(cam.y)), cz = int(std::floor(cam.z));
     rainVerts_.clear();

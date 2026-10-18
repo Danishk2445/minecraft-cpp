@@ -90,6 +90,12 @@ Particle ParticleSystem::withSpeed(ParticleType type, const glm::dvec3& at, cons
 
 void ParticleSystem::add(ParticleType type, const glm::dvec3& at, const glm::dvec3& speed, const glm::vec3& color) {
     if (type != ParticleType::ExplosionEmitter && sprites_[size_t(type)].empty()) return;
+    if (camera) {
+        ParticleMode level = mode; // vanilla calculateParticleLevel
+        if (level == ParticleMode::Decreased && random_.nextInt(3) == 0) level = ParticleMode::Minimal;
+        const glm::dvec3 d = at - *camera;
+        if (glm::dot(d, d) > 1024.0 || level == ParticleMode::Minimal) return;
+    }
     Particle p;
     auto jitter = [&] { return double((random_.nextFloat() - random_.nextFloat()) * 0.05f); };
     switch (type) {
@@ -349,7 +355,7 @@ void ParticleSystem::addItemParticles(const glm::dvec3& eye, float yaw, float pi
 void ParticleSystem::addBlockBreak(const BlockRegistry& reg, StateId state, const BlockPos& pos, int sprite,
                                    uint32_t tint) {
     const Shape& shape = reg.outlineShape(state);
-    const glm::dvec3 origin(pos.vec());
+    const glm::dvec3 origin = glm::dvec3(pos.vec()) + reg.shapeOffset(state, pos);
     for (const AABB& b : shape) {
         const glm::dvec3 size = glm::min(b.size(), glm::dvec3(1.0));
         const int nx = std::max(2, int(std::ceil(size.x / 0.25))), ny = std::max(2, int(std::ceil(size.y / 0.25)));
@@ -369,6 +375,7 @@ void ParticleSystem::addBlockHit(const BlockRegistry& reg, StateId state, const 
     if (shape.empty()) return;
     AABB b = shape[0];
     for (const AABB& a : shape) b = AABB(glm::min(b.min, a.min), glm::max(b.max, a.max));
+    b = b.moved(reg.shapeOffset(state, pos));
     constexpr double kMargin = 0.1;
     glm::dvec3 p = glm::dvec3(pos.vec()) +
                    glm::dvec3(random_.nextDouble() * (b.max.x - b.min.x - kMargin * 2) + kMargin + b.min.x,

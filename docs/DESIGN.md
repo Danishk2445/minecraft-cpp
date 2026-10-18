@@ -37,6 +37,15 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
   idx = weightedPick(abs((int32)r.nextLong()) % totalWeight)
   ```
 
+- **Random block offset** (vanilla OffsetType; `offset`, `max_horizontal_offset`, `offset_shapes` in `data/blocks/properties.json`):
+  ```
+  l = Mth.getSeed(x, 0, z)          // one offset per column: both halves of a tall plant agree
+  f(k) = (float)((l >> k) & 15) / 15.0f
+  dx = clamp((f(0) - 0.5)·0.5, ±maxH)   dz = clamp((f(8) - 0.5)·0.5, ±maxH)   // maxH 0.25, bamboo 0.45, dripstone 0.125
+  dy = XYZ ? (f(4) - 1)·maxV : 0        // maxV 0.2: grass, ferns, dry grass and small dripleaf sink
+  ```
+  The model moves; its lighting stays the cell's. Outlines and collision move only for flowers, bamboo, pointed dripstone, propagules and small dripleaf.
+
 ## Model baking (`resources/ModelBaker`)
 - **Parent merge:**
   - `textures` merge, and the child wins.
@@ -512,3 +521,24 @@ These are the formulas and conventions the code follows. Values marked *(mem)* c
 - **World icon** (tryTakeScreenshotIfNeeded): once a saved world's whole view is drawn and it has no `icon.png`, the frame's middle square (before the HUD) is box-filtered to 64×64.
 - **Leaving a world:** "Saving world" shows for a frame, the world saves, and the title screen returns.
 - **Commands:** vanilla permission levels: `/help`, `/list`, `/me` and `/seed` for anyone; the rest need "Allow Commands" (the harness's worlds always have it). Others get "Unknown or incomplete command".
+
+## Polish (M13: `world/mesh/VisGraph`, `render/ChunkRenderer`, `ui/ScreenOverlays`, `game/KeyBindings`, `app/ActionScript`)
+- **VisGraph** (cave culling): a section's cells that are opaque full cubes block sight. Fewer than 256 of them: every face sees every other; all 4096: none. Otherwise flood-fill from every open boundary cell; each region links all the faces it touches (36 bits, `a·6 + b`).
+- **Occlusion search** (SectionOcclusionGraph full update): BFS from the camera's section (from outside the world's height: every column's top or bottom section in range, nearest first, entered from above or below and heading outward). A node keeps the directions it was entered from (`sources`) and every direction its path took (`dirs`). From a node it goes on in direction d when:
+  - `opposite(d)` is not in `dirs` (no turning back along an axis);
+  - some source `s` has `visible(opposite(s), d)` in the section's VisibilitySet (the camera's section sees everywhere);
+  - the neighbor is within the render distance's cylinder (`(rd·16 + 16)` from chunk centers);
+  - for nodes more than 60 blocks from the camera on any axis: from the neighbor's corner nearest the camera (offset along d's axis away from it), steps of 28 blocks toward the camera must only pass sections already reached until within 60.
+
+  A reached neighbor gains d as another source. Columns without meshes are reached but not entered. The renderer then frustum-tests what was reached.
+- **View bobbing** (bobView), after the roll, on the view and on the hands:
+  ```
+  walkDist += horizontalDistanceMoved·0.6;  bob += (min(0.1, horizontalSpeed if onGround else 0) - bob)·0.4
+  g = -(walkDist + (walkDist - walkDistO)·pt),  h = lerp(pt, oBob, bob)
+  translate(sin(gπ)·h/2, -|cos(gπ)·h|, 0) · rotZ(sin(gπ)·h·3°) · rotX(|cos(gπ - 0.2)·h|·5°)
+  ```
+- **Screen overlays** (ScreenEffectRenderer): quads at z = −0.5 spanning −1..1 in the hands' 70° projection, mapped to GUI pixels. In a block: its particle sprite, color 0.1, U mirrored. Under water: `misc/underwater` repeated 4×, offset `(−yaw/64, pitch/64)`, color (b, b, b, 0.1) with b the eyes' brightness. Burning: two `fire_1` quads translated `(∓0.24, −0.3)`, turned ±10° about y, alpha 0.9.
+- **Vignette** (Gui.renderVignette, Fancy only): `vignetteBrightness += (clamp(1 − brightness(max(sky − skyDarken, block)), 0, 1) − vignetteBrightness)·0.01` per tick, at the eyes; drawn full screen with blending `(ZERO, ONE_MINUS_SRC_COLOR)` and color `(v, v, v)`. `brightness(l) = f/(4 − 3f)`, `f = l/15`.
+- **Particles option** (addParticleInternal): nothing beyond 32 blocks of the camera; Decreased drops one in three (`random.nextInt(3) == 0`), Minimal everything; terrain debris and item pieces are exempt.
+- **Key bindings:** GLFW codes, saved by vanilla's InputConstants names (`key.keyboard.left.shift`, `key.mouse.left|right|middle`, `key.mouse.N` for button N−1, `key.keyboard.unknown`). The Key Binds list sorts by category (movement, gameplay, inventory, creative, multiplayer, ui, misc), then by translated name; rows 20 apart in a 340-wide list, Reset (50) 10 left of the scrollbar and the key button (75) 5 left of that, 2 above the row. A key in use twice reads `§c[ §fKEY§c ]` with a 3-wide red bar 6 left of its button and the "also used for" tooltip; the key waiting for input reads `§e> §f§nKEY§r§e <`.
+- **Action script** (`--script`): runs in the world's tick before the player acts, and only ever sets the player's look, holds controls, adds attack and use clicks, and clicks menu slots (`Menu::clicked`). Moving uses the mob pathfinder (a 0.6×1.8 mob; a path ending with the target within reach counts), else a staircase dug one step at a time: down (clear head, feet and below ahead), level, or up (clear above the head and two ahead, jump). Each step goes along the axis with the most left to go first. Steps never go into lava, next to a fluid when a block must be broken, into a cell already dug through, or off more than a 2-block drop. Tools: the inventory's best for the block (harvests it, then fastest; bare hands over a tool that gains nothing), swapped into the hotbar with a number-key click. Crafting places one ingredient per cell (pick the stack up, right-click a cell, put the rest back), then takes the result and puts it down where it stacks. Smelting fills the input and fuel slots, waits for the output, and shift-clicks it out.

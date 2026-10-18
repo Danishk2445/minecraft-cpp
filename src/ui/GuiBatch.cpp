@@ -48,8 +48,7 @@ void GuiBatch::restoreState() {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
-    if (blend_ == Blend::Invert) glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
-    else glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    applyBlend();
     shader_.use();
     shader_.set("uProj", glm::ortho(0.0f, size_.x, size_.y, 0.0f, -1.0f, 1.0f));
 }
@@ -58,8 +57,15 @@ void GuiBatch::setBlend(Blend blend) {
     if (blend == blend_) return;
     flush();
     blend_ = blend;
-    if (blend == Blend::Invert) glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
-    else glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    applyBlend();
+}
+
+void GuiBatch::applyBlend() {
+    switch (blend_) {
+    case Blend::Invert: glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO); break;
+    case Blend::Darken: glBlendFuncSeparate(GL_ZERO, GL_ONE_MINUS_SRC_COLOR, GL_ZERO, GL_ONE); break;
+    case Blend::Alpha: glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); break;
+    }
 }
 
 void GuiBatch::quad(const glm::vec2 (&corners)[4], float u0, float v0, float u1, float v1, uint32_t argb) {

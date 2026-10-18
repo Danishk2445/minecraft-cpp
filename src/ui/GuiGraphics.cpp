@@ -29,6 +29,7 @@ void GuiGraphics::blurBehind(int radius) {
 
 void GuiGraphics::begin(glm::ivec2 framebuffer, int scale) {
     framebuffer_ = framebuffer;
+    scissors_.clear();
     batch_.begin(framebuffer, scale);
     items_.beginGui();
 }
@@ -84,14 +85,32 @@ void GuiGraphics::tooltip(const std::vector<std::string>& lines, float mouseX, f
 
 void GuiGraphics::enableScissor(float x0, float y0, float x1, float y1) {
     batch_.flush();
-    const float s = float(scale());
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(GLint(x0 * s), GLint(float(framebuffer_.y) - y1 * s), GLsizei((x1 - x0) * s), GLsizei((y1 - y0) * s));
+    glm::vec4 r(x0, y0, x1, y1);
+    if (!scissors_.empty()) {
+        const glm::vec4& o = scissors_.back();
+        r = glm::vec4(std::max(r.x, o.x), std::max(r.y, o.y), std::min(r.z, o.z), std::min(r.w, o.w));
+        r.z = std::max(r.z, r.x);
+        r.w = std::max(r.w, r.y);
+    }
+    scissors_.push_back(r);
+    applyScissor();
 }
 
 void GuiGraphics::disableScissor() {
     batch_.flush();
-    glDisable(GL_SCISSOR_TEST);
+    if (!scissors_.empty()) scissors_.pop_back();
+    applyScissor();
+}
+
+void GuiGraphics::applyScissor() const {
+    if (scissors_.empty()) {
+        glDisable(GL_SCISSOR_TEST);
+        return;
+    }
+    const glm::vec4& r = scissors_.back();
+    const float s = float(scale());
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(GLint(r.x * s), GLint(float(framebuffer_.y) - r.w * s), GLsizei((r.z - r.x) * s), GLsizei((r.w - r.y) * s));
 }
 
 void GuiGraphics::playerFollowingMouse(const Player& player, float x0, float y0, float x1, float y1, float scale,

@@ -103,6 +103,8 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
     oldYaw = yaw;
     oldPitch = pitch;
     beginLivingTick();
+    walkDistO = walkDist;
+    oBob = bob;
     xBobO = xBob;
     yBobO = yBob;
     xBob += (pitch - xBob) * 0.5f;
@@ -166,6 +168,11 @@ void Player::tick(const BlockGetter& level, const PlayerInput& in) {
     if (eyeInWater(level)) causeFoodExhaustion(0.01f * cm(glm::length(d)));
     else if (inWater) causeFoodExhaustion(0.01f * cm(horizontal));
     else if (onGround && sprinting) causeFoodExhaustion(0.1f * cm(horizontal));
+    // Vanilla Entity.move adds the walk (not for spectators), Player.aiStep eases the bob.
+    if (!noPhysics) walkDist += float(horizontal) * 0.6f;
+    const float bobTarget =
+        onGround && !dead() ? std::min(0.1f, float(std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z))) : 0.0f;
+    bob += (bobTarget - bob) * 0.4f;
     updateWalkAnimation();
     // Landing ends creative flight (vanilla checks after moving, so taking off works).
     if (flying && onGround && mode_ != GameMode::Spectator) flying = false;

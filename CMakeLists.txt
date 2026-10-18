@@ -355,11 +355,11 @@ if(XVFB_RUN AND Python3_FOUND)
     mc_py_test(gl_falling_blocks_powder gl_falling_blocks check_image.py ${MC_TEST_RUN}/falling_blocks.png
         --region 470,90,540,140 --mean-rgb 130,42,40 --tol 8)
     # Weather: the sky greyed by rain at noon (clear is about 148,186,255), and nearly black
-    # at midnight in the rain.
+    # at midnight in the rain. (Measured mid-screen: the vignette darkens the edges in rain.)
     mc_gl_test(gl_weather_rain ${MC_SIM_SCENE} --time 6000 --weather rain --pos 0.5,-58,0.5 --look 0,-30 --ticks 40
         --screenshot ${MC_TEST_RUN}/weather_rain.png --exit)
     mc_py_test(gl_weather_rain_sky gl_weather_rain check_image.py ${MC_TEST_RUN}/weather_rain.png
-        --no-magenta --region 0,0,1280,200 --mean-rgb 92,104,139 --tol 10)
+        --no-magenta --region 440,200,840,450 --mean-rgb 92,104,139 --tol 10)
     mc_gl_test(gl_weather_night_rain ${MC_SIM_SCENE} --time 18000 --weather rain --pos 0.5,-58,0.5 --look 0,-30
         --ticks 40 --screenshot ${MC_TEST_RUN}/weather_night_rain.png --exit)
     mc_py_test(gl_weather_night_rain_sky gl_weather_night_rain check_image.py ${MC_TEST_RUN}/weather_night_rain.png
@@ -423,6 +423,71 @@ if(XVFB_RUN AND Python3_FOUND)
         --region 545,205,640,330 --mean-rgb 18,37,48 --tol 12)
     mc_py_test(gl_mobs_night_swirl gl_mobs_night check_image.py ${MC_TEST_RUN}/mobs_night.png
         --region 300,240,410,400 --mean-rgb 31,57,66 --tol 15)
+
+    # M13: cave culling. In a lit cave room looking up a shaft to the sky, the picture is the
+    # same with the occlusion search off, and most sections are left out.
+    set(MC_CAVE_SCENE --gamemode spectator --seed 1 --render-distance 8 --pos 14,-24,14 --look 135,-45 --time 6000
+        --freeze-time --freeze-textures --wait-chunks --ticks 20
+        --exec [=[/fill -8 -28 -8 24 -12 24 air$<SEMICOLON>/fill -8 -28 -8 24 -28 24 glowstone$<SEMICOLON>/fill 4 -12 4 6 100 6 air]=])
+    mc_gl_test(gl_cave_culling ${MC_CAVE_SCENE} --gamedir ${MC_TEST_RUN}/cave --screenshot ${MC_TEST_RUN}/cave_culled.png --exit)
+    mc_gl_test(gl_cave_unculled ${MC_CAVE_SCENE} --cave-culling off --screenshot ${MC_TEST_RUN}/cave_unculled.png --exit)
+    mc_py_test(gl_cave_culling_same "gl_cave_culling;gl_cave_unculled" check_image.py ${MC_TEST_RUN}/cave_culled.png
+        --same-as ${MC_TEST_RUN}/cave_unculled.png --max-diff-pixels 20 --min-colors 100)
+    mc_py_test(gl_cave_culling_occludes gl_cave_culling check_log.py ${MC_TEST_RUN}/cave/logs/latest.log
+        [=[\(([0-9]+) occluded\)]=] --min 1000)
+    # M13: view bobbing sways the view and the hand while walking (the horizon tilts).
+    set(MC_WALK_SCENE --world-type flat --render-distance 4 --pos 0.5,~,0.5 --look 0,20 --time 6000 --freeze-time
+        --hold forward --ticks 13)
+    mc_gl_test(gl_view_bobbing ${MC_WALK_SCENE} --view-bobbing on --screenshot ${MC_TEST_RUN}/bob_on.png --exit)
+    mc_gl_test(gl_view_bobbing_off ${MC_WALK_SCENE} --screenshot ${MC_TEST_RUN}/bob_off.png --exit)
+    mc_py_test(gl_view_bobbing_sways "gl_view_bobbing;gl_view_bobbing_off" check_image.py ${MC_TEST_RUN}/bob_on.png
+        --same-as ${MC_TEST_RUN}/bob_off.png --min-diff-pixels 20000)
+    # M13 screen overlays: the block the eyes are in (darkened), flames while burning, the
+    # vignette in the dark (Fancy graphics only), a worn carved pumpkin's blur; and Fast
+    # graphics' solid leaves.
+    set(MC_OVERLAY_SCENE --world-type flat --render-distance 4 --freeze-time --gamerule doMobSpawning=false
+        --pos 0.5,-58.4,0.5 --ticks 3)
+    mc_gl_test(gl_overlay_in_wall ${MC_OVERLAY_SCENE} --gamemode creative --pos 0.5,-62.4,0.5 --time 6000
+        --screenshot ${MC_TEST_RUN}/overlay_in_wall.png --exit)
+    mc_py_test(gl_overlay_in_wall_dark gl_overlay_in_wall check_image.py ${MC_TEST_RUN}/overlay_in_wall.png
+        --no-magenta --max-luma 20 --min-colors 20)
+    mc_gl_test(gl_overlay_fire ${MC_OVERLAY_SCENE} --look 0,-80 --time 6000 --exec "/setblock 0 -60 0 fire"
+        --screenshot ${MC_TEST_RUN}/overlay_fire.png --exit)
+    mc_py_test(gl_overlay_fire_flames gl_overlay_fire check_image.py ${MC_TEST_RUN}/overlay_fire.png
+        --region 100,480,400,600 --mean-rgb 193,112,29 --tol 35)
+    mc_gl_test(gl_overlay_vignette ${MC_OVERLAY_SCENE} --look 0,30 --time 18000
+        --screenshot ${MC_TEST_RUN}/overlay_vignette.png --exit)
+    mc_gl_test(gl_overlay_vignette_fast ${MC_OVERLAY_SCENE} --look 0,30 --time 18000 --graphics fast
+        --screenshot ${MC_TEST_RUN}/overlay_vignette_fast.png --exit)
+    mc_py_test(gl_overlay_vignette_corners "gl_overlay_vignette;gl_overlay_vignette_fast" check_image.py
+        ${MC_TEST_RUN}/overlay_vignette.png --luma-vs ${MC_TEST_RUN}/overlay_vignette_fast.png --region 0,0,160,120
+        --min-ratio 0.2 --max-ratio 0.7)
+    mc_gl_test(gl_overlay_pumpkin ${MC_OVERLAY_SCENE} --time 6000
+        --exec "/item replace entity @s armor.head with carved_pumpkin" --screenshot ${MC_TEST_RUN}/overlay_pumpkin.png --exit)
+    mc_py_test(gl_overlay_pumpkin_blur gl_overlay_pumpkin check_image.py ${MC_TEST_RUN}/overlay_pumpkin.png
+        --region 0,0,200,150 --max-luma 3)
+    set(MC_LEAF_WALL --look 0,0 --time 6000 --exec "/fill -6 -60 3 6 -52 3 oak_leaves[persistent=true]" --wait-chunks)
+    mc_gl_test(gl_leaves_fancy ${MC_OVERLAY_SCENE} ${MC_LEAF_WALL} --screenshot ${MC_TEST_RUN}/leaves_fancy.png --exit)
+    mc_gl_test(gl_leaves_fast ${MC_OVERLAY_SCENE} ${MC_LEAF_WALL} --graphics fast --screenshot ${MC_TEST_RUN}/leaves_fast.png --exit)
+    mc_py_test(gl_leaves_fancy_see_through gl_leaves_fancy check_image.py ${MC_TEST_RUN}/leaves_fancy.png
+        --region 200,100,1080,500 --count-rgb 157,191,255 --tol 40 --min-count 20000)
+    mc_py_test(gl_leaves_fast_solid gl_leaves_fast check_image.py ${MC_TEST_RUN}/leaves_fast.png
+        --region 200,100,1080,500 --count-rgb 157,191,255 --tol 40 --min-count 0 --max-count 200)
+    # M13 end-to-end survival run: from bare hands to a diamond through the game's own
+    # controls and menus (tests/scripts/survival.txt); the harness exits with 1 if a step fails.
+    mc_gl_test(gl_survival_run --seed 5 --size 640x360 --render-distance 6 --exec "/difficulty peaceful"
+        --script ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/survival.txt --tick-speed 20 --exit)
+    set_tests_properties(gl_survival_run PROPERTIES LABELS "gl;slow" TIMEOUT 600)
+    # M13 key binds: options.json with Jump on Left Shift (Sneak's key) shows both rows'
+    # red conflict marks left of their key buttons.
+    add_test(NAME gl_keybinds_setup COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/tests/golden/options/keybinds.json
+        ${MC_TEST_RUN}/keybinds/options.json)
+    set_tests_properties(gl_keybinds_setup PROPERTIES LABELS gl)
+    mc_gl_test(gl_keybinds --gamedir ${MC_TEST_RUN}/keybinds --screen keybinds --size 1280x720 --frames 3
+        --screenshot ${MC_TEST_RUN}/keybinds.png --exit)
+    set_tests_properties(gl_keybinds PROPERTIES DEPENDS gl_keybinds_setup)
+    mc_py_test(gl_keybinds_conflicts gl_keybinds check_image.py ${MC_TEST_RUN}/keybinds.png --no-magenta
+        --region 730,160,760,280 --count-rgb 255,0,0 --tol 30 --min-count 600)
 endif()
 
 message(STATUS "MinecraftCpp ${PROJECT_VERSION} -- build type: ${CMAKE_BUILD_TYPE}")

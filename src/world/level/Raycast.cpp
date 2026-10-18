@@ -76,11 +76,12 @@ std::optional<BlockHit> raycastBlocks(const BlockGetter& level, const glm::dvec3
                 best = BlockHit{p, hit->second, from + dir * hit->first, hit->first};
         };
         if (!(info.flags & kAir)) {
+            const glm::dvec3 o = glm::dvec3(p.vec()) + reg.shapeOffset(s, p);
             if (shapeKind == RayShape::Outline) {
-                for (const AABB& b : reg.outlineShape(s)) consider(b.moved(glm::dvec3(p.vec())));
+                for (const AABB& b : reg.outlineShape(s)) consider(b.moved(o));
             } else if (const Shape& shape = reg.collisionShape(s);
                        !shape.empty() && (shapeKind == RayShape::Collider || !emptyVisualShape(reg.blockOf(s)))) {
-                for (const AABB& b : shape) consider(b.moved(glm::dvec3(p.vec())));
+                for (const AABB& b : shape) consider(b.moved(o));
             }
         }
         if (fluids != RayFluid::None && !info.fluid.empty() && (fluids == RayFluid::Any || info.fluid.source())) {

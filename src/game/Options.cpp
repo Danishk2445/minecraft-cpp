@@ -17,8 +17,11 @@ E enumFrom(const Json& j, const char* key, E fallback, int count) {
 } // namespace
 
 std::string Options::toJson() const {
+    Json keyNames = Json::object();
+    for (size_t i = 0; i < kKeyActionCount; ++i) keyNames[keyMappingInfo(KeyAction(i)).name] = keys.keys[i].name();
     const Json j = {
         {"version", 1},
+        {"graphics", int(graphics)},
         {"fov", fov},
         {"fovEffectScale", fovEffectScale},
         {"renderDistance", renderDistance},
@@ -33,6 +36,9 @@ std::string Options::toJson() const {
         {"clouds", int(clouds)},
         {"particles", int(particles)},
         {"menuBlur", menuBlur},
+        {"biomeBlend", biomeBlend},
+        {"mipmapLevels", mipmapLevels},
+        {"entityDistance", entityDistance},
         {"attackIndicator", int(attackIndicator)},
         {"mouseSensitivity", mouseSensitivity},
         {"invertMouse", invertMouse},
@@ -40,6 +46,7 @@ std::string Options::toJson() const {
         {"chatOpacity", chatOpacity},
         {"textBackgroundOpacity", textBackgroundOpacity},
         {"chatScale", chatScale},
+        {"keys", keyNames},
     };
     return j.dump(2) + "\n";
 }
@@ -52,6 +59,7 @@ Options Options::fromJson(std::string_view text, std::string* error) {
         return o;
     }
     try {
+        o.graphics = enumFrom(j, "graphics", o.graphics, 3);
         o.fov = std::clamp(j.value("fov", o.fov), 30, 110);
         o.fovEffectScale = std::clamp(j.value("fovEffectScale", o.fovEffectScale), 0.0f, 1.0f);
         o.renderDistance = std::clamp(j.value("renderDistance", o.renderDistance), 2, 32);
@@ -66,6 +74,9 @@ Options Options::fromJson(std::string_view text, std::string* error) {
         o.clouds = enumFrom(j, "clouds", o.clouds, 3);
         o.particles = enumFrom(j, "particles", o.particles, 3);
         o.menuBlur = std::clamp(j.value("menuBlur", o.menuBlur), 0, 10);
+        o.biomeBlend = std::clamp(j.value("biomeBlend", o.biomeBlend), 0, 7);
+        o.mipmapLevels = std::clamp(j.value("mipmapLevels", o.mipmapLevels), 0, 4);
+        o.entityDistance = std::clamp(j.value("entityDistance", o.entityDistance), 0.5f, 5.0f);
         o.attackIndicator = enumFrom(j, "attackIndicator", o.attackIndicator, 3);
         o.mouseSensitivity = std::clamp(j.value("mouseSensitivity", o.mouseSensitivity), 0.0f, 1.0f);
         o.invertMouse = j.value("invertMouse", o.invertMouse);
@@ -73,6 +84,11 @@ Options Options::fromJson(std::string_view text, std::string* error) {
         o.chatOpacity = std::clamp(j.value("chatOpacity", o.chatOpacity), 0.1f, 1.0f);
         o.textBackgroundOpacity = std::clamp(j.value("textBackgroundOpacity", o.textBackgroundOpacity), 0.0f, 1.0f);
         o.chatScale = std::clamp(j.value("chatScale", o.chatScale), 0.0f, 1.0f);
+        // Vanilla names; unknown actions and keys keep the defaults.
+        if (const auto it = j.find("keys"); it != j.end() && it->is_object())
+            for (size_t i = 0; i < kKeyActionCount; ++i)
+                if (const auto k = it->find(keyMappingInfo(KeyAction(i)).name); k != it->end() && k->is_string())
+                    if (const auto key = InputKey::parse(k->get<std::string>())) o.keys.keys[i] = *key;
     } catch (const Json::exception& e) {
         if (error) *error = std::string("options: ") + e.what();
     }

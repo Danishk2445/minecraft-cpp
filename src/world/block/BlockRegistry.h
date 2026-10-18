@@ -63,6 +63,14 @@ enum StateFlag : uint16_t {
     kHasCollision = 1 << 9, // entities collide with it (not plants, fluids, signs, ...)
 };
 
+// Vanilla OffsetType: the random sideways (and for some, downward) nudge of a plant's model
+// by position, so a field of flowers or grass doesn't line up.
+enum class OffsetType : uint8_t { None, XZ, XYZ };
+
+// Vanilla getOffset for a block at column (x, z): from Mth.getSeed(x, 0, z), up to a quarter
+// block each way sideways (clamped to `maxHorizontal`) and, for XYZ, down to `maxVertical`.
+glm::dvec3 blockOffset(OffsetType type, float maxHorizontal, float maxVertical, int x, int z);
+
 // A block shape: boxes in block-local coordinates (a full cube spans 0..1; fence
 // and wall collision reaches 1.5 high).
 using Shape = std::vector<AABB>;
@@ -100,6 +108,10 @@ struct Block {
     uint8_t igniteOdds = 0;   // fire: how readily it catches from a neighboring fire
     uint8_t burnOdds = 0;     // fire: how fast it burns away
     bool requiresTool = false; // vanilla requiresCorrectToolForDrops: slow to break and no drops by hand
+    OffsetType offsetType = OffsetType::None;
+    float maxHorizontalOffset = 0.25f; // vanilla getMaxHorizontalOffset (bamboo 0.45, pointed dripstone 0.125)
+    float maxVerticalOffset = 0.2f;    // vanilla getMaxVerticalOffset
+    bool offsetShapes = false; // the outline and collision move with the model (flowers, bamboo), not just the model
 
     StateId stateAt(uint32_t local) const { return StateId(first + local); }
 };
@@ -148,6 +160,12 @@ public:
     const Shape& outlineShape(StateId s) const { return shapes_[info_[s].outline]; }
     const Shape& collisionShape(StateId s) const { return shapes_[info_[s].collision]; }
     const Shape& shape(uint16_t index) const { return shapes_[index]; }
+    // The block's random offset at `p` (zero for most blocks): every model moves by it, the
+    // shapes only where vanilla moves them too.
+    glm::dvec3 modelOffset(StateId s, const BlockPos& p) const;
+    glm::dvec3 shapeOffset(StateId s, const BlockPos& p) const {
+        return blockOf(s).offsetShapes ? modelOffset(s, p) : glm::dvec3(0.0);
+    }
     size_t shapeCount() const { return shapes_.size(); }
     std::optional<TagId> tag(std::string_view name) const { return tags_.find(name); }
     bool hasTag(StateId s, TagId t) const { return tags_.containsBlock(t, info_[s].block); }

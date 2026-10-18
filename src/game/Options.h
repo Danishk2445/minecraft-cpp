@@ -5,15 +5,21 @@
 #include <filesystem>
 #include <string>
 
+#include "game/KeyBindings.h"
+
 namespace mc {
 
 enum class CloudMode : uint8_t { Off, Fast, Fancy };
+// Fast: opaque leaves, rain and snow within 5 blocks, no vignette. Fabulous! draws like
+// Fancy here (vanilla adds transparency shaders).
+enum class GraphicsMode : uint8_t { Fast, Fancy, Fabulous };
 enum class ParticleMode : uint8_t { All, Decreased, Minimal };
 enum class ChatVisibility : uint8_t { Full, Commands, Hidden };
 enum class AttackIndicator : uint8_t { Off, Crosshair, Hotbar };
 
 struct Options {
     // Video
+    GraphicsMode graphics = GraphicsMode::Fancy;
     int fov = 70;             // 30..110 degrees
     float fovEffectScale = 1.0f; // vanilla "FOV Effects" (accessibility): how much sprinting, flying and bows widen or narrow it
     int renderDistance = 12;  // 2..32 chunks
@@ -28,10 +34,14 @@ struct Options {
     CloudMode clouds = CloudMode::Fancy;
     ParticleMode particles = ParticleMode::All;
     int menuBlur = 5;         // menu background blurriness, 0..10
+    int biomeBlend = 2;       // 0..7 blocks around (vanilla biomeBlendRadius: OFF, 3x3 .. 15x15)
+    int mipmapLevels = 4;     // 0..4
+    float entityDistance = 1.0f; // 0.5..5: how far entities are drawn (vanilla entityDistanceScaling)
     AttackIndicator attackIndicator = AttackIndicator::Crosshair;
     // Controls
     float mouseSensitivity = 0.5f; // 0..1
     bool invertMouse = false;
+    KeyBindings keys;
     // Chat
     ChatVisibility chatVisibility = ChatVisibility::Full;
     float chatOpacity = 1.0f;          // 0.1..1
@@ -44,6 +54,7 @@ struct Options {
         return d * d * d * 8.0 * 0.15;
     }
     bool unlimitedFps() const { return maxFps >= 260; }
+    bool fancyGraphics() const { return graphics != GraphicsMode::Fast; }
 
     // Missing or unreadable files keep the defaults.
     static Options load(const std::filesystem::path& file, std::string* error = nullptr);

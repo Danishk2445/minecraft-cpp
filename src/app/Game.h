@@ -16,6 +16,7 @@
 
 namespace mc {
 
+class FlyBenchmark;
 class Gallery;
 class WorldSession;
 
@@ -96,7 +97,7 @@ private:
     std::unique_ptr<Gallery> gallery_;
     Camera galleryCamera_;
     glm::vec2 lastGuiMouse_{-1.0f};
-    std::array<bool, 3> guiButtonsDown_{};
+    std::array<bool, Input::kButtons> guiButtonsDown_{};
     glm::vec2 screenSize_{0.0f};
     double fps_ = 0.0;
     std::string splash_;
@@ -114,6 +115,7 @@ private:
     int framesSinceTitle_ = 0;
     Stopwatch runTimer_;
     bool meshedLogged_ = false;
+    std::unique_ptr<FlyBenchmark> bench_; // --bench-fly
 };
 
 } // namespace mc

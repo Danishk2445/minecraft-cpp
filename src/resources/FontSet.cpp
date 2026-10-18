@@ -290,6 +290,14 @@ std::vector<std::string> FontSet::split(std::string_view text, float width) cons
             codes += cps[++i];
             continue;
         }
+        if (c == U'\n') {
+            // A line break of its own (vanilla StringSplitter): the formatting carries on.
+            out.push_back(encodeUtf8(line));
+            line = codes;
+            w = 0.0f;
+            lastSpace = std::u32string::npos;
+            continue;
+        }
         const float adv = font.advance(c, style);
         if (w + adv > width && !line.empty()) {
             std::u32string next;

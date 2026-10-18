@@ -3,6 +3,7 @@
 #include "core/Log.h"
 #include "core/Timer.h"
 #include "gfx/GL.h"
+#include "resources/TextureMeta.h"
 
 namespace mc {
 
@@ -89,10 +90,17 @@ const Texture& ClientAssets::texture(std::string_view id) const {
     if (it == textures_.end()) {
         std::unique_ptr<Texture> tex;
         std::string err;
-        if (auto img = Image::loadPng(pack_->resource(ResourceLocation::parse(id), "textures", ".png"), &err)) {
+        const auto path = pack_->resource(ResourceLocation::parse(id), "textures", ".png");
+        if (auto img = Image::loadPng(path, &err)) {
             tex = std::make_unique<Texture>();
             tex->create(img->width, img->height, 1);
             tex->upload(0, 0, 0, *img);
+            // The mcmeta's "blur" asks for linear filtering (the vignette, the pumpkin blur).
+            auto metaPath = path;
+            metaPath += ".mcmeta";
+            if (std::filesystem::exists(metaPath))
+                if (auto j = pack_->json(metaPath, &err); j && parseTextureMeta(*j).blur)
+                    tex->setFilter(GL_LINEAR, GL_LINEAR);
         } else {
             log::warn("texture {}: {}", id, err);
         }

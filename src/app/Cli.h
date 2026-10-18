@@ -46,9 +46,13 @@ struct CliOptions {
     bool freezeTime = false;       // stop the daylight cycle (deterministic screenshots)
     std::string weather;           // clear, rain or thunder from the start (and no weather cycle)
     std::optional<float> fovEffects; // the FOV Effects scale (harness runs: 0 unless given)
+    std::optional<bool> viewBobbing; // harness runs: off unless given
     std::vector<std::pair<std::string, std::string>> gameRules; // set before any chunk generates
     bool debugOverlay = false;     // show the F3 screen from the start
     std::optional<bool> smoothLighting; // overrides the option
+    std::optional<int> graphics;        // overrides the option: 0 fast, 1 fancy, 2 fabulous
+    bool caveCulling = true;            // the occlusion search (off: every section in the frustum)
+    bool freezeTextures = false;        // harness: animated textures stay on their first frame
 
     // Camera / world placement
     std::optional<glm::dvec3> pos;  // --pos X,Y,Z
@@ -58,6 +62,8 @@ struct CliOptions {
     std::optional<std::string> splash; // harness: this title splash instead of a random one
     std::string play; // harness: open saves/<play> as the world list does (title, loading screen, game)
     bool worldRequested = false;       // some option names a world: open it instead of the title screen
+    std::filesystem::path script;      // harness: play this action script (ActionScript.h) once the world is ready
+    int tickSpeed = 1;                 // harness: game ticks run this many times faster than real time
 
     // Tools
     std::filesystem::path dumpModelSheets; // render every block state to sheets, then exit
@@ -68,6 +74,8 @@ struct CliOptions {
     int mapSize = 4096;                    // biome map: width/height in blocks
     int mapStep = 4;                       // biome map: blocks per pixel
     int benchGen = 0;                      // generate and light about N chunks, report throughput, exit
+    double benchFly = 0.0;                 // fly the benchmark path for this many seconds, report frame times, exit
+    std::filesystem::path benchOut;        // --bench-fly: also write the results here (JSON)
     std::filesystem::path slice;           // write a vertical x/y cross-section PNG of the terrain, then exit
     bool checkData = false;                // load blocks, tags, biomes and features; report every problem; exit
     bool bakePanorama = false;             // render the title panorama into <gameDir>/panorama, then exit

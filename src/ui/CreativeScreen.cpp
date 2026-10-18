@@ -190,7 +190,7 @@ bool CreativeScreen::keyPressed(int key, int scancode, int mods) {
         if (key == GLFW_KEY_ESCAPE) return false;
         // Letters type into the box instead of acting as hotkeys (E, Q, numbers).
         if (key != GLFW_KEY_ENTER && key < GLFW_KEY_ESCAPE) return true;
-    } else if (key == GLFW_KEY_T) {
+    } else if (ctx_.keyMatches(KeyAction::Chat, key)) {
         // The chat key jumps to search (vanilla).
         for (size_t i = 0; i < tabList_.size(); ++i)
             if (tabList_[i].kind == Tab::Kind::Search) selectTab(int(i));

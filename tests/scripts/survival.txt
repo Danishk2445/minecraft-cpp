@@ -1,0 +1,45 @@
+# The end-to-end survival run (M13): from bare hands to a diamond, through the game's
+# own controls and menus. ActionScript.h describes the actions.
+
+log wood
+until #minecraft:logs 5
+  find #minecraft:logs 32
+  mine
+end
+craft #minecraft:planks 20
+craft crafting_table
+craft stick 8
+place crafting_table
+craft wooden_pickaxe
+
+log stone
+until cobblestone 11
+  find stone 24
+  mine
+end
+find crafting_table 16
+goto
+craft stone_pickaxe
+craft furnace
+mine                       # the table comes along
+
+log iron
+until raw_iron 3
+  find #minecraft:iron_ores 64
+  mine
+end
+place furnace
+smelt raw_iron 3 #minecraft:planks 2
+expect iron_ingot 3
+until crafting_table 1     # the old one was left behind: another from spare planks
+  craft crafting_table
+end
+place crafting_table
+craft iron_pickaxe
+
+log diamonds
+until diamond 1
+  find #minecraft:diamond_ores 64
+  mine
+end
+expect diamond 1

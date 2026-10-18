@@ -616,9 +616,40 @@ void Commands::addBasics() {
         return true;
     });
 
-    // Vanilla /item replace block <pos> container.<slot> with <item> [count].
-    add("item", "/item replace block <x> <y> <z> container.<slot> with <item> [count]",
+    // Vanilla /item replace block <pos> container.<slot> with <item> [count], and
+    // /item replace entity @s <slot> with <item> [count] for the player's own slots.
+    add("item", "/item replace (block <x> <y> <z> container.<slot> | entity @s <slot>) with <item> [count]",
         [](CommandSource& src, Args a, std::string& err) {
+            if (a.size() >= 6 && a[0] == "replace" && a[1] == "entity") {
+                if (a[2] != "@s" || a[4] != "with" || a.size() > 7) {
+                    err = "expected replace entity @s <slot> with <item> [count]";
+                    return false;
+                }
+                // Vanilla SlotArgument names: armor.*, weapon.*, hotbar.N, inventory.N.
+                std::optional<int> slot;
+                const std::string_view name = a[3];
+                long long n = 0;
+                if (name == "armor.feet") slot = 36;
+                else if (name == "armor.legs") slot = 37;
+                else if (name == "armor.chest") slot = 38;
+                else if (name == "armor.head") slot = 39;
+                else if (name == "weapon.offhand") slot = 40;
+                else if (name == "weapon.mainhand" || name == "weapon") slot = -1; // the selected one
+                else if (name.starts_with("hotbar.") && parseLong(name.substr(7), n) && n >= 0 && n < 9) slot = int(n);
+                else if (name.starts_with("inventory.") && parseLong(name.substr(10), n) && n >= 0 && n < 27)
+                    slot = 9 + int(n);
+                long long count = 1;
+                if (!slot || (a.size() == 7 && !parseLong(a[6], count))) {
+                    err = "unknown slot or bad count";
+                    return false;
+                }
+                if (!src.replacePlayerSlot || !src.replacePlayerSlot(*slot, a[5], int(count))) {
+                    err = "unknown item " + a[5];
+                    return false;
+                }
+                if (src.feedback) src.feedback(std::format("Replaced {} with {}", a[3], a[5]));
+                return true;
+            }
             if (a.size() < 8 || a.size() > 9 || a[0] != "replace" || a[1] != "block" || a[6] != "with" ||
                 !a[5].starts_with("container.")) {
                 err = "expected replace block <x> <y> <z> container.<slot> with <item> [count]";

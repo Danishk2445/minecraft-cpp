@@ -39,8 +39,9 @@ public:
     }
     void resetTransform() { transformed_ = false; }
 
-    // Alpha blending, or vanilla's crosshair blend that inverts what is underneath.
-    enum class Blend : uint8_t { Alpha, Invert };
+    // Alpha blending, vanilla's crosshair blend that inverts what is underneath, or the
+    // vignette's that darkens it by the source color (ZERO, ONE_MINUS_SRC_COLOR).
+    enum class Blend : uint8_t { Alpha, Invert, Darken };
     void setBlend(Blend blend);
 
     int scale() const { return scale_; }
@@ -54,6 +55,7 @@ private:
     };
     void quad(const glm::vec2 (&p)[4], float u0, float v0, float u1, float v1, uint32_t argb);
     void use(const Texture& texture);
+    void applyBlend();
 
     Shader shader_;
     Texture white_;

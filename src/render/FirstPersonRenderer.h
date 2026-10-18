@@ -15,15 +15,19 @@ class EntityRenderer;
 class Player;
 struct Item;
 
+// Vanilla GameRenderer.bobView: walking sways the view side to side and dips it.
+glm::mat4 viewBob(const Player& player, float partialTick);
+
 class FirstPersonRenderer {
 public:
     FirstPersonRenderer();
     // 20 Hz: the equip animation (vanilla ItemInHandRenderer.tick).
     void tick(const Player& player);
     // After the world: clears depth and draws the hands with their own projection
-    // (vanilla renderItemInHand). The lightmap must be bound to texture unit 1.
+    // (vanilla renderItemInHand), swayed by `view` (the camera's hurt tilt and bob). The
+    // lightmap must be bound to texture unit 1.
     void render(EntityRenderer& entities, const ClientAssets& assets, const Player& player, glm::ivec2 viewport,
-                float partialTick, glm::vec2 light);
+                float partialTick, glm::vec2 light, const glm::mat4& view = glm::mat4(1.0f));
 
 private:
     // The items shown in each hand; they change once the hand has dipped out of view.

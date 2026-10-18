@@ -10,6 +10,7 @@ struct Camera {
     float yaw = 0.0f;   // degrees
     float pitch = 0.0f; // degrees, clamped to [-90, 90]
     float roll = 0.0f;  // degrees about the view axis (vanilla bobHurt: hurt and death tilt)
+    glm::mat4 bob{1.0f}; // view-space sway after the roll (vanilla bobView)
     float fov = 70.0f;  // vertical, degrees
     float nearPlane = 0.05f;
     float farPlane = 1024.0f;

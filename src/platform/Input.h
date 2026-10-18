@@ -7,6 +7,8 @@
 
 #include <glm/glm.hpp>
 
+#include "game/KeyBindings.h"
+
 namespace mc {
 
 class Input {
@@ -28,6 +30,11 @@ public:
     bool mousePressed(int button) const;
     bool mouseReleased(int button) const;
     int mods() const { return mods_; }
+    // A bound key or mouse button: held, or went down this frame.
+    bool down(const InputKey& k) const { return k.type == InputKey::Type::Mouse ? mouseDown(k.code) : keyDown(k.code); }
+    bool pressed(const InputKey& k) const {
+        return k.type == InputKey::Type::Mouse ? mousePressed(k.code) : keyPressed(k.code);
+    }
 
     glm::dvec2 cursor() const { return cursor_; }
     glm::dvec2 mouseDelta() const { return delta_; }
@@ -46,9 +53,10 @@ public:
     void onChar(unsigned codepoint);
     void onFocusLost();
 
+    static constexpr int kButtons = 8;
+
 private:
     static constexpr int kKeys = 512;
-    static constexpr int kButtons = 8;
     std::array<bool, kKeys> down_{};
     std::array<bool, kKeys> pressed_{};
     std::array<bool, kKeys> released_{};

@@ -1,6 +1,8 @@
 #include "render/ChunkRenderer.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 
 #include "core/Log.h"
 #include "gfx/Frustum.h"
@@ -10,6 +12,12 @@ namespace mc {
 namespace {
 
 constexpr uint32_t kPageVertices = 4u << 20; // 64 MB of 16-byte vertices per page
+
+double nowSeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+constexpr int kOcclusionInterval = 100; // ms between searches while only distant sections change
 
 void streamUpload(unsigned& buffer, const void* data, size_t bytes) {
     if (!buffer) glCreateBuffers(1, &buffer);
@@ -125,7 +133,10 @@ void ChunkRenderer::release(Alloc& a) {
 }
 
 void ChunkRenderer::upload(ChunkPos chunk, const SectionMesh& mesh) {
-    SectionGpu& sg = chunks_[chunk].sections[size_t(mesh.section)];
+    ChunkGpu& cg = chunks_[chunk];
+    cg.visibility[size_t(mesh.section)] = mesh.visibility;
+    SectionGpu& sg = cg.sections[size_t(mesh.section)];
+    occlusionChanged(chunk);
     sg.translucent = mesh.layers[size_t(RenderLayer::Translucent)];
     sg.centers = mesh.translucentCenters;
     for (int l = 0; l < kLayerCount; ++l) {
@@ -165,6 +176,13 @@ void ChunkRenderer::dropChunk(ChunkPos chunk) {
     for (auto& s : it->second.sections)
         for (auto& a : s.layers) release(a);
     chunks_.erase(it);
+    occlusionChanged(chunk);
+    occlusionUrgent_ = true; // the search's results point into the chunk
+}
+
+void ChunkRenderer::occlusionChanged(ChunkPos chunk) {
+    occlusionDirty_ = true;
+    if (lastCameraChunk_ && chunk.chebyshev(*lastCameraChunk_) <= 1) occlusionUrgent_ = true;
 }
 
 void ChunkRenderer::clear() {
@@ -196,26 +214,62 @@ void ChunkRenderer::collectVisible(const Camera& camera, const glm::mat4& viewPr
     visible_.clear();
     const Frustum frustum = Frustum::fromMatrix(viewProj);
     const double maxDist = renderDistance * 16.0 + 16.0;
+    const auto consider = [&](ChunkPos pos, int si, const SectionGpu& sg) {
+        const glm::vec3 origin(float(pos.minBlockX() - camera.position.x), float(sectionMinY(si) - camera.position.y),
+                               float(pos.minBlockZ() - camera.position.z));
+        if (!frustum.intersects(origin - glm::vec3(1.0f), origin + glm::vec3(17.0f))) {
+            ++stats_.culled;
+            return;
+        }
+        ++stats_.drawn;
+        const glm::vec3 c = origin + glm::vec3(8.0f);
+        visible_.push_back({&sg, origin, glm::dot(c, c)});
+    };
+    const auto hasGeometry = [](const SectionGpu& sg) {
+        for (const auto& a : sg.layers)
+            if (a.count > 0) return true;
+        return false;
+    };
     for (const auto& [pos, cg] : chunks_) {
         const double cx = pos.minBlockX() + 8.0 - camera.position.x, cz = pos.minBlockZ() + 8.0 - camera.position.z;
         if (cx * cx + cz * cz > maxDist * maxDist) continue;
-        for (int si = 0; si < kSectionCount; ++si) {
-            const SectionGpu& sg = cg.sections[size_t(si)];
-            bool any = false;
-            for (const auto& a : sg.layers) any |= a.count > 0;
-            if (!any) continue;
-            ++stats_.sections;
-            const glm::vec3 origin(float(pos.minBlockX() - camera.position.x), float(sectionMinY(si) - camera.position.y),
-                                   float(pos.minBlockZ() - camera.position.z));
-            if (!frustum.intersects(origin - glm::vec3(1.0f), origin + glm::vec3(17.0f))) {
-                ++stats_.culled;
-                continue;
-            }
-            ++stats_.drawn;
-            const glm::vec3 c = origin + glm::vec3(8.0f);
-            visible_.push_back({&sg, origin, glm::dot(c, c)});
-        }
+        for (const SectionGpu& sg : cg.sections) stats_.sections += hasGeometry(sg);
     }
+    if (!occlusionCulling) {
+        lastOcclusionCulling_ = false;
+        for (const auto& [pos, cg] : chunks_) {
+            const double cx = pos.minBlockX() + 8.0 - camera.position.x, cz = pos.minBlockZ() + 8.0 - camera.position.z;
+            if (cx * cx + cz * cz > maxDist * maxDist) continue;
+            for (int si = 0; si < kSectionCount; ++si)
+                if (hasGeometry(cg.sections[size_t(si)])) consider(pos, si, cg.sections[size_t(si)]);
+        }
+        return;
+    }
+    // Rerun the search when the camera enters another section, when sections near it
+    // change (a block broken into a cave), and now and then as distant chunks arrive.
+    const BlockPos cb = BlockPos::containing(camera.position);
+    const glm::ivec3 camSection(cb.x >> 4, int(std::floor((camera.position.y - kWorldMinY) / 16.0)), cb.z >> 4);
+    lastCameraChunk_ = ChunkPos(camSection.x, camSection.z);
+    const double now = nowSeconds();
+    if (camSection != occlusionCameraSection_ || renderDistance != occlusionRenderDistance_ || !lastOcclusionCulling_ ||
+        occlusionUrgent_ || (occlusionDirty_ && (now - lastOcclusionTime_) * 1000.0 >= kOcclusionInterval)) {
+        occlusionColumns_.clear();
+        for (const auto& [pos, cg] : chunks_) occlusionColumns_.emplace_back(pos, &cg);
+        occlusion_.search(camera.position, renderDistance, occlusionColumns_);
+        occlusionCameraSection_ = camSection;
+        occlusionRenderDistance_ = renderDistance;
+        lastOcclusionCulling_ = true;
+        occlusionDirty_ = occlusionUrgent_ = false;
+        lastOcclusionTime_ = now;
+    }
+    int reachedWithGeometry = 0;
+    for (const SectionOcclusionGraph::Reached& r : occlusion_.reached()) {
+        const SectionGpu& sg = static_cast<const ChunkGpu*>(r.column)->sections[size_t(r.index)];
+        if (!hasGeometry(sg)) continue;
+        ++reachedWithGeometry;
+        consider(r.chunk, r.index, sg);
+    }
+    stats_.occluded = std::max(0, stats_.sections - reachedWithGeometry);
 }
 
 void ChunkRenderer::drawLayers(int firstLayer, int lastLayer, const glm::mat4& viewProj, const Texture& atlas,

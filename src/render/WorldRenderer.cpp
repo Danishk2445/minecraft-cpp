@@ -122,18 +122,29 @@ void WorldRenderer::render(const Camera& camera, glm::ivec2 viewport, int render
     fog.color = glm::vec4(env_.fogColor, 1.0f);
     fog.distances = glm::vec4(env_.fogEnvStart, env_.fogEnvEnd, env_.fogRdStart, env_.fogRdEnd);
     lightmap_.bind(1);
+    // Vanilla LevelRenderer.setupRender: no cave culling for a spectator inside a solid block.
+    chunks_.occlusionCulling =
+        caveCulling && !(view.spectator && (registry_.info(level.getBlock(BlockPos::containing(camera.position))).flags & kOpaqueCube));
     chunks_.renderOpaque(camera, viewProj, assets_.blockAtlasTexture(), renderDistance, fog);
     entities_.render(viewProj, fog);
     chunks_.renderTranslucent(camera, viewProj, assets_.blockAtlasTexture(), fog);
     if (clouds != CloudMode::Off) sky_.renderClouds(camera, aspect, env_, double(level.gameTime()) + partialTick, clouds == CloudMode::Fancy);
 }
 
-void WorldRenderer::renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick) {
+void WorldRenderer::setMipmapLevels(int levels) {
+    levels = std::clamp(levels, 0, ClientAssets::kBlockMipLevels);
+    if (levels == mipmapLevels_) return;
+    mipmapLevels_ = levels;
+    glTextureParameteri(assets_.blockAtlasTexture().id(), GL_TEXTURE_MAX_LEVEL, levels);
+}
+
+void WorldRenderer::renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick,
+                                const glm::mat4& view) {
     // Lit at the eyes, like the player model.
     const glm::dvec3 eye = glm::mix(player.oldPos, player.pos, double(partialTick)) + glm::dvec3(0.0, player.eyeHeight(), 0.0);
     const uint8_t l = level.lightAt(BlockPos::containing(eye));
     lightmap_.bind(1);
-    hands_.render(entities_, assets_, player, viewport, partialTick, glm::vec2(float(l & 15), float(l >> 4)));
+    hands_.render(entities_, assets_, player, viewport, partialTick, glm::vec2(float(l & 15), float(l >> 4)), view);
 }
 
 void WorldRenderer::renderParticles(const ParticleSystem& particles, const Level& level, const Camera& camera,
@@ -154,6 +165,7 @@ void WorldRenderer::renderWeather(const Level& level, const Camera& camera, glm:
                                   float partialTick) {
     const float aspect = float(viewport.x) / float(std::max(viewport.y, 1));
     lightmap_.bind(1);
+    weather_.radius = fancyGraphics ? 10 : 5;
     weather_.render(level, camera, camera.projection(aspect) * camera.view(), ticks, partialTick, glm::vec4(env_.fogColor, 1.0f),
                     glm::vec4(env_.fogEnvStart, env_.fogEnvEnd, env_.fogRdStart, env_.fogRdEnd));
 }

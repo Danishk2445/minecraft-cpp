@@ -25,6 +25,7 @@ public:
     // The lightmap must be bound to texture unit 1.
     void render(const Level& level, const Camera& camera, const glm::mat4& viewProj, int64_t ticks, float partialTick,
                 const glm::vec4& fogColor, const glm::vec4& fogDistances);
+    int radius = 10; // blocks around the camera: vanilla's 10 with Fancy graphics, 5 with Fast
 
 private:
     struct Vertex {

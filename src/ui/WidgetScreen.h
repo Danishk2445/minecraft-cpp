@@ -4,6 +4,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,9 @@ public:
     bool keyPressed(int key, int scancode, int mods) override;
     bool charTyped(char32_t c) override;
     const std::vector<std::unique_ptr<Widget>>& widgets() const { return widgets_; }
+    // The part of the screen a widget shows in (x0, y0, x1, y1), for widgets in a scrolling
+    // list: drawn clipped to it and clicked only inside it. None for the rest.
+    virtual std::optional<glm::vec4> clipOf(const Widget&) const { return std::nullopt; }
 
 protected:
     template <class W, class... Args>

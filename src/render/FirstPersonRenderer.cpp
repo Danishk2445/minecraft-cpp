@@ -44,15 +44,25 @@ void FirstPersonRenderer::tick(const Player& player) {
            1.0f);
 }
 
+glm::mat4 viewBob(const Player& player, float pt) {
+    const float delta = player.walkDist - player.walkDistO;
+    const float g = -(player.walkDist + delta * pt); // vanilla leads by a tick here
+    const float h = player.oBob + (player.bob - player.oBob) * pt;
+    glm::mat4 m = glm::translate(glm::mat4(1.0f), glm::vec3(std::sin(g * kPi) * h * 0.5f,
+                                                            -std::abs(std::cos(g * kPi) * h), 0.0f));
+    m = rotZ(m, std::sin(g * kPi) * h * 3.0f);
+    return rotX(m, std::abs(std::cos(g * kPi - 0.2f) * h) * 5.0f);
+}
+
 void FirstPersonRenderer::render(EntityRenderer& entities, const ClientAssets& assets, const Player& player,
-                                 glm::ivec2 viewport, float pt, glm::vec2 light) {
+                                 glm::ivec2 viewport, float pt, glm::vec2 light, const glm::mat4& view) {
     if (player.mode() == GameMode::Spectator) return;
     entities.begin(glm::dvec3(0.0)); // view space: the camera at the origin, looking down -z
     const float swing = player.attackAnim(pt);
     // renderHandsWithItems: the hands trail the view by a tenth of the recent turn.
     const float xBob = player.xBobO + (player.xBob - player.xBobO) * pt;
     const float yBob = player.yBobO + (player.yBob - player.yBobO) * pt;
-    glm::mat4 base = rotX(glm::mat4(1.0f), (player.pitch - xBob) * 0.1f);
+    glm::mat4 base = rotX(view, (player.pitch - xBob) * 0.1f);
     base = rotY(base, (player.yaw - yBob) * 0.1f);
 
     for (const bool left : {false, true}) {

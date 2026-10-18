@@ -80,7 +80,8 @@ public:
     void textTooltip(std::string_view text, float mouseX, float mouseY) {
         tooltip(font_.split(text, 170.0f), mouseX, mouseY, 0xFFFFFFFF);
     }
-    // Clips drawing to a GUI rectangle (vanilla enableScissor; not nested).
+    // Clips drawing to a GUI rectangle until the matching disableScissor (vanilla
+    // enableScissor): nested ones clip to where they overlap the ones around them.
     void enableScissor(float x0, float y0, float x1, float y1);
     void disableScissor();
     // The player in a GUI box, turned toward the mouse (vanilla renderEntityInInventoryFollowsMouse).
@@ -107,6 +108,8 @@ private:
     MenuBlur blur_;
     ItemModelContext itemContext_;
     glm::ivec2 framebuffer_{0};
+    std::vector<glm::vec4> scissors_; // x0, y0, x1, y1 in GUI pixels, innermost last
+    void applyScissor() const;
     std::unordered_map<std::string, std::unique_ptr<Texture>> fileTextures_;
     std::unique_ptr<ModelDefinition> playerRest_, playerPosed_;
 };

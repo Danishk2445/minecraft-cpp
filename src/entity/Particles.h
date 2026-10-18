@@ -6,12 +6,15 @@
 
 #include <array>
 #include <string_view>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
 
 #include "core/Rng.h"
 #include "world/block/BlockGetter.h"
+
+#include "game/Options.h"
 
 namespace mc {
 
@@ -71,6 +74,12 @@ struct Particle {
 class ParticleSystem {
 public:
     static constexpr size_t kMax = 16384; // vanilla's per-type limit
+
+    // Vanilla LevelRenderer.addParticleInternal: with a camera, add() skips particles more
+    // than 32 blocks from it, a third of them on Decreased and all on Minimal. Block
+    // debris and item pieces always show.
+    ParticleMode mode = ParticleMode::All;
+    std::optional<glm::dvec3> camera;
 
     // The atlas sprites of each type (from particles/*.json); types without any are skipped.
     void setSprites(ParticleType type, std::vector<int> sprites);

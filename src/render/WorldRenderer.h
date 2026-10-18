@@ -41,8 +41,9 @@ public:
     // entities() since its begin(), and clouds.
     void render(const Camera& camera, glm::ivec2 viewport, int renderDistance, const Level& level, float partialTick);
     EntityRenderer& entities() { return entities_; }
-    // First-person hands over the finished world (call after render()).
-    void renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick);
+    // First-person hands over the finished world (call after render()), swayed by `view`.
+    void renderHands(const Player& player, const Level& level, glm::ivec2 viewport, float partialTick,
+                     const glm::mat4& view = glm::mat4(1.0f));
     void tickHands(const Player& player) { hands_.tick(player); }
     const EnvironmentState& environment() const { return env_; }
     // Particles over the world just drawn (uses its lightmap and camera).
@@ -52,6 +53,10 @@ public:
     void renderWeather(const Level& level, const Camera& camera, glm::ivec2 viewport, int64_t ticks, float partialTick);
     float gamma = 0.5f; // the Brightness option (0 = Moody, 1 = Bright)
     CloudMode clouds = CloudMode::Fancy;
+    bool caveCulling = true; // vanilla smartCull (--cave-culling off for comparisons)
+    bool fancyGraphics = true; // Fast: rain and snow within 5 blocks instead of 10
+    // The Mipmap Levels option: the block atlas samples levels 0..n.
+    void setMipmapLevels(int levels);
     // What the camera sees beyond the level itself this frame: lightning's flash, the
     // fluid around the camera and the eyes' adjustment to water (set before render()).
     struct View {
@@ -89,6 +94,7 @@ private:
     BlockEntityMeshes blockEntities_;
     std::shared_ptr<int> alive_ = std::make_shared<int>(0);
     int inFlight_ = 0;
+    int mipmapLevels_ = -1;
     uint64_t nextSeq_ = 1;
     // Latest submitted mesh sequence per chunk section; older results are discarded.
     std::unordered_map<ChunkPos, std::array<uint64_t, kSectionCount>> latest_;

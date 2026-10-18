@@ -52,8 +52,13 @@ public:
 
     struct FrameStats {
         int sections = 0, drawn = 0, culled = 0, draws = 0;
+        int occluded = 0; // sections with geometry that the occlusion search didn't reach
         size_t vertices = 0;
     };
+    // Vanilla smartCull: draw only the sections the occlusion search reaches from the
+    // camera through faces that see each other (cave culling). Off draws every section in
+    // the frustum (vanilla turns it off for a spectator inside an opaque block).
+    bool occlusionCulling = true;
     struct Fog {
         glm::vec4 color{1.0f};
         glm::vec4 distances{1e9f, 1e9f + 1, 1e9f, 1e9f + 1}; // envStart, envEnd, rdStart, rdEnd
@@ -65,6 +70,8 @@ public:
     // Draws the translucent layer (after the opaque layers and entities).
     void renderTranslucent(const Camera& camera, const glm::mat4& viewProj, const Texture& atlas, const Fog& fog);
     const FrameStats& stats() const { return stats_; }
+    // The occlusion search has run since the last section upload (or isn't in use).
+    bool occlusionSettled() const { return !lastOcclusionCulling_ || !(occlusionDirty_ || occlusionUrgent_); }
     size_t gpuBytes() const;
     size_t sectionCount() const;
 
@@ -80,7 +87,8 @@ private:
         std::vector<TerrainVertex> translucent;
         std::vector<glm::vec3> centers;
     };
-    struct ChunkGpu {
+    // The occlusion search reads its sections' visibility (ColumnVisibility).
+    struct ChunkGpu : ColumnVisibility {
         std::array<SectionGpu, kSectionCount> sections;
     };
     struct Page {
@@ -89,6 +97,8 @@ private:
     };
 
     void collectVisible(const Camera& camera, const glm::mat4& viewProj, int renderDistance);
+    // A section changed: the occlusion search reruns (at once when it is near the camera).
+    void occlusionChanged(ChunkPos chunk);
     void drawLayers(int firstLayer, int lastLayer, const glm::mat4& viewProj, const Texture& atlas, const Fog& fog);
     Alloc allocate(uint32_t vertices);
     void release(Alloc& a);
@@ -114,6 +124,15 @@ private:
         float distance2;
     };
     std::vector<Visible> visible_;
+    // The occlusion search, its input and when to rerun it.
+    SectionOcclusionGraph occlusion_;
+    std::vector<std::pair<ChunkPos, const ColumnVisibility*>> occlusionColumns_;
+    bool occlusionDirty_ = true, occlusionUrgent_ = true;
+    bool lastOcclusionCulling_ = true;
+    glm::ivec3 occlusionCameraSection_{INT32_MIN};
+    int occlusionRenderDistance_ = -1;
+    std::optional<ChunkPos> lastCameraChunk_; // none before the first frame
+    double lastOcclusionTime_ = -1e9;
     std::vector<DrawCommand> commands_;
     std::vector<glm::vec3> offsets_;
     unsigned commandBuffer_ = 0, offsetBuffer_ = 0; // re-specified every draw (stream)

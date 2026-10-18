@@ -127,6 +127,28 @@ TEST_F(PhysicsFixture, WalkAndSprintSpeeds) {
     EXPECT_NEAR(p.pos.x, 0.5, 1e-6);
 }
 
+// M13 view bobbing (vanilla walkDist and bob): 0.6 per block walked; the bob eases to the
+// ground speed, capped at 0.1, and dies away in the air and standing still.
+TEST_F(PhysicsFixture, ViewBobbingFollowsTheWalk) {
+    TestWorld w(*registry);
+    w.floor(0, S("stone"), 200);
+    PlayerInput walk;
+    walk.forward = 1.0f;
+    Player p = standing(w);
+    const glm::dvec3 start = p.pos;
+    for (int i = 0; i < 40; ++i) p.tick(w, walk);
+    EXPECT_NEAR(p.walkDist, glm::distance(p.pos, start) * 0.6, 1e-3);
+    EXPECT_NEAR(p.bob, 0.1f, 1e-3f); // walking is 0.216 blocks a tick
+    EXPECT_NEAR(p.walkDist - p.walkDistO, 4.317 / 20.0 * 0.6, 0.01);
+    PlayerInput jump = walk;
+    jump.jump = true;
+    p.tick(w, jump);
+    for (int i = 0; i < 5; ++i) p.tick(w, walk);
+    EXPECT_LT(p.bob, 0.01f);
+    for (int i = 0; i < 40; ++i) p.tick(w, PlayerInput{});
+    EXPECT_LT(p.bob, 1e-4f);
+}
+
 TEST_F(PhysicsFixture, StepsOntoSlabsButNotFullBlocks) {
     TestWorld w(*registry);
     w.floor(0, S("stone"));
@@ -260,6 +282,29 @@ TEST_F(PhysicsFixture, BreakParticles) {
     ps.addBlockHit(*registry, S("stone"), {0, 1, 0}, Direction::Up, 0, 0xFFFFFF);
     ASSERT_EQ(ps.particles().size(), 1u);
     EXPECT_NEAR(ps.particles()[0].pos.y, 2.1, 1e-9);
+}
+
+// M13 Particles option (vanilla addParticleInternal): with a camera, nothing past 32 blocks,
+// a third dropped on Decreased, none on Minimal; block debris always shows.
+TEST_F(PhysicsFixture, ParticlesOptionThinsLevelParticles) {
+    ParticleSystem ps;
+    ps.setSprites(ParticleType::Smoke, {0});
+    ps.camera = glm::dvec3(0.0);
+    for (int i = 0; i < 300; ++i) ps.add(ParticleType::Smoke, {1.0, 1.0, 1.0});
+    EXPECT_EQ(ps.particles().size(), 300u);
+    ps.add(ParticleType::Smoke, {40.0, 0.0, 0.0}); // too far
+    EXPECT_EQ(ps.particles().size(), 300u);
+    ps.mode = ParticleMode::Decreased;
+    for (int i = 0; i < 300; ++i) ps.add(ParticleType::Smoke, {1.0, 1.0, 1.0});
+    const size_t decreased = ps.particles().size() - 300;
+    EXPECT_GT(decreased, 160u); // two in three
+    EXPECT_LT(decreased, 240u);
+    ps.mode = ParticleMode::Minimal;
+    const size_t before = ps.particles().size();
+    for (int i = 0; i < 100; ++i) ps.add(ParticleType::Smoke, {1.0, 1.0, 1.0});
+    EXPECT_EQ(ps.particles().size(), before);
+    ps.addBlockBreak(*registry, S("stone"), {0, 1, 0}, 0, 0xFFFFFF);
+    EXPECT_EQ(ps.particles().size(), before + 64u);
 }
 
 // Vanilla LivingEntity animation state: limb swing from movement, the body

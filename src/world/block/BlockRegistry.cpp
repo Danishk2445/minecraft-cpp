@@ -8,6 +8,7 @@
 
 #include "core/Json.h"
 #include "core/Log.h"
+#include "core/Rng.h"
 #include "resources/Atlas.h"
 #include "resources/BlockModels.h"
 #include "resources/ResourcePack.h"
@@ -538,6 +539,15 @@ bool BlockRegistry::build(const BlockModels& models, const Atlas& atlas, const s
         if (const Json* f = firstField(propRules, name, "burn_odds"); f && f->is_number())
             b.burnOdds = uint8_t(std::clamp(f->get<int>(), 0, 255));
         const Json* solidJ = firstField(propRules, name, "solid");
+        if (const Json* f = firstField(propRules, name, "offset"); f && f->is_string()) {
+            const std::string t = f->get<std::string>();
+            if (t == "xz") b.offsetType = OffsetType::XZ;
+            else if (t == "xyz") b.offsetType = OffsetType::XYZ;
+            else problems.push_back(std::format("{}: unknown offset type {}", b.id, t));
+        }
+        if (const Json* f = firstField(propRules, name, "max_horizontal_offset"); f && f->is_number())
+            b.maxHorizontalOffset = f->get<float>();
+        if (const Json* f = firstField(propRules, name, "offset_shapes"); f && f->is_boolean()) b.offsetShapes = f->get<bool>();
         const bool liquid = b.className == "liquid";
         const bool waterPlant = b.className == "water_plant" || b.className == "tall_water_plant" ||
                                 b.className == "kelp" || name == "bubble_column";
@@ -674,6 +684,23 @@ StateId BlockRegistry::withSlot(StateId s, size_t slot, int valueIndex) const {
     const Block& b = blockOf(s);
     const int cur = slotValue(s, slot);
     return StateId(int(s) + (valueIndex - cur) * int(b.strides[slot]));
+}
+
+glm::dvec3 blockOffset(OffsetType type, float maxHorizontal, float maxVertical, int x, int z) {
+    if (type == OffsetType::None) return glm::dvec3(0.0);
+    const int64_t l = positionSeed(x, 0, z);
+    // Float division, then double arithmetic, as in vanilla.
+    const auto nibble = [&](int shift) { return double(float((l >> shift) & 15) / 15.0f); };
+    const double h = double(maxHorizontal);
+    const double dx = std::clamp((nibble(0) - 0.5) * 0.5, -h, h);
+    const double dz = std::clamp((nibble(8) - 0.5) * 0.5, -h, h);
+    const double dy = type == OffsetType::XYZ ? (nibble(4) - 1.0) * double(maxVertical) : 0.0;
+    return {dx, dy, dz};
+}
+
+glm::dvec3 BlockRegistry::modelOffset(StateId s, const BlockPos& p) const {
+    const Block& b = blockOf(s);
+    return blockOffset(b.offsetType, b.maxHorizontalOffset, b.maxVerticalOffset, p.x, p.z);
 }
 
 std::string_view BlockRegistry::value(StateId s, std::string_view prop) const {

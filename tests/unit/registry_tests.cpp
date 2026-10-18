@@ -239,3 +239,48 @@ TEST_F(RegistryFixture, Shapes) {
             EXPECT_LE(a.max.y, 1.5 + 1e-6) << r.describe(StateId(s));
         }
 }
+
+TEST(BlockOffset, MatchesVanillaGetOffset) {
+    // Values from vanilla's arithmetic (Java longs, float division) at a few columns.
+    auto expect = [](const glm::dvec3& got, double x, double y, double z) {
+        EXPECT_NEAR(got.x, x, 1e-9);
+        EXPECT_NEAR(got.y, y, 1e-9);
+        EXPECT_NEAR(got.z, z, 1e-9);
+    };
+    expect(blockOffset(OffsetType::XYZ, 0.25f, 0.2f, 0, 0), -0.25, -0.20000000298023224, -0.25);
+    expect(blockOffset(OffsetType::XYZ, 0.25f, 0.2f, 1, 0), 0.11666667461395264, -0.1333333333333333, -0.01666666567325592);
+    expect(blockOffset(OffsetType::XYZ, 0.25f, 0.2f, 10, -7), 0.016666680574417114, -0.026666665474573747,
+           0.050000011920928955);
+    expect(blockOffset(OffsetType::XZ, 0.25f, 0.2f, -123, 456), -0.14999999850988388, 0.0, 0.016666680574417114);
+    // Pointed dripstone's clamp.
+    expect(blockOffset(OffsetType::XZ, 0.125f, 0.2f, -123, 456), -0.125, 0.0, 0.016666680574417114);
+    expect(blockOffset(OffsetType::None, 0.25f, 0.2f, 1, 0), 0.0, 0.0, 0.0);
+}
+
+TEST_F(RegistryFixture, BlockOffsetsFromData) {
+    const BlockRegistry& r = *registry;
+    auto P = [&](const char* text) { return *r.parse(text); };
+    const BlockPos at(1, 70, 0), above(1, 200, 0);
+    // Grass sinks as well as shifting; the whole column shares one offset.
+    EXPECT_LT(r.modelOffset(P("short_grass"), at).y, 0.0);
+    EXPECT_EQ(r.modelOffset(P("short_grass"), at), r.modelOffset(P("short_grass"), above));
+    EXPECT_EQ(r.shapeOffset(P("short_grass"), at), glm::dvec3(0.0)); // its outline stays put
+    // Flowers move sideways only, outline included.
+    EXPECT_EQ(r.modelOffset(P("poppy"), at).y, 0.0);
+    EXPECT_NE(r.modelOffset(P("poppy"), at).x, 0.0);
+    EXPECT_EQ(r.shapeOffset(P("poppy"), at), r.modelOffset(P("poppy"), at));
+    // Both halves of a tall flower line up.
+    EXPECT_EQ(r.modelOffset(P("sunflower[half=lower]"), at), r.modelOffset(P("sunflower[half=upper]"), at.above()));
+    // Bamboo's and dripstone's limits; their collision moves too.
+    EXPECT_FLOAT_EQ(r.blockOf(P("bamboo")).maxHorizontalOffset, 0.45f);
+    EXPECT_FLOAT_EQ(r.blockOf(P("pointed_dripstone")).maxHorizontalOffset, 0.125f);
+    EXPECT_NE(r.shapeOffset(P("bamboo"), at), glm::dvec3(0.0));
+    for (int x = -20; x <= 20; ++x)
+        for (int z = -20; z <= 20; ++z) {
+            const glm::dvec3 o = r.shapeOffset(P("pointed_dripstone"), BlockPos(x, 0, z));
+            EXPECT_LE(std::abs(o.x), 0.125 + 1e-9);
+            EXPECT_LE(std::abs(o.z), 0.125 + 1e-9);
+        }
+    EXPECT_EQ(r.modelOffset(P("stone"), at), glm::dvec3(0.0));
+    EXPECT_EQ(r.modelOffset(P("oak_sapling"), at), glm::dvec3(0.0));
+}

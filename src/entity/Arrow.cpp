@@ -78,7 +78,8 @@ void Arrow::tick(Level& level) {
     const StateId here = level.getBlock(cell);
     if (!(level.registry().info(here).flags & kAir))
         for (const AABB& b : level.registry().collisionShape(here))
-            if (contains(b.moved(glm::dvec3(cell.x, cell.y, cell.z)), pos)) inGround = true;
+            if (contains(b.moved(glm::dvec3(cell.x, cell.y, cell.z) + level.registry().shapeOffset(here, cell)), pos))
+                inGround = true;
     if (shakeTime > 0) --shakeTime;
     if (inGround) {
         // The block gone: it drops; else it lies there for a minute.

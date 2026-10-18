@@ -36,7 +36,7 @@ void gatherBlockCollisions(const BlockGetter& level, const AABB& region, std::ve
             for (int x = x0; x <= x1; ++x) {
                 const StateId s = level.getBlock({x, y, z});
                 if (!(reg.info(s).flags & kHasCollision)) continue;
-                const glm::dvec3 o(x, y, z);
+                const glm::dvec3 o = glm::dvec3(x, y, z) + reg.shapeOffset(s, {x, y, z});
                 for (const AABB& b : reg.collisionShape(s)) {
                     const AABB w = b.moved(o);
                     if (w.intersects(region)) out.push_back(w);

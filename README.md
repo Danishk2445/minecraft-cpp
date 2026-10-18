@@ -59,6 +59,7 @@ More options:
 - `--fov-effects S` (scripted runs keep the FOV still unless asked: 0..1)
 - `--debug-overlay` (F3)
 - `--smooth-lighting off`
+- `--graphics fast|fancy|fabulous`, `--cave-culling off` (to compare), `--view-bobbing on` (scripted runs keep it off), `--freeze-textures` (animated textures stay on their first frame, for image diffs)
 
 Play options:
 - `--gamemode survival|creative|adventure|spectator` (default survival). Spectator flies through blocks, which the screenshot tests use.
@@ -81,7 +82,9 @@ Controls:
 - F5: third person from behind, then from the front, then back to first person
 - F11: fullscreen
 
-Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule <rule> [value]` (doDaylightCycle, keepInventory, naturalRegeneration, doFireTick, waterSourceConversion, lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread, doWeatherCycle, doMobSpawning, doMobLoot, mobGriefing, randomTickSpeed, snowAccumulationHeight), `/weather clear|rain|thunder [duration]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb|tnt|lightning_bolt|pig|cow|sheep|chicken|zombie|skeleton|creeper|spider [x y z] [nbt]` (mobs take vanilla keys such as `{NoAI:1b,Age:-24000,IsBaby:1b,Color:14,powered:1b,equipment:{mainhand:{id:"minecraft:bow"}}}`), `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill [@s|@e|@e[type=zombie]|@e[type=!player]]`, `/item replace block x y z container.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
+Options > Controls > Key Binds rebinds every key above but F1, F3 and Esc (click a key, then press a key or mouse button; Esc unbinds). Keys used twice show red.
+
+Commands (in chat, or `--exec "/cmd"`): `/help`, `/list`, `/me`, `/seed`, and with "Allow Commands" (always on for command-line worlds) `/say`, `/difficulty`, `/gamemode`, `/give <item> [count]`, `/clear [item] [count]`, `/tp`, `/teleport`, `/time`, `/gamerule <rule> [value]` (doDaylightCycle, keepInventory, naturalRegeneration, doFireTick, waterSourceConversion, lavaSourceConversion, doTileDrops, doEntityDrops, doVinesSpread, doWeatherCycle, doMobSpawning, doMobLoot, mobGriefing, randomTickSpeed, snowAccumulationHeight), `/weather clear|rain|thunder [duration]`, `/setblock x y z block[{nbt}]` (sign text as in vanilla: `oak_sign{front_text:{messages:["Hi","","",""]}}`), `/fill`, `/summon item|experience_orb|tnt|lightning_bolt|pig|cow|sheep|chicken|zombie|skeleton|creeper|spider [x y z] [nbt]` (mobs take vanilla keys such as `{NoAI:1b,Age:-24000,IsBaby:1b,Color:14,powered:1b,equipment:{mainhand:{id:"minecraft:bow"}}}`), `/experience add|set|query <target> [amount] [points|levels]` (and `/xp`; the target is always the player), `/kill [@s|@e|@e[type=zombie]|@e[type=!player]]`, `/item replace block x y z container.N with item [count]` and `/item replace entity @s armor.head|armor.chest|armor.legs|armor.feet|weapon.mainhand|weapon.offhand|hotbar.N|inventory.N with item [count]`, and `/assertblock x y z block` for test scripts (a mismatch makes the run exit with code 1).
 
 Survival: health, hunger and saturation, air, fall and fire damage, armor, death (the inventory and experience drop; Respawn or Title Screen) and respawning at the last bed. Tools mine at their tier's speed and only the right tier drops ores; tools and armor wear out. Drops and thrown items lie on the ground until picked up; experience orbs fly to the player. Crafting works in the inventory's 2×2 grid and at crafting tables (1,063 recipes), furnaces, smokers and blast furnaces smelt with fuel, and two worn tools of a kind repair each other. The Attack Indicator option (Video Settings) shows the attack cooldown under the crosshair or beside the hotbar.
 
@@ -89,13 +92,20 @@ Mobs: pigs, cows, sheep and chickens wander the grass, follow food, breed and gr
 
 The world lives: water and lava flow (two water sources make a third), sand and gravel fall, crops, saplings, cane, cactus, kelp, bamboo, vines and berries grow (bone meal hurries them), grass spreads, leaves decay without logs, farmland dries and gets trampled, ice and snow melt by torches and form in the cold, copper weathers, fire spreads and burns things away, TNT blows up (and lights other TNT), and the weather turns: rain, snow in cold biomes, and thunderstorms with lightning. Particles show smoke, flames, splashes, drips, falling leaves and explosions; under water and in lava the fog closes in.
 
-`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen NAME` opens a screen for screenshots: in a world once it is ready (`inventory`, `pause`, `options`, `video`, `chat`), or over the title (`title`, `worlds`, `create`, `options`, `video`). `--splash TEXT` fixes the title's splash.
+`--dump-model-sheets DIR` renders every block state into 32-px tiles and reports any missing textures. `--dump-item-icons DIR` renders every item's GUI icon into one sheet and reports empty or missing-texture icons. The GL tests use both. `--screen NAME` opens a screen for screenshots: in a world once it is ready (`inventory`, `pause`, `options`, `video`, `controls`, `keybinds`, `chat`), or over the title (`title`, `worlds`, `create`, `options`, `video`, `controls`, `keybinds`). `--splash TEXT` fixes the title's splash.
 
 World generation tools run without a window:
 - `--biome-map FILE [--map-size N] [--map-step N]` writes a shaded top-down biome map around `--pos` (default 0,0), then prints biome shares, the nearest location of each biome, and the highest point.
 - `--slice FILE [--map-size N]` writes a vertical cross-section (x/y plane at `--pos` z, default the spawn) and reports how much of the underground is cave air.
 - `--dump-column X,Z` prints climate, spline and density values down one column.
 - `--bench-gen N` generates and lights about N chunks through the pipeline and prints chunks per second (`--threads` sets the workers).
+
+`--bench-fly SECONDS [--bench-out FILE]` waits until the view around the start is meshed, then flies a fixed path east (20 blocks a second, weaving and looking around) as a spectator with no frame cap, and prints the average frame rate, the 1% and 0.1% lows, frame time percentiles, memory and chunk counts (JSON with `--bench-out`). Measure on a real GPU, for example `--bench-fly 30 --render-distance 16 --size 1920x1080 --seed 42`.
+
+`--script FILE` plays an action script once the world is ready, through the game's own controls and menus: `find BLOCK|#TAG [RADIUS]`, `goto`, `mine`, `craft ITEM|#TAG [COUNT]`, `place ITEM`, `smelt ITEM COUNT FUEL N`, `expect ITEM COUNT`, `repeat N`/`until ITEM COUNT` ... `end`, `log TEXT` (see `src/app/ActionScript.h`). With `--exit` the run waits for the script and exits with 1 if a step fails. `--tick-speed N` runs the game N times faster. The end-to-end test plays `tests/scripts/survival.txt`, from bare hands to a diamond:
+```sh
+./build/release/bin/minecraft --seed 5 --exec "/difficulty peaceful" --script tests/scripts/survival.txt --tick-speed 20 --exit
+```
 
 ## Tests
 ```sh
@@ -118,5 +128,6 @@ The GL tests need `xorg-server-xvfb` and Python with Pillow and NumPy. They rend
 | `src/app` | main loop, command-line harness and world tools |
 | `shaders/`, `data/` | GLSL sources and gameplay data |
 | `tests/unit` | GoogleTest unit tests (no GL) |
-| `tests/client` | client tests without a GL context: every menu laid out at GUI scales 1–4, screen behavior |
-| `tools/` | loader generator and screenshot checker |
+| `tests/client` | client tests without a GL context: every menu laid out at GUI scales 1–4, screen behavior, action script parsing |
+| `tests/scripts` | action scripts for the harness (the end-to-end survival run) |
+| `tools/` | loader generator, screenshot and log checkers |

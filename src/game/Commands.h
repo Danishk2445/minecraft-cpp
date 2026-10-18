@@ -47,6 +47,9 @@ struct CommandSource {
     // /item replace block: puts `count` of item `id` into a container's slot; false when the
     // block has no such slot or the item is unknown.
     std::function<bool(const BlockPos&, int slot, std::string_view id, int count)> replaceBlockSlot;
+    // The player's slot by vanilla inventory number (0-35 main, 36-39 armor feet to head,
+    // 40 offhand); "air" empties it.
+    std::function<bool(int slot, std::string_view id, int count)> replacePlayerSlot;
     // /kill: the player dies (vanilla genericKill, past invulnerability and armor).
     std::function<void()> kill;
     // Experience: adds points or levels (negative removes); the query reads them.

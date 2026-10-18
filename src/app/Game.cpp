@@ -10,6 +10,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include "app/Benchmark.h"
 #include "app/WorldSession.h"
 #include "core/Fs.h"
 #include "core/Log.h"
@@ -92,7 +93,12 @@ bool Game::init() {
     if (!err.empty()) log::warn("{}", err);
     if (cli.renderDistance) client_.options.renderDistance = *cli.renderDistance;
     if (cli.smoothLighting) client_.options.smoothLighting = *cli.smoothLighting;
+    if (cli.graphics) client_.options.graphics = GraphicsMode(*cli.graphics);
     if (cli.vsync) client_.options.vsync = *cli.vsync;
+    if (cli.benchFly > 0.0) {
+        if (!cli.vsync) client_.options.vsync = false; // limitFramerate() lets the benchmark run free too
+        bench_ = std::make_unique<FlyBenchmark>(cli.benchFly, cli.benchOut);
+    }
 
     Shader::setDirectory(cli.shaderDir);
     WindowConfig wc;
@@ -429,6 +435,7 @@ WorldLoadStatus Game::worldLoadStatus() const { return world_ ? world_->loadStat
 
 void Game::applyScreenChanges() {
     // The top of the stack changes; covered screens stay alive for going back.
+    const bool hadScreen = screen() != nullptr;
     std::vector<ScreenChange> changes;
     changes.swap(screenChanges_);
     for (ScreenChange& change : changes) {
@@ -458,10 +465,13 @@ void Game::applyScreenChanges() {
             guiButtonsDown_ = {};
         }
     }
+    client_.screenOpen = screen() != nullptr;
+    client_.chatOpen = dynamic_cast<ChatScreen*>(screen()) != nullptr;
+    // Back in the game: the mouse is grabbed again (vanilla grabMouse when the screen closes).
+    if (hadScreen && !screen() && world_) client_.window.setCursorCaptured(true);
 }
 
 void Game::applyPending() {
-    const bool hadScreen = screen() != nullptr;
     applyScreenChanges();
     if (leaveWorldPending_ && frameCount_ > leaveWorldFrame_) {
         leaveWorldPending_ = false;
@@ -491,10 +501,6 @@ void Game::applyPending() {
         meshedLogged_ = false;
     }
     applyScreenChanges();
-    client_.screenOpen = screen() != nullptr;
-    client_.chatOpen = dynamic_cast<ChatScreen*>(screen()) != nullptr;
-    // Back in the game: the mouse is grabbed again (vanilla grabMouse when the screen closes).
-    if (hadScreen && !screen() && world_) client_.window.setCursorCaptured(true);
 }
 
 std::unique_ptr<Screen> Game::makeScreen(const std::string& name) {
@@ -532,6 +538,8 @@ std::unique_ptr<Screen> Game::makeScreen(const std::string& name) {
     }
     if (name == "options") return std::make_unique<OptionsScreen>(ctx);
     if (name == "video") return std::make_unique<VideoSettingsScreen>(ctx);
+    if (name == "controls") return std::make_unique<ControlsScreen>(ctx);
+    if (name == "keybinds") return std::make_unique<KeyBindsScreen>(ctx);
     if (name == "chat" || name == "command") return std::make_unique<ChatScreen>(ctx, *client_.chat, name == "command" ? "/" : "");
     if (name == "inventory" && world_) {
         Player& player = world_->player();
@@ -566,11 +574,12 @@ int Game::run() {
         applyPending();
 
         const double now = Window::time();
-        const double frameDt = std::min(now - last, 0.25); // after a stall, skip ahead instead of catching up
+        const double rawDt = now - last;
+        const double frameDt = std::min(rawDt, 0.25); // after a stall, skip ahead instead of catching up
         last = now;
-        accumulator += frameDt;
+        accumulator += frameDt * client_.cli.tickSpeed;
         int ticksThisFrame = 0;
-        while (accumulator >= kTickSeconds && ticksThisFrame < 10) {
+        while (accumulator >= kTickSeconds && ticksThisFrame < 10 * client_.cli.tickSpeed) {
             tick();
             accumulator -= kTickSeconds;
             ++ticksThisFrame;
@@ -599,6 +608,7 @@ int Game::run() {
                 openHarnessScreen();
                 applyPending();
             }
+            if (bench_ && harnessStarted_ && bench_->frame(*world_, rawDt)) client_.window.setShouldClose(true);
         } else if (gallery_) {
             updateGallery(frameDt);
         }
@@ -617,8 +627,10 @@ int Game::run() {
 
 void Game::handleInput() {
     const Input& in = client_.window.input();
-    if (in.keyPressed(GLFW_KEY_F11)) client_.window.toggleFullscreen();
-    if (in.keyPressed(GLFW_KEY_F2)) screenshotRequested_ = true;
+    if (!(screen() && screen()->waitingForKey())) {
+        if (in.pressed(client_.options.keys[KeyAction::Fullscreen])) client_.window.toggleFullscreen();
+        if (in.pressed(client_.options.keys[KeyAction::Screenshot])) screenshotRequested_ = true;
+    }
     if (screen()) {
         handleScreenInput();
         return;
@@ -644,15 +656,15 @@ void Game::handleScreenInput() {
             s->close();
     }
     for (char32_t c : in.typedText()) s->charTyped(c);
-    for (int b = 0; b < 3; ++b)
+    for (int b = 0; b < Input::kButtons; ++b)
         if (in.mousePressed(b)) {
             s->mouseClicked(mouse, b, in.mods());
             guiButtonsDown_[size_t(b)] = true;
         }
     if (mouse != lastGuiMouse_)
-        for (int b = 0; b < 3; ++b)
+        for (int b = 0; b < Input::kButtons; ++b)
             if (guiButtonsDown_[size_t(b)] && in.mouseDown(b)) s->mouseDragged(mouse, b, mouse - lastGuiMouse_);
-    for (int b = 0; b < 3; ++b)
+    for (int b = 0; b < Input::kButtons; ++b)
         if (in.mouseReleased(b) && guiButtonsDown_[size_t(b)]) {
             s->mouseReleased(mouse, b, in.mods());
             guiButtonsDown_[size_t(b)] = false;
@@ -665,7 +677,7 @@ void Game::handleScreenInput() {
 void Game::tick() {
     ++tickCount_;
     client_.chatTicks = tickCount_;
-    client_.assets->tick();
+    if (!client_.cli.freezeTextures) client_.assets->tick();
     // Single player pauses under pause screens (vanilla Minecraft.pause).
     const bool paused = screen() && screen()->isPauseScreen();
     if (world_ && !paused) {
@@ -677,6 +689,8 @@ void Game::tick() {
         } else if (!request.empty()) {
             if (auto s = makeScreen(request)) setScreen(std::move(s));
         }
+        // Now, so the next tick sees it (several can run in one slow frame).
+        applyScreenChanges();
     }
     if (screen()) screen()->tick();
 }
@@ -757,13 +771,15 @@ void Game::afterFrame() {
     if (harnessDone_) return;
     const bool harness = !cli.screenshot.empty() || cli.exitAfter;
     if (!harness || frameCount_ < std::max(cli.frames, 1) || tickCount_ < cli.ticks) return;
+    if (world_ && world_->scriptRunning()) return;
     if (world_ && cli.worldRequested && (!cli.exec.empty() || cli.waitChunks || !cli.screen.empty())) {
         // Here --ticks counts from when the world was ready and the --exec commands ran, so
         // a slow start (sanitizers, llvmpipe) doesn't use them up.
         if (!harnessStarted_ || tickCount_ - harnessStartTick_ < cli.ticks) return;
-        if (cli.waitChunks && !world_->viewMeshed()) return;
+        if (cli.waitChunks && !world_->viewDrawn()) return;
     }
     harnessDone_ = true;
+    if (world_) log::info("Harness: {}", world_->statusLine());
     if (!cli.screenshot.empty()) saveScreenshot(cli.screenshot, fb.x, fb.y);
     if (cli.exitAfter) client_.window.setShouldClose(true);
 }
@@ -773,7 +789,7 @@ void Game::limitFramerate() {
     const Options& o = client_.options;
     const int limit = world_ ? (o.unlimitedFps() ? 0 : o.maxFps) : 60;
     const double now = Window::time();
-    if (limit > 0 && !o.vsync && client_.cli.screenshot.empty()) {
+    if (limit > 0 && !o.vsync && client_.cli.screenshot.empty() && !bench_) {
         const double frame = 1.0 / double(limit);
         if (now - lastFrameEnd_ < frame) std::this_thread::sleep_for(std::chrono::duration<double>(frame - (now - lastFrameEnd_)));
         lastFrameEnd_ = std::max(lastFrameEnd_ + frame, Window::time() - frame);

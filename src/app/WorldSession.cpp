@@ -1,4 +1,6 @@
 #include "app/WorldSession.h"
+#include "app/ActionScript.h"
+#include "core/Fs.h"
 
 #include <algorithm>
 #include <cmath>
@@ -42,6 +44,7 @@
 #include "ui/GuiGraphics.h"
 #include "ui/Hud.h"
 #include "ui/Screen.h"
+#include "ui/ScreenOverlays.h"
 #include "world/biome/Biome.h"
 #include "world/block/BlockBehavior.h"
 #include "world/block/BlockRegistry.h"
@@ -175,6 +178,7 @@ bool WorldSession::init() {
         player_->pos.y = std::round(player_->pos.y * 1e6) / 1e6;
     } else {
         player_->pos = generator->spawnPoint();
+        settleSpawn_ = true; // on top of what the decorated chunk holds, once it is ready
     }
     player_->oldPos = player_->pos;
     // A new player faces the spawn angle (0), level; the harness looks down a little by default.
@@ -185,7 +189,10 @@ bool WorldSession::init() {
                        : cli.perspective == "front" ? Perspective::ThirdPersonFront
                                                     : Perspective::FirstPerson;
     if (!worldDir_.empty())
-        if (auto saved = readPlayerFile(worldDir_)) loadPlayer(*player_, *saved, *client_.items);
+        if (auto saved = readPlayerFile(worldDir_)) {
+            loadPlayer(*player_, *saved, *client_.items);
+            settleSpawn_ = false;
+        }
     camera_.position = player_->eyePos();
     camera_.yaw = player_->yaw;
     camera_.pitch = player_->pitch;
@@ -200,10 +207,44 @@ bool WorldSession::init() {
     level_->difficulty = params_.difficulty;
     log::info("World: type {}, seed {}, render distance {}", generator->type(), params_.seed,
               client_.options.renderDistance);
+    if (params_.commandLine && !cli.script.empty()) {
+        const std::optional<std::string> text = fs::readText(cli.script);
+        std::string problem = text ? "" : "can't read the file";
+        auto program = text ? parseActionScript(*text, &problem) : std::nullopt;
+        if (!program) {
+            log::error("--script {}: {}", cli.script.string(), problem);
+            return false;
+        }
+        script_ = std::make_unique<ActionScript>(*this, std::move(*program));
+    }
     // Saved right away, so the world list shows it even if the game stops early.
     save(false);
     return true;
 }
+
+bool WorldSession::scriptRunning() const { return script_ && !script_->done(); }
+
+glm::dvec3 WorldSession::spawnOnTop() const {
+    // Vanilla PlayerRespawnLogic.getOverworldRespawnPos: on the highest block of the spawn
+    // column that entities stand on (tree tops too), unless a fluid comes first; else up
+    // from the generator's height to the first space the player fits.
+    const glm::dvec3 spawn = level_->generator().spawnPoint();
+    const int x = int(std::floor(spawn.x)), z = int(std::floor(spawn.z));
+    const BlockRegistry& registry = *client_.registry;
+    for (int y = kWorldMaxY; y >= kWorldMinY; --y) {
+        const StateInfo& info = registry.info(level_->getBlock({x, y, z}));
+        if (!info.fluid.empty()) break;
+        if (info.flags & kBlocksMotion) return {spawn.x, double(y + 1), spawn.z};
+    }
+    glm::dvec3 feet = spawn;
+    for (int y = int(spawn.y); y < kWorldMaxY; ++y) {
+        feet.y = double(y);
+        if (noCollision(*level_, player_->boxAt(feet))) break;
+    }
+    return feet;
+}
+
+bool WorldSession::screenOpen() const { return client_.screenOpen; }
 
 InventoryMenu& WorldSession::inventoryMenu() { return *inventoryMenu_; }
 
@@ -226,6 +267,7 @@ void WorldSession::save(bool wait) {
 bool WorldSession::viewReady() const { return level_->chunks().viewReady(); }
 
 bool WorldSession::viewMeshed() const { return level_->chunks().viewMeshed() && worldRenderer_->idle(); }
+bool WorldSession::viewDrawn() const { return viewMeshed() && worldRenderer_->chunkRenderer().occlusionSettled(); }
 
 float WorldSession::loadProgress() const {
     const auto st = level_->chunks().stats();
@@ -253,6 +295,7 @@ WorldLoadStatus WorldSession::loadStatus() const {
 
 void WorldSession::setPose(const glm::dvec3& eye, float yaw, float pitch) {
     player_->pos = player_->oldPos = eye - glm::dvec3(0.0, player_->eyeHeight(), 0.0);
+    player_->velocity = glm::dvec3(0.0);
     player_->setRotation(yaw, pitch);
     camera_.position = eye;
     camera_.yaw = yaw;
@@ -312,17 +355,19 @@ void WorldSession::frame(double) {
 
 std::string WorldSession::handleInput() {
     const Input& in = client_.window.input();
-    if (in.keyPressed(GLFW_KEY_F5)) perspective_ = Perspective((int(perspective_) + 1) % 3);
+    const KeyBindings& keys = client_.options.keys;
+    const auto pressed = [&](KeyAction a) { return in.pressed(keys[a]); };
+    if (pressed(KeyAction::TogglePerspective)) perspective_ = Perspective((int(perspective_) + 1) % 3);
     if (in.keyPressed(GLFW_KEY_F3)) showDebug = !showDebug;
     if (in.keyPressed(GLFW_KEY_ESCAPE)) return "pause";
-    if (in.keyPressed(GLFW_KEY_E) && player_->mode() != GameMode::Spectator) return "inventory";
-    if (in.keyPressed(GLFW_KEY_T)) return "chat";
-    if (in.keyPressed(GLFW_KEY_SLASH)) return "command";
-    // F swaps the main and off hand (not for spectators).
-    if (in.keyPressed(GLFW_KEY_F) && player_->mode() != GameMode::Spectator)
+    if (pressed(KeyAction::Inventory) && player_->mode() != GameMode::Spectator) return "inventory";
+    if (pressed(KeyAction::Chat)) return "chat";
+    if (pressed(KeyAction::Command)) return "command";
+    // The off hand swap (F) is not for spectators.
+    if (pressed(KeyAction::SwapOffhand) && player_->mode() != GameMode::Spectator)
         std::swap(player_->inventory.selectedStack(), player_->inventory.offhand);
     // Q throws one of the selected stack, Ctrl+Q all of it (vanilla keyDrop), swinging the arm.
-    if (in.keyPressed(GLFW_KEY_Q) && player_->mode() != GameMode::Spectator) {
+    if (pressed(KeyAction::Drop) && player_->mode() != GameMode::Spectator) {
         ItemStack& held = player_->inventory.selectedStack();
         if (!held.empty()) {
             player_->drop(held.split((in.mods() & GLFW_MOD_CONTROL) ? held.count : 1));
@@ -334,12 +379,12 @@ std::string WorldSession::handleInput() {
         return ""; // the capturing click is not an attack
     }
     if (!client_.window.cursorCaptured()) return "";
-    attackClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_LEFT);
-    useClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_RIGHT);
-    pickClicks_ += in.mousePressed(GLFW_MOUSE_BUTTON_MIDDLE);
+    attackClicks_ += pressed(KeyAction::Attack);
+    useClicks_ += pressed(KeyAction::Use);
+    pickClicks_ += pressed(KeyAction::PickItem);
     int& selected = player_->inventory.selected;
     for (int i = 0; i < 9; ++i)
-        if (in.keyPressed(GLFW_KEY_1 + i)) selected = i;
+        if (pressed(hotbarAction(i))) selected = i;
     if (const double scroll = in.scrollY(); scroll != 0.0) selected = ((selected - (scroll > 0 ? 1 : -1)) % 9 + 9) % 9;
     return "";
 }
@@ -419,6 +464,17 @@ void WorldSession::runCommand(const std::string& line, const std::function<void(
             return false;
         return true;
     };
+    src.replacePlayerSlot = [this](int slot, std::string_view id, int count) {
+        ItemStack& st = slot < 0 ? player_->inventory.selectedStack() : player_->inventory.slot(slot);
+        if (id == "air" || id == "minecraft:air") {
+            st = ItemStack{};
+            return true;
+        }
+        const Item* item = client_.items->find(id);
+        if (!item) return false;
+        st = ItemStack{item, std::clamp(count, 1, item->maxStack)};
+        return true;
+    };
     src.addExperience = [this](int amount, bool levels) {
         if (levels) player_->giveExperienceLevels(amount);
         else player_->giveExperiencePoints(amount);
@@ -442,6 +498,12 @@ void WorldSession::tick() {
     // The player waits (vanilla: frozen) until the chunk around it is ready.
     const ChunkPos here = ChunkPos::of(BlockPos::containing(player_->pos));
     if (player_->noPhysics || level_->chunks().isReady(here)) {
+        if (std::exchange(settleSpawn_, false)) player_->pos = player_->oldPos = spawnOnTop();
+        // A --script plays as the player would: its turns, keys and clicks come first.
+        if (script_ && client_.harnessRunning && !script_->done()) {
+            script_->tick();
+            if (script_->failed()) assertionFailed_ = true;
+        }
         // Vanilla handles the mouse buttons before the entities tick; the dead don't act.
         if (!player_->dead() && !player_->sleeping()) tickInteraction();
         player_->inRain = level_->isRainingAt(BlockPos::containing(player_->pos)) ||
@@ -461,6 +523,10 @@ void WorldSession::tick() {
         if (const auto landed = std::exchange(player_->landedOnFarmland, std::nullopt))
             sim::trampleFarmland(*level_, landed->first, landed->second);
         if (player_->dead() && !deathHandled_) die();
+        // Vanilla Gui.updateVignetteBrightness: 1% a tick toward the darkness at the eyes.
+        const float darkness = std::clamp(1.0f - eyeBrightness(), 0.0f, 1.0f);
+        vignette_ = vignetteSettled_ || !params_.commandLine ? vignette_ + (darkness - vignette_) * 0.01f : darkness;
+        vignetteSettled_ = true;
         checkOpenMenu();
         particles_.tick(*level_);
     } else {
@@ -558,6 +624,9 @@ void WorldSession::setupCamera(float partialTick) {
         f = std::sin(f * f * f * f * 3.1415927f);
         camera_.roll -= f * 14.0f;
     }
+    // Vanilla bobView (the View Bobbing option; harness runs keep still unless asked).
+    const bool bobbing = params_.commandLine ? client_.cli.viewBobbing.value_or(false) : client_.options.viewBobbing;
+    camera_.bob = bobbing ? viewBob(*player_, partialTick) : glm::mat4(1.0f);
     if (perspective_ == Perspective::FirstPerson) return;
     if (perspective_ == Perspective::ThirdPersonFront) {
         camera_.yaw += 180.0f;
@@ -571,16 +640,27 @@ void WorldSession::applyOptions() {
     const Options& o = client_.options;
     worldRenderer_->gamma = o.gamma;
     worldRenderer_->clouds = o.clouds;
+    worldRenderer_->caveCulling = client_.cli.caveCulling;
+    worldRenderer_->fancyGraphics = o.fancyGraphics();
     worldRenderer_->entities().shadows = o.entityShadows;
-    if (worldRenderer_->mesherOptions().smoothLighting != o.smoothLighting) {
-        worldRenderer_->mesherOptions().smoothLighting = o.smoothLighting;
-        level_->chunks().markAllMeshesDirty(); // old meshes stay up until the new ones arrive
+    // Options the chunk meshes bake in: changing one remeshes everything (the old meshes
+    // stay up until the new ones arrive).
+    MesherOptions& mesher = worldRenderer_->mesherOptions();
+    if (mesher.smoothLighting != o.smoothLighting || mesher.biomeBlend != o.biomeBlend ||
+        mesher.fastLeaves != !o.fancyGraphics()) {
+        mesher.smoothLighting = o.smoothLighting;
+        mesher.biomeBlend = o.biomeBlend;
+        mesher.fastLeaves = !o.fancyGraphics();
+        level_->chunks().markAllMeshesDirty();
     }
+    worldRenderer_->setMipmapLevels(o.mipmapLevels);
+    particles_.mode = o.particles;
 }
 
 void WorldSession::render(glm::ivec2 fb, float partialTick, const std::function<void()>& renderGui) {
     applyOptions();
     setupCamera(partialTick);
+    particles_.camera = camera_.position; // the Particles option and its 32-block cut-off
     updateTarget(partialTick);
     EntityRenderer& entities = worldRenderer_->entities();
     const glm::vec3 right = camera_.right();
@@ -618,10 +698,15 @@ void WorldSession::render(glm::ivec2 fb, float partialTick, const std::function<
     worldRenderer_->renderWeather(*level_, camera_, fb, tickCount_, partialTick);
     if (target_ && player_->mode() != GameMode::Spectator) {
         const int stage = breaking_.active && breaking_.pos == target_->pos ? int(breaking_.progress * 10.0f) - 1 : -1;
-        overlay_->render(camera_, fb, target_->pos, client_.registry->outlineShape(level_->getBlock(target_->pos)), stage);
+        const StateId s = level_->getBlock(target_->pos);
+        Shape shape = client_.registry->outlineShape(s);
+        const glm::dvec3 offset = client_.registry->shapeOffset(s, target_->pos);
+        for (AABB& b : shape) b = b.moved(offset);
+        overlay_->render(camera_, fb, target_->pos, shape, stage);
     }
     if (perspective_ == Perspective::FirstPerson && !player_->sleeping())
-        worldRenderer_->renderHands(*player_, *level_, fb, partialTick);
+        worldRenderer_->renderHands(*player_, *level_, fb, partialTick,
+                                    glm::rotate(glm::mat4(1.0f), glm::radians(camera_.roll), glm::vec3(0, 0, 1)) * camera_.bob);
     captureIcon(fb);
     renderHud(fb, partialTick, renderGui);
 }
@@ -1179,13 +1264,7 @@ void WorldSession::respawnPlayer() {
             message("block.minecraft.spawn.not_valid");
         }
     }
-    if (!atBed) {
-        const glm::dvec3 spawn = glm::dvec3(level_->generator().spawnPoint()) + glm::dvec3(0.5, 0.0, 0.5);
-        for (int y = int(spawn.y); y < kWorldMaxY; ++y) {
-            player_->pos = {spawn.x, double(y), spawn.z};
-            if (noCollision(*level_, player_->box())) break;
-        }
-    }
+    if (!atBed) player_->pos = spawnOnTop();
     player_->oldPos = player_->pos;
     const bool keep = level_->keepInventory;
     const int levels = player_->experienceLevel;
@@ -1302,10 +1381,12 @@ void WorldSession::submitEntities(float partialTick, int skyDarken) {
             out.submitText(glyphs, font.texture(), origin, m, light);
         }
     }
-    // Vanilla shouldRenderAtSqrDistance: 4 x box size x 64 blocks (items 64, orbs 128).
+    // Vanilla shouldRenderAtSqrDistance: 4 x box size x 64 blocks (items 64, orbs 128),
+    // scaled by the Entity Distance option.
+    const double viewScale = client_.options.entityDistance;
     auto near = [&](const Entity& e, double limit) {
         const glm::dvec3 d = e.pos - camera_.position;
-        return glm::dot(d, d) < limit * limit;
+        return glm::dot(d, d) < limit * limit * viewScale * viewScale;
     };
     for (const auto& e : level_->entities()) {
         if (e->removed) continue;
@@ -1341,15 +1422,20 @@ void WorldSession::submitEntities(float partialTick, int skyDarken) {
     }
 }
 
-bool WorldSession::controlDown(int key, std::string_view action) const {
-    if (!client_.screenOpen && client_.window.cursorCaptured() && client_.window.input().keyDown(key)) return true;
+bool WorldSession::controlDown(KeyAction action) const {
+    if (!client_.screenOpen && client_.window.cursorCaptured() &&
+        client_.window.input().down(client_.options.keys[action]))
+        return true;
+    if (!client_.screenOpen && script_ && script_->held(action)) return true;
+    // --hold names the action without vanilla's "key." ("forward", "attack").
     const auto& hold = client_.cli.hold;
-    return params_.commandLine && client_.harnessRunning && std::find(hold.begin(), hold.end(), action) != hold.end();
+    const std::string_view name = std::string_view(keyMappingInfo(action).name).substr(4);
+    return params_.commandLine && client_.harnessRunning && std::find(hold.begin(), hold.end(), name) != hold.end();
 }
 
 PlayerInput WorldSession::readPlayerInput() {
     PlayerInput in;
-    const bool jumpDown = controlDown(GLFW_KEY_SPACE, "jump");
+    const bool jumpDown = controlDown(KeyAction::Jump);
     // Vanilla double-tap: a second jump press within 7 ticks toggles creative flight.
     if (jumpTapTimer_ > 0) --jumpTapTimer_;
     if (jumpDown && !jumpWasDown_) {
@@ -1361,11 +1447,11 @@ PlayerInput WorldSession::readPlayerInput() {
         }
     }
     jumpWasDown_ = jumpDown;
-    in.forward = float(controlDown(GLFW_KEY_W, "forward")) - float(controlDown(GLFW_KEY_S, "back"));
-    in.strafe = float(controlDown(GLFW_KEY_A, "left")) - float(controlDown(GLFW_KEY_D, "right"));
+    in.forward = float(controlDown(KeyAction::Forward)) - float(controlDown(KeyAction::Back));
+    in.strafe = float(controlDown(KeyAction::Left)) - float(controlDown(KeyAction::Right));
     in.jump = jumpDown;
-    in.sneak = controlDown(GLFW_KEY_LEFT_SHIFT, "sneak");
-    in.sprint = controlDown(GLFW_KEY_LEFT_CONTROL, "sprint");
+    in.sneak = controlDown(KeyAction::Sneak);
+    in.sprint = controlDown(KeyAction::Sprint);
     // Eating slows to a fifth and stops sprinting (vanilla LocalPlayer.aiStep).
     if (player_->usingItem()) {
         in.forward *= 0.2f;
@@ -1608,10 +1694,8 @@ void WorldSession::tickInteraction() {
     if (!target_ || player_->mode() == GameMode::Spectator) breaking_.active = false;
     if (destroyDelay_ > 0) --destroyDelay_;
     if (useDelay_ > 0) --useDelay_;
-    const Input& in = client_.window.input();
-    const bool captured = client_.window.cursorCaptured() && !client_.screenOpen;
-    const bool attackHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_LEFT)) || controlDown(-1, "attack");
-    const bool useHeld = (captured && in.mouseDown(GLFW_MOUSE_BUTTON_RIGHT)) || controlDown(-1, "use");
+    const bool attackHeld = controlDown(KeyAction::Attack);
+    const bool useHeld = controlDown(KeyAction::Use);
     // Pick block (creative): the target's block into the selected slot.
     if (pickClicks_ > 0 && target_ && player_->mode() == GameMode::Creative)
         if (const Item* item = client_.items->forBlock(registry.blockOf(level_->getBlock(target_->pos))))
@@ -1820,6 +1904,27 @@ void WorldSession::renderHud(glm::ivec2 fb, float, const std::function<void()>& 
     hud_->attackReady = aimed && aimed->alive() && player_->attackStrengthScale(0.0f) >= 1.0f &&
                         player_->attackStrengthDelay() > 5.0f;
     hud_->hardcore = params_.hardcore;
+    // What covers the view: vanilla ScreenEffectRenderer in first person out of bed (a block
+    // the eyes are in, water, flames), then Gui.renderCameraOverlays (the vignette with
+    // Fancy graphics, a carved pumpkin's blur in first person).
+    ScreenOverlays overlays;
+    if (perspective_ == Perspective::FirstPerson && !player_->sleeping()) {
+        if (!player_->noPhysics) overlays.inWall = viewBlockingSprite();
+        if (player_->mode() != GameMode::Spectator) {
+            if (player_->eyeInWater(*level_)) {
+                overlays.underwater = true;
+                overlays.underwaterBrightness = eyeBrightness();
+                overlays.yaw = player_->yaw;
+                overlays.pitch = player_->pitch;
+            }
+            if (player_->onFire() && !player_->fireImmune())
+                overlays.fire = &client_.assets->blockAtlas().sprite("minecraft:block/fire_1");
+        }
+        const ItemStack& head = player_->inventory.armor[3];
+        overlays.pumpkin = !head.empty() && head.item->id == "minecraft:carved_pumpkin";
+    }
+    if (client_.options.fancyGraphics()) overlays.vignette = vignette_;
+    renderScreenOverlays(gui, overlays, client_.assets->blockAtlasTexture());
     hud_->render(gui, *player_, perspective_ == Perspective::FirstPerson && !client_.screenOpen, eyeInWater,
                  [&gui](const ItemStack& stack, float x, float y) {
                      gui.item(stack, x, y);
@@ -1832,13 +1937,35 @@ void WorldSession::renderHud(glm::ivec2 fb, float, const std::function<void()>& 
     gui.end();
 }
 
+const SpriteInfo* WorldSession::viewBlockingSprite() const {
+    const BlockRegistry& registry = *client_.registry;
+    const glm::dvec3 eye = player_->eyePos();
+    for (int i = 0; i < 8; ++i) {
+        const double x = player_->pos.x + (double(i & 1) - 0.5) * player_->width * 0.8;
+        const double y = eye.y + (double((i >> 1) & 1) - 0.5) * 0.1;
+        const double z = player_->pos.z + (double((i >> 2) & 1) - 0.5) * player_->width * 0.8;
+        const StateId s = level_->getBlock(BlockPos::containing(glm::dvec3(x, y, z)));
+        if (!(registry.info(s).flags & kOpaqueCube)) continue;
+        const auto choices = registry.modelChoices(s);
+        if (choices.empty() || choices[0]->models.empty()) continue;
+        return &client_.assets->blockAtlas().sprite(choices[0]->models[0]->particleSprite);
+    }
+    return nullptr;
+}
+
+float WorldSession::eyeBrightness() const {
+    const uint8_t packed = level_->lightAt(BlockPos::containing(player_->eyePos()));
+    return lightBrightness(std::max(int(packed >> 4) - level_->skyDarken(), int(packed & 15)));
+}
+
 void WorldSession::renderDebugOverlay(GuiGraphics& gui) {
     const BlockRegistry& registry = *client_.registry;
     std::vector<std::string> lines;
     lines.push_back("Minecraft 1.21.8 (minecraft-cpp)");
     const glm::dvec3& p = camera_.position;
     const auto& r = worldRenderer_->chunkRenderer().stats();
-    lines.push_back(std::format("{:.0f} fps  C: {}/{} sections, {} draws", fps, r.drawn, r.sections, r.draws));
+    lines.push_back(std::format("{:.0f} fps  C: {}/{} sections ({} occluded), {} draws", fps, r.drawn, r.sections,
+                                r.occluded, r.draws));
     const auto st = level_->chunks().stats();
     lines.push_back(std::format("Chunks: {} loaded, {} lit, {} ready, {} jobs", st.entries, st.lit, st.meshReady, st.inFlight));
     // Vanilla's entity line, and the mob caps (vanilla F3's "SC" spawn counts).
@@ -1909,8 +2036,9 @@ void WorldSession::renderDebugOverlay(GuiGraphics& gui) {
 std::string WorldSession::statusLine() const {
     const auto s = level_->chunks().stats();
     const auto& r = worldRenderer_->chunkRenderer().stats();
-    return std::format("chunks {} (lit {}, ready {}, jobs {})  |  sections {}/{}  |  {:.0f} MB VRAM  |  {:.1f} {:.1f} {:.1f}",
-                       s.entries, s.lit, s.meshReady, s.inFlight, r.drawn, r.sections,
+    return std::format("chunks {} (lit {}, ready {}, jobs {})  |  sections {}/{} ({} occluded), {} vertices  |  {:.0f} MB "
+                       "VRAM  |  {:.1f} {:.1f} {:.1f}",
+                       s.entries, s.lit, s.meshReady, s.inFlight, r.drawn, r.sections, r.occluded, r.vertices,
                        double(worldRenderer_->chunkRenderer().gpuBytes()) / (1 << 20), camera_.position.x,
                        camera_.position.y, camera_.position.z);
 }

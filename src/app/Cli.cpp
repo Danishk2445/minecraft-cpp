@@ -76,6 +76,12 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view) { return o.glDebug = true, true; }},
         {"--threads", "N", "worker threads (0 = run jobs inline on the main thread)",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.threads) && o.threads >= 0; }},
+        {"--script", "FILE",
+         "harness: play an action script (find, mine, craft, place, smelt, expect; see ActionScript.h) once the "
+         "world is ready; --exit waits for it, and a failed step exits with 1",
+         [](CliOptions& o, std::string_view v) { return o.script = v, !v.empty(); }},
+        {"--tick-speed", "N", "harness: run game ticks N times faster than real time (1-100)",
+         [](CliOptions& o, std::string_view v) { return parseInt(v, o.tickSpeed) && o.tickSpeed >= 1 && o.tickSpeed <= 100; }},
         {"--frames", "N", "harness: render at least N frames before --screenshot/--exit",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.frames) && o.frames >= 0; }},
         {"--ticks", "N", "harness: run at least N game ticks before --screenshot/--exit (with --exec, --wait-chunks or --screen: after the world is ready)",
@@ -113,7 +119,7 @@ const std::vector<Option>& options() {
              }
              return true;
          }},
-        {"--wait-chunks", "", "harness: before --screenshot/--exit, wait until every visible chunk is meshed",
+        {"--wait-chunks", "", "harness: before --screenshot/--exit, wait until every visible chunk is meshed and drawn",
          [](CliOptions& o, std::string_view) { return o.waitChunks = true, true; }},
         {"--time", "TICKS", "initial time of day (0 sunrise, 6000 noon, 13000 night, 18000 midnight)",
          [](CliOptions& o, std::string_view v) {
@@ -150,6 +156,13 @@ const std::vector<Option>& options() {
              o.fovEffects = float(f[0]);
              return true;
          }},
+        {"--view-bobbing", "on|off", "harness: view bobbing while walking (off by default for stable framing)",
+         [](CliOptions& o, std::string_view v) {
+             bool b = false;
+             if (!parseBool(v, b)) return false;
+             o.viewBobbing = b;
+             return true;
+         }},
         {"--debug-overlay", "", "show the F3 debug screen",
          [](CliOptions& o, std::string_view) { return o.debugOverlay = true, true; }},
         {"--smooth-lighting", "on|off", "smooth lighting and ambient occlusion (default on)",
@@ -159,6 +172,18 @@ const std::vector<Option>& options() {
              o.smoothLighting = on;
              return true;
          }},
+        {"--cave-culling", "on|off", "draw only the sections the occlusion search reaches (default on; off to compare)",
+         [](CliOptions& o, std::string_view v) { return parseBool(v, o.caveCulling); }},
+        {"--graphics", "MODE", "fast, fancy or fabulous (overrides the option)",
+         [](CliOptions& o, std::string_view v) {
+             if (v == "fast") o.graphics = 0;
+             else if (v == "fancy") o.graphics = 1;
+             else if (v == "fabulous") o.graphics = 2;
+             else return false;
+             return true;
+         }},
+        {"--freeze-textures", "", "harness: keep animated textures (water, lava, fire...) on their first frame, for image diffs",
+         [](CliOptions& o, std::string_view) { return o.freezeTextures = true, true; }},
         {"--gallery", "", "show the block gallery (every block state on a grid) instead of a world",
          [](CliOptions& o, std::string_view) { return o.gallery = true, true; }},
         {"--world", "NAME", "play the saved world <gamedir>/saves/NAME, creating it (with --seed and --world-type) if missing",
@@ -200,10 +225,10 @@ const std::vector<Option>& options() {
          }},
         {"--screen", "NAME",
          "harness: open a screen at start, or in a world once the spawn area is ready (inventory, pause, options, "
-         "video, chat, title, worlds, create)",
+         "video, controls, keybinds, chat, title, worlds, create)",
          [](CliOptions& o, std::string_view v) {
-             static constexpr std::string_view kScreens[] = {"inventory", "pause",  "options", "video",
-                                                             "chat",      "title",  "worlds",  "create"};
+             static constexpr std::string_view kScreens[] = {"inventory", "pause", "options", "video",  "controls",
+                                                             "keybinds",  "chat",  "title",   "worlds", "create"};
              if (std::find(std::begin(kScreens), std::end(kScreens), v) == std::end(kScreens)) return false;
              o.screen = v;
              if (v == "inventory" || v == "pause" || v == "chat") o.worldRequested = true;
@@ -253,6 +278,16 @@ const std::vector<Option>& options() {
          [](CliOptions& o, std::string_view) { return o.checkData = true, true; }},
         {"--bench-gen", "N", "generate and light about N chunks around --pos (or 0,0), print chunks per second, then exit",
          [](CliOptions& o, std::string_view v) { return parseInt(v, o.benchGen) && o.benchGen > 0; }},
+        {"--bench-fly", "SECONDS", "once the view is meshed, fly a fixed path east for SECONDS (spectator, no vsync or frame cap), print frame rate, lows and memory, then exit",
+         [](CliOptions& o, std::string_view v) {
+             std::array<double, 1> a{};
+             if (!parseFloats(v, a) || !(a[0] > 0.0)) return false;
+             o.benchFly = a[0];
+             o.gameMode = "spectator";
+             return true;
+         }},
+        {"--bench-out", "FILE", "with --bench-fly: also write the results to FILE as JSON",
+         [](CliOptions& o, std::string_view v) { return o.benchOut = v, !v.empty(); }},
         {"--golden-tiles", "FILE", "with --dump-model-sheets: also save the tiles of the states listed in FILE",
          [](CliOptions& o, std::string_view v) { return o.goldenTiles = v, true; }},
         {"--log-level", "LEVEL", "debug, info, warn or error",
@@ -303,7 +338,8 @@ std::optional<CliOptions> parseCli(int argc, char** argv, std::string& error) {
         // Options about a world open it directly instead of the title screen.
         static constexpr std::string_view kWorldOptions[] = {
             "--world", "--world-type", "--seed", "--pos", "--look", "--gamemode", "--exec", "--time",
-            "--freeze-time", "--weather", "--perspective", "--hold", "--wait-chunks", "--debug-overlay", "--gamerule"};
+            "--freeze-time", "--weather", "--perspective", "--hold", "--wait-chunks", "--debug-overlay", "--gamerule",
+            "--bench-fly", "--script"};
         if (std::find(std::begin(kWorldOptions), std::end(kWorldOptions), arg) != std::end(kWorldOptions))
             out.worldRequested = true;
     }

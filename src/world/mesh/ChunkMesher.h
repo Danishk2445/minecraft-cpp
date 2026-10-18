@@ -13,6 +13,7 @@
 
 #include "world/block/BlockRegistry.h"
 #include "world/chunk/ChunkSnapshot.h"
+#include "world/mesh/VisGraph.h"
 
 namespace mc {
 
@@ -38,6 +39,8 @@ struct SectionMesh {
     std::array<std::vector<TerrainVertex>, kLayerCount> layers;
     // Translucent quad centers (section-local), one per quad, for back-to-front sorting.
     std::vector<glm::vec3> translucentCenters;
+    // Which faces see each other through the section (all, for an empty one): cave culling.
+    VisibilitySet visibility;
     bool empty() const {
         for (const auto& l : layers)
             if (!l.empty()) return false;
@@ -62,6 +65,7 @@ struct FluidSprites {
 
 struct MesherOptions {
     bool smoothLighting = true;
+    bool fastLeaves = false; // Fast graphics: leaves are solid (their see-through texels opaque)
     BiomeColors colors;                  // used when `biomes` is null
     const BiomeRegistry* biomes = nullptr; // per-position biome colors
     int biomeBlend = 2;                  // blend radius in blocks (vanilla default 2 = 5x5)

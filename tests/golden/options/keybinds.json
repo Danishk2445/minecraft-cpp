@@ -1,0 +1,7 @@
+{
+  "keys": {
+    "key.jump": "key.keyboard.left.shift",
+    "key.forward": "key.keyboard.up",
+    "key.drop": "key.keyboard.unknown"
+  }
+}
